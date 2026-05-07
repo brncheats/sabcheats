@@ -1,0 +1,696 @@
+--[=[
+ d888b  db    db d888888b      .d888b.      db      db    db  .d8b.  
+88' Y8b 88    88   `88'        VP  `8D      88      88    88 d8' `8b 
+88      88    88    88            odD'      88      88    88 88ooo88 
+88  ooo 88    88    88          .88'        88      88    88 88~~~88 
+88. ~8~ 88b  d88   .88.        j88.         88booo. 88b  d88 88   88    @uniquadev
+ Y888P  ~Y8888P' Y888888P      888888D      Y88888P ~Y8888P' YP   YP  CONVERTER 
+]=]
+
+-- Instances: 52 | Scripts: 2 | Modules: 0 | Tags: 0
+local G2L = {};
+
+-- StarterGui.Visual
+G2L["1"] = Instance.new("ScreenGui", game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"));
+G2L["1"]["Name"] = [[Visual]];
+G2L["1"]["ZIndexBehavior"] = Enum.ZIndexBehavior.Sibling;
+
+
+-- StarterGui.Visual.Frame
+G2L["2"] = Instance.new("Frame", G2L["1"]);
+G2L["2"]["BorderSizePixel"] = 0;
+G2L["2"]["BackgroundColor3"] = Color3.fromRGB(32, 32, 32);
+G2L["2"]["Size"] = UDim2.new(0, 490, 0, 391);
+G2L["2"]["Position"] = UDim2.new(0.27782, 0, 0.22195, 0);
+G2L["2"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["2"]["BackgroundTransparency"] = 0.2;
+
+
+-- StarterGui.Visual.Frame.DragScript
+G2L["3"] = Instance.new("LocalScript", G2L["2"]);
+G2L["3"]["Name"] = [[DragScript]];
+
+
+-- StarterGui.Visual.Frame.Frame
+G2L["4"] = Instance.new("Frame", G2L["2"]);
+G2L["4"]["BorderSizePixel"] = 0;
+G2L["4"]["BackgroundColor3"] = Color3.fromRGB(46, 46, 46);
+G2L["4"]["Size"] = UDim2.new(0, 490, 0, 33);
+G2L["4"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+
+
+-- StarterGui.Visual.Frame.Frame.TextLabel
+G2L["5"] = Instance.new("TextLabel", G2L["4"]);
+G2L["5"]["BorderSizePixel"] = 0;
+G2L["5"]["TextSize"] = 25;
+G2L["5"]["TextXAlignment"] = Enum.TextXAlignment.Left;
+G2L["5"]["BackgroundColor3"] = Color3.fromRGB(255, 255, 255);
+G2L["5"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["5"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["5"]["BackgroundTransparency"] = 1;
+G2L["5"]["Size"] = UDim2.new(0, 219, 0, 33);
+G2L["5"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["5"]["Text"] = [[Xploits Brainrot Spawner - discord.gg/4hseHSkCEE]];
+G2L["5"]["Position"] = UDim2.new(0.0131, 0, 0, 0);
+
+
+-- StarterGui.Visual.Frame.Frame.TextLabel.UIPadding
+G2L["6"] = Instance.new("UIPadding", G2L["5"]);
+G2L["6"]["PaddingLeft"] = UDim.new(0, 5);
+
+
+-- StarterGui.Visual.Frame.Frame1
+G2L["7"] = Instance.new("Frame", G2L["2"]);
+G2L["7"]["BorderSizePixel"] = 0;
+G2L["7"]["BackgroundColor3"] = Color3.fromRGB(39, 39, 39);
+G2L["7"]["Size"] = UDim2.new(0, 490, 0, 358);
+G2L["7"]["Position"] = UDim2.new(0, 0, 0.0844, 0);
+G2L["7"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["7"]["Name"] = [[Frame1]];
+G2L["7"]["BackgroundTransparency"] = 0.2;
+
+
+-- StarterGui.Visual.Frame.Frame1.Handle
+G2L["8"] = Instance.new("LocalScript", G2L["7"]);
+G2L["8"]["Name"] = [[Handle]];
+
+
+-- StarterGui.Visual.Frame.Frame1.TextLabel
+G2L["9"] = Instance.new("TextLabel", G2L["7"]);
+G2L["9"]["BorderSizePixel"] = 0;
+G2L["9"]["TextSize"] = 25;
+G2L["9"]["BackgroundColor3"] = Color3.fromRGB(255, 255, 255);
+G2L["9"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["9"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["9"]["BackgroundTransparency"] = 1;
+G2L["9"]["Size"] = UDim2.new(0, 166, 0, 32);
+G2L["9"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["9"]["Text"] = [[Brainrot]];
+G2L["9"]["Position"] = UDim2.new(0.0131, 0, -0.00111, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.TextLabel
+G2L["a"] = Instance.new("TextLabel", G2L["7"]);
+G2L["a"]["BorderSizePixel"] = 0;
+G2L["a"]["TextSize"] = 25;
+G2L["a"]["BackgroundColor3"] = Color3.fromRGB(255, 255, 255);
+G2L["a"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["a"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["a"]["BackgroundTransparency"] = 1;
+G2L["a"]["Size"] = UDim2.new(0, 166, 0, 32);
+G2L["a"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["a"]["Text"] = [[Traits]];
+G2L["a"]["Position"] = UDim2.new(0.32993, 0, 0.00194, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.TextLabel
+G2L["b"] = Instance.new("TextLabel", G2L["7"]);
+G2L["b"]["BorderSizePixel"] = 0;
+G2L["b"]["TextSize"] = 25;
+G2L["b"]["BackgroundColor3"] = Color3.fromRGB(255, 255, 255);
+G2L["b"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["b"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["b"]["BackgroundTransparency"] = 1;
+G2L["b"]["Size"] = UDim2.new(0, 166, 0, 33);
+G2L["b"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["b"]["Text"] = [[Mutation]];
+G2L["b"]["Position"] = UDim2.new(0.65522, 0, -0.00111, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.ScrollingFrame
+G2L["c"] = Instance.new("ScrollingFrame", G2L["7"]);
+G2L["c"]["Active"] = true;
+G2L["c"]["BorderSizePixel"] = 0;
+G2L["c"]["BackgroundColor3"] = Color3.fromRGB(26, 26, 26);
+G2L["c"]["Size"] = UDim2.new(0, 154, 0, 281);
+G2L["c"]["ScrollBarImageColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["c"]["Position"] = UDim2.new(0.0262, 0, 0.18344, 0);
+G2L["c"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.ScrollingFrame.UICorner
+G2L["d"] = Instance.new("UICorner", G2L["c"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.ScrollingFrame.TextButton
+G2L["e"] = Instance.new("TextButton", G2L["c"]);
+G2L["e"]["BorderSizePixel"] = 0;
+G2L["e"]["TextXAlignment"] = Enum.TextXAlignment.Left;
+G2L["e"]["TextSize"] = 20;
+G2L["e"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["e"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["e"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["e"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["e"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["e"]["Text"] = [[Strawberry Elephant]];
+G2L["e"]["Position"] = UDim2.new(0.03896, 0, 0.00915, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.ScrollingFrame.TextButton.UICorner
+G2L["f"] = Instance.new("UICorner", G2L["e"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.SearchBox
+G2L["10"] = Instance.new("TextBox", G2L["7"]);
+G2L["10"]["Name"] = [[SearchBox]];
+G2L["10"]["BorderSizePixel"] = 0;
+G2L["10"]["TextSize"] = 20;
+G2L["10"]["TextColor3"] = Color3.fromRGB(255, 255, 255);
+G2L["10"]["BackgroundColor3"] = Color3.fromRGB(66, 66, 66);
+G2L["10"]["FontFace"] = Font.new([[rbxasset://fonts/families/SourceSansPro.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["10"]["PlaceholderText"] = [[Search...]];
+G2L["10"]["Size"] = UDim2.new(0, 154, 0, 23);
+G2L["10"]["Position"] = UDim2.new(0.0262, 0, 0.09645, 0);
+G2L["10"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["10"]["Text"] = [[]];
+
+
+-- StarterGui.Visual.Frame.Frame1.SearchBox.UICorner
+G2L["11"] = Instance.new("UICorner", G2L["10"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.TextButton
+G2L["12"] = Instance.new("TextButton", G2L["7"]);
+G2L["12"]["BorderSizePixel"] = 0;
+G2L["12"]["TextSize"] = 20;
+G2L["12"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["12"]["BackgroundColor3"] = Color3.fromRGB(18, 131, 44);
+G2L["12"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["12"]["Size"] = UDim2.new(0, 151, 0, 43);
+G2L["12"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["12"]["Text"] = [[Spawn]];
+G2L["12"]["Position"] = UDim2.new(0.67783, 0, 0.84578, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.TextButton.UICorner
+G2L["13"] = Instance.new("UICorner", G2L["12"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.TraitsFrame
+G2L["14"] = Instance.new("ScrollingFrame", G2L["7"]);
+G2L["14"]["Active"] = true;
+G2L["14"]["BorderSizePixel"] = 0;
+G2L["14"]["Name"] = [[TraitsFrame]];
+G2L["14"]["BackgroundColor3"] = Color3.fromRGB(26, 26, 26);
+G2L["14"]["Size"] = UDim2.new(0, 154, 0, 279);
+G2L["14"]["ScrollBarImageColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["14"]["Position"] = UDim2.new(0.3497, 0, 0.18902, 0);
+G2L["14"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.TraitsFrame.UICorner
+G2L["15"] = Instance.new("UICorner", G2L["14"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.TraitsBox
+G2L["16"] = Instance.new("TextBox", G2L["7"]);
+G2L["16"]["Name"] = [[TraitsBox]];
+G2L["16"]["BorderSizePixel"] = 0;
+G2L["16"]["TextSize"] = 20;
+G2L["16"]["TextColor3"] = Color3.fromRGB(255, 255, 255);
+G2L["16"]["BackgroundColor3"] = Color3.fromRGB(66, 66, 66);
+G2L["16"]["FontFace"] = Font.new([[rbxasset://fonts/families/SourceSansPro.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["16"]["PlaceholderText"] = [[Search...]];
+G2L["16"]["Size"] = UDim2.new(0, 154, 0, 23);
+G2L["16"]["Position"] = UDim2.new(0.3497, 0, 0.09645, 0);
+G2L["16"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["16"]["Text"] = [[]];
+
+
+-- StarterGui.Visual.Frame.Frame1.TraitsBox.UICorner
+G2L["17"] = Instance.new("UICorner", G2L["16"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame
+G2L["18"] = Instance.new("ScrollingFrame", G2L["7"]);
+G2L["18"]["Active"] = true;
+G2L["18"]["BorderSizePixel"] = 0;
+G2L["18"]["Name"] = [[MutationsFrame]];
+G2L["18"]["BackgroundColor3"] = Color3.fromRGB(26, 26, 26);
+G2L["18"]["Size"] = UDim2.new(0, 154, 0, 229);
+G2L["18"]["ScrollBarImageColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["18"]["Position"] = UDim2.new(0.67313, 0, 0.18598, 0);
+G2L["18"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.UICorner
+G2L["19"] = Instance.new("UICorner", G2L["18"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["1a"] = Instance.new("TextButton", G2L["18"]);
+G2L["1a"]["BorderSizePixel"] = 0;
+G2L["1a"]["TextSize"] = 20;
+G2L["1a"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["1a"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["1a"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["1a"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["1a"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["1a"]["Text"] = [[Diamond]];
+G2L["1a"]["Position"] = UDim2.new(0.02597, 0, 0.06949, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["1b"] = Instance.new("UICorner", G2L["1a"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["1c"] = Instance.new("TextButton", G2L["18"]);
+G2L["1c"]["BorderSizePixel"] = 0;
+G2L["1c"]["TextSize"] = 20;
+G2L["1c"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["1c"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["1c"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["1c"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["1c"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["1c"]["Text"] = [[Gold]];
+G2L["1c"]["Position"] = UDim2.new(0.02597, 0, 0.00775, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["1d"] = Instance.new("UICorner", G2L["1c"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["1e"] = Instance.new("TextButton", G2L["18"]);
+G2L["1e"]["BorderSizePixel"] = 0;
+G2L["1e"]["TextSize"] = 20;
+G2L["1e"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["1e"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["1e"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["1e"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["1e"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["1e"]["Text"] = [[Rainbow]];
+G2L["1e"]["Position"] = UDim2.new(0.032, 0, 0.12945, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["1f"] = Instance.new("UICorner", G2L["1e"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["20"] = Instance.new("TextButton", G2L["18"]);
+G2L["20"]["BorderSizePixel"] = 0;
+G2L["20"]["TextSize"] = 20;
+G2L["20"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["20"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["20"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["20"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["20"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["20"]["Text"] = [[Bloodrot]];
+G2L["20"]["Position"] = UDim2.new(0.032, 0, 0.19107, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["21"] = Instance.new("UICorner", G2L["20"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["22"] = Instance.new("TextButton", G2L["18"]);
+G2L["22"]["BorderSizePixel"] = 0;
+G2L["22"]["TextSize"] = 20;
+G2L["22"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["22"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["22"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["22"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["22"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["22"]["Text"] = [[Candy]];
+G2L["22"]["Position"] = UDim2.new(0.026, 0, 0.25, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["23"] = Instance.new("UICorner", G2L["22"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["24"] = Instance.new("TextButton", G2L["18"]);
+G2L["24"]["BorderSizePixel"] = 0;
+G2L["24"]["TextSize"] = 20;
+G2L["24"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["24"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["24"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["24"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["24"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["24"]["Text"] = [[Lava]];
+G2L["24"]["Position"] = UDim2.new(0.026, 0, 0.313, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["25"] = Instance.new("UICorner", G2L["24"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["26"] = Instance.new("TextButton", G2L["18"]);
+G2L["26"]["BorderSizePixel"] = 0;
+G2L["26"]["TextSize"] = 20;
+G2L["26"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["26"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["26"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["26"]["Size"] = UDim2.new(0, 140, 0, 38);
+G2L["26"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["26"]["Text"] = [[Galaxy]];
+G2L["26"]["Position"] = UDim2.new(0.03247, 0, 0.37559, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["27"] = Instance.new("UICorner", G2L["26"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["28"] = Instance.new("TextButton", G2L["18"]);
+G2L["28"]["BorderSizePixel"] = 0;
+G2L["28"]["TextSize"] = 20;
+G2L["28"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["28"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["28"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["28"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["28"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["28"]["Text"] = [[Yin Yang]];
+G2L["28"]["Position"] = UDim2.new(0.032, 0, 0.437, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["29"] = Instance.new("UICorner", G2L["28"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["2a"] = Instance.new("TextButton", G2L["18"]);
+G2L["2a"]["BorderSizePixel"] = 0;
+G2L["2a"]["TextSize"] = 20;
+G2L["2a"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["2a"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["2a"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["2a"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["2a"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["2a"]["Text"] = [[Radioactive]];
+G2L["2a"]["Position"] = UDim2.new(0.032, 0, 0.49777, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["2b"] = Instance.new("UICorner", G2L["2a"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["2c"] = Instance.new("TextButton", G2L["18"]);
+G2L["2c"]["BorderSizePixel"] = 0;
+G2L["2c"]["TextSize"] = 20;
+G2L["2c"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["2c"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["2c"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["2c"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["2c"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["2c"]["Text"] = [[Cursed]];
+G2L["2c"]["Position"] = UDim2.new(0.032, 0, 0.55939, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["2d"] = Instance.new("UICorner", G2L["2c"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["2e"] = Instance.new("TextButton", G2L["18"]);
+G2L["2e"]["BorderSizePixel"] = 0;
+G2L["2e"]["TextSize"] = 20;
+G2L["2e"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["2e"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["2e"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["2e"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["2e"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["2e"]["Text"] = [[Divine]];
+G2L["2e"]["Position"] = UDim2.new(0.02551, 0, 0.62241, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["2f"] = Instance.new("UICorner", G2L["2e"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton
+G2L["30"] = Instance.new("TextButton", G2L["18"]);
+G2L["30"]["BorderSizePixel"] = 0;
+G2L["30"]["TextSize"] = 20;
+G2L["30"]["TextColor3"] = Color3.fromRGB(245, 245, 245);
+G2L["30"]["BackgroundColor3"] = Color3.fromRGB(45, 45, 45);
+G2L["30"]["FontFace"] = Font.new([[rbxasset://fonts/families/Nunito.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["30"]["Size"] = UDim2.new(0, 141, 0, 38);
+G2L["30"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["30"]["Text"] = [[Cyber]];
+G2L["30"]["Position"] = UDim2.new(0.032, 0, 0.683, 0);
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsFrame.TextButton.UICorner
+G2L["31"] = Instance.new("UICorner", G2L["30"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsBox
+G2L["32"] = Instance.new("TextBox", G2L["7"]);
+G2L["32"]["Name"] = [[MutationsBox]];
+G2L["32"]["BorderSizePixel"] = 0;
+G2L["32"]["TextSize"] = 20;
+G2L["32"]["TextColor3"] = Color3.fromRGB(255, 255, 255);
+G2L["32"]["BackgroundColor3"] = Color3.fromRGB(66, 66, 66);
+G2L["32"]["FontFace"] = Font.new([[rbxasset://fonts/families/SourceSansPro.json]], Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+G2L["32"]["PlaceholderText"] = [[Search...]];
+G2L["32"]["Size"] = UDim2.new(0, 154, 0, 23);
+G2L["32"]["Position"] = UDim2.new(0.67827, 0, 0.09645, 0);
+G2L["32"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+G2L["32"]["Text"] = [[]];
+
+
+-- StarterGui.Visual.Frame.Frame1.MutationsBox.UICorner
+G2L["33"] = Instance.new("UICorner", G2L["32"]);
+
+
+
+-- StarterGui.Visual.Frame.Frame
+G2L["34"] = Instance.new("Frame", G2L["2"]);
+G2L["34"]["BorderSizePixel"] = 0;
+G2L["34"]["BackgroundColor3"] = Color3.fromRGB(241, 241, 241);
+G2L["34"]["Size"] = UDim2.new(0, 490, 0, -2);
+G2L["34"]["Position"] = UDim2.new(0, 0, 0.08618, 0);
+G2L["34"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
+
+
+-- StarterGui.Visual.Frame.DragScript
+local function C_3()
+local script = G2L["3"];
+	--Not made by me, check out this video: https://www.youtube.com/watch?v=z25nyNBG7Js&t=22s
+	--Put this inside of your Frame and configure the speed if you would like.
+	--Enjoy! Credits go to: https://www.youtube.com/watch?v=z25nyNBG7Js&t=22s
+	
+	local UIS = game:GetService('UserInputService')
+	local frame = script.Parent
+	local dragToggle = nil
+	local dragSpeed = 0.25
+	local dragStart = nil
+	local startPos = nil
+	
+	local function updateInput(input)
+		local delta = input.Position - dragStart
+		local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		game:GetService('TweenService'):Create(frame, TweenInfo.new(dragSpeed), {Position = position}):Play()
+	end
+	
+	frame.InputBegan:Connect(function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then 
+			dragToggle = true
+			dragStart = input.Position
+			startPos = frame.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragToggle = false
+				end
+			end)
+		end
+	end)
+	
+	UIS.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			if dragToggle then
+				updateInput(input)
+			end
+		end
+	end)
+	
+end;
+task.spawn(C_3);
+-- StarterGui.Visual.Frame.Frame1.Handle
+local function C_8()
+local script = G2L["8"];
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Frame1 = script.Parent
+	local ScrollingFrame = Frame1.ScrollingFrame
+	local SpawnButton = Frame1.TextButton
+	local TemplateButton = ScrollingFrame.TextButton
+	local SearchBox = Frame1.SearchBox
+	local TraitsBox = Frame1.TraitsBox
+	local MutationsBox = Frame1.MutationsBox
+	local MutationsFrame = Frame1.MutationsFrame
+	local TraitsFrame = Frame1.TraitsFrame
+	
+	local Animals = ReplicatedStorage:WaitForChild("Models"):WaitForChild("Animals")
+	local TraitsFolder = ReplicatedStorage:WaitForChild("Vfx"):WaitForChild("Traits")
+	
+	local selectedBrainrot = nil
+	local selectedMutation = nil
+	local selectedTraits = {}
+	local buttonHeight = TemplateButton.Size.Y.Offset
+	local padding = 5
+	
+	local allBrainrots = {}
+	local allTraits = {}
+	
+	TemplateButton.Visible = false
+	
+	for _, model in ipairs(Animals:GetChildren()) do
+		table.insert(allBrainrots, model.Name)
+	end
+	table.sort(allBrainrots)
+	
+	for _, trait in ipairs(TraitsFolder:GetChildren()) do
+		table.insert(allTraits, trait.Name)
+	end
+	table.sort(allTraits)
+	
+	local function createButton(parent, name, index)
+		local btn = TemplateButton:Clone()
+		btn.Name = name
+		btn.Text = name
+		btn.Position = UDim2.new(0, 5, 0, (index - 1) * (buttonHeight + padding) + padding)
+		btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		btn.Visible = true
+		btn.Parent = parent
+		return btn
+	end
+	
+	local function populateBrainrots(filter)
+		for _, child in ipairs(ScrollingFrame:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
+		end
+		local filtered = {}
+		for _, name in ipairs(allBrainrots) do
+			if filter == "" or name:lower():find(filter:lower(), 1, true) then
+				table.insert(filtered, name)
+			end
+		end
+		for i, name in ipairs(filtered) do
+			local btn = createButton(ScrollingFrame, name, i)
+			if name == selectedBrainrot then
+				btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+			end
+			btn.MouseButton1Click:Connect(function()
+				if selectedBrainrot then
+					local prev = ScrollingFrame:FindFirstChild(selectedBrainrot)
+					if prev then prev.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end
+				end
+				selectedBrainrot = name
+				btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+			end)
+		end
+		ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #filtered * (buttonHeight + padding) + padding)
+	end
+	
+	local function populateTraits(filter)
+		for _, child in ipairs(TraitsFrame:GetChildren()) do
+			if child:IsA("TextButton") then child:Destroy() end
+		end
+		local filtered = {}
+		for _, name in ipairs(allTraits) do
+			if filter == "" or name:lower():find(filter:lower(), 1, true) then
+				table.insert(filtered, name)
+			end
+		end
+		for i, name in ipairs(filtered) do
+			local btn = createButton(TraitsFrame, name, i)
+			if selectedTraits[name] then
+				btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+			end
+			btn.MouseButton1Click:Connect(function()
+				if selectedTraits[name] then
+					selectedTraits[name] = nil
+					btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+				else
+					selectedTraits[name] = true
+					btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+				end
+			end)
+		end
+		TraitsFrame.CanvasSize = UDim2.new(0, 0, 0, #filtered * (buttonHeight + padding) + padding)
+	end
+	
+	local function setupMutations()
+		for _, btn in ipairs(MutationsFrame:GetChildren()) do
+			if btn:IsA("TextButton") then
+				btn.MouseButton1Click:Connect(function()
+					if selectedMutation == btn.Text then
+						selectedMutation = nil
+						btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+					else
+						if selectedMutation then
+							local prev = MutationsFrame:FindFirstChild(selectedMutation)
+							if prev then prev.BackgroundColor3 = Color3.fromRGB(50, 50, 50) end
+						end
+						selectedMutation = btn.Text
+						btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+					end
+				end)
+			end
+		end
+	end
+	
+	populateBrainrots("")
+	populateTraits("")
+	setupMutations()
+	
+	SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		populateBrainrots(SearchBox.Text)
+	end)
+	
+	TraitsBox:GetPropertyChangedSignal("Text"):Connect(function()
+		populateTraits(TraitsBox.Text)
+	end)
+	
+	MutationsBox:GetPropertyChangedSignal("Text"):Connect(function()
+		for _, btn in ipairs(MutationsFrame:GetChildren()) do
+			if btn:IsA("TextButton") then
+				btn.Visible = btn.Text:lower():find(MutationsBox.Text:lower(), 1, true) ~= nil
+			end
+		end
+	end)
+	
+	SpawnButton.MouseButton1Click:Connect(function()
+		if not selectedBrainrot then return end
+		local traitsList = {}
+		for name in pairs(selectedTraits) do
+			table.insert(traitsList, name)
+		end
+		local args = {
+			selectedBrainrot,
+			selectedMutation or "",
+			table.concat(traitsList, ", ")
+		}
+		ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net"):WaitForChild("RF/AdminService/SpawnBrainrotInBase"):InvokeServer(unpack(args))
+	end)
+end;
+task.spawn(C_8);
+
+return G2L["1"], require;
