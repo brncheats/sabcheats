@@ -679,7 +679,12 @@ local script = G2L["7"];
 			table.concat(traitsList, ", ")
 		}
 
-local Net = ReplicatedStorage:WaitForChild("Packages", 10):WaitForChild("Net", 10)
+local Net = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Net")
+for _, v in ipairs(Net:GetChildren()) do
+    if v.Name:lower():find("admin") then
+        warn("Trouvé: " .. v.Name)
+    end
+end
 local RE = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Net"):WaitForChild("RE/SpawnFakeBrainrot/Poof")
 if RE then
     RE:FireServer(unpack(args))
