@@ -528,14 +528,14 @@ local function C_8()
 local script = G2L["7"];
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local Frame1 = G2L["7"]
-	local ScrollingFrame = Frame1.ScrollingFrame
-	local SpawnButton = Frame1.TextButton
-	local TemplateButton = ScrollingFrame.TextButton
-	local SearchBox = Frame1.SearchBox
-	local TraitsBox = Frame1.TraitsBox
-	local MutationsBox = Frame1.MutationsBox
-	local MutationsFrame = Frame1.MutationsFrame
-	local TraitsFrame = Frame1.TraitsFrame
+	local ScrollingFrame = G2L["c"]
+	local SpawnButton = G2L["12"]
+    local TemplateButton = G2L["e"]
+    local SearchBox = G2L["10"]
+    local TraitsBox = G2L["16"]
+    local MutationsBox = G2L["32"]
+    local MutationsFrame = G2L["18"]
+    local TraitsFrame = G2L["14"]
 	
 	local Animals = ReplicatedStorage:WaitForChild("Models"):WaitForChild("Animals")
 	local TraitsFolder = ReplicatedStorage:WaitForChild("Vfx"):WaitForChild("Traits")
