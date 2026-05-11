@@ -487,7 +487,7 @@ local script = G2L["2"];
 	--Enjoy! Credits go to: https://www.youtube.com/watch?v=z25nyNBG7Js&t=22s
 	
 	local UIS = game:GetService('UserInputService')
-	local frame = script.Parent
+	local frame = G2L["2"]
 	local dragToggle = nil
 	local dragSpeed = 0.25
 	local dragStart = nil
@@ -527,7 +527,7 @@ task.spawn(C_3);
 local function C_8()
 local script = G2L["7"];
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	local Frame1 = script.Parent
+	local Frame1 = G2L["7"]
 	local ScrollingFrame = Frame1.ScrollingFrame
 	local SpawnButton = Frame1.TextButton
 	local TemplateButton = ScrollingFrame.TextButton
