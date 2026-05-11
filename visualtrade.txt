@@ -29,6 +29,7 @@ G2L["2"]["BackgroundTransparency"] = 0.2;
 -- StarterGui.Visual.Frame.DragScript
 G2L["3"] = Instance.new("LocalScript", G2L["2"]);
 G2L["3"]["Name"] = [[DragScript]];
+G2L["3"].Source = "--";
 G2L["3"].Disabled = true;
 
 
@@ -74,6 +75,7 @@ G2L["7"]["BackgroundTransparency"] = 0.2;
 -- StarterGui.Visual.Frame.Frame1.Handle
 G2L["8"] = Instance.new("LocalScript", G2L["7"]);
 G2L["8"]["Name"] = [[Handle]];
+G2L["8"].Source = "--";
 G2L["8"].Disabled = true;
 
 
