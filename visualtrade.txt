@@ -481,7 +481,7 @@ G2L["34"]["BorderColor3"] = Color3.fromRGB(0, 0, 0);
 
 -- StarterGui.Visual.Frame.DragScript
 local function C_3()
-local script = nil;
+local script = G2L["2"];
 	--Not made by me, check out this video: https://www.youtube.com/watch?v=z25nyNBG7Js&t=22s
 	--Put this inside of your Frame and configure the speed if you would like.
 	--Enjoy! Credits go to: https://www.youtube.com/watch?v=z25nyNBG7Js&t=22s
@@ -525,7 +525,7 @@ end;
 task.spawn(C_3);
 -- StarterGui.Visual.Frame.Frame1.Handle
 local function C_8()
-local script = nil;
+local script = G2L["7"];
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local Frame1 = script.Parent
 	local ScrollingFrame = Frame1.ScrollingFrame
