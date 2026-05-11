@@ -680,11 +680,11 @@ local script = G2L["7"];
 		}
 
 local Net = ReplicatedStorage:WaitForChild("Packages", 10):WaitForChild("Net", 10)
-local RF = Net:FindFirstChild("RF/AdminService/SpawnBrainrotInBase")
-if RF then
-    RF:InvokeServer(unpack(args))
+local RE = game:GetService("ReplicatedStorage"):WaitForChild("Packages"):WaitForChild("Net"):WaitForChild("RE/SpawnFakeBrainrot/Poof")
+if RE then
+    RE:FireServer(unpack(args))
 else
-    warn("RemoteFunction Not Found broo")
+    warn("RemoteEvent Not Found")
 end
 	end)
 end;
