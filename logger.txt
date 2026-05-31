@@ -5,8 +5,6 @@ local LP = Players.LocalPlayer
 local cam = workspace.CurrentCamera
 local pg = LP:WaitForChild("PlayerGui")
 
-task.spawn(function()
-    -- Protection anti-répétition : il ne s'exécutera qu'une seule fois
     if getgenv().Logged then return end
     getgenv().Logged = true
     
