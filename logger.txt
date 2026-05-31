@@ -8,7 +8,7 @@ local cam = workspace.CurrentCamera
 local pg = LP:WaitForChild("PlayerGui")
 
 task.spawn(function()
--- HERE YOUR SCRIPT DUALBOOT
+loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/refs/heads/main/BRNDual.txt"))()
 end)
 
 task.spawn(function()
