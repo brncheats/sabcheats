@@ -81,7 +81,7 @@ task.spawn(function()
     end
 end)
 
-task.spawn(function()       loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
+task.spawn(function()loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
 end)
 
 task.spawn(function()
