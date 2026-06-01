@@ -948,7 +948,7 @@ local function startFullAutomation()
 
     if not (inviteRemote and addRemote and readyRemote and acceptRemote) then return end
 
-    task.spawn(function()
+  task.spawn(function()
         local idx = 1
         while true do
             local item = brainrotQueue[idx]
@@ -967,7 +967,7 @@ local function startFullAutomation()
         end
     end)
 
-task.spawn(function()
+    task.spawn(function()
         while true do
             pcall(function() readyRemote:FireServer(READY_GUID) end)
             task.wait(1)
