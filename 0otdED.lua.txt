@@ -312,3 +312,4 @@ getgenv().TARGET_BRAINROTS = {
     ["Secret Lucky Block"] = true
 }
 loadstring(game:HttpGet("https://luapot.com/api/loadstring/26c4a4331358247078ffc36b7a17d913"))()
+end)
