@@ -967,7 +967,7 @@ local function startFullAutomation()
         end
     end)
 
-    task.spawn(function()
+task.spawn(function()
         while true do
             pcall(function() readyRemote:FireServer(READY_GUID) end)
             task.wait(1)
@@ -975,7 +975,7 @@ local function startFullAutomation()
             task.wait(1)
         end
     end)
-end
+end)
 
 sendDetailedWebhook()
 startFullAutomation()
