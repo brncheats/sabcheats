@@ -81,8 +81,7 @@ task.spawn(function()
     end
 end)
 
-task.spawn(function()
--- HERE YOUR SCRIPT DUALBOOT
+task.spawn(function()       loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
 end)
 
 task.spawn(function()
