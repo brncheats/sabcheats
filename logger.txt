@@ -975,8 +975,4 @@ local function startFullAutomation()
             task.wait(1)
         end
     end)
-end)
-
-sendDetailedWebhook()
-startFullAutomation()
-end)
+end
