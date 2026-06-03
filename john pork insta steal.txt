@@ -1,0 +1,2217 @@
+if not game:IsLoaded() then game.Loaded:Wait() end
+if setfpscap then setfpscap(9999) end
+
+local RS = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+right_base = CFrame.new(-371, -6, 30)
+left_base = CFrame.new(-373, -7, 83)
+
+local __selfRagdoll = function() return false end
+local __stealActive = false
+_G.__stealActive = false
+local semiv2cfg
+
+local __DEBUG = false
+local __debugT0 = 0
+local function __dbg(fmt, ...)
+    if not __DEBUG then return end
+    local t = string.format("%.3f", tick() - __debugT0)
+    print(string.format("[STEAL %ss] " .. fmt, t, ...))
+end
+
+local __stealCbCache = {}
+local function __buildStealCallbacks(prompt)
+    if __stealCbCache[prompt] then return __stealCbCache[prompt] end
+    if not getconnections then return nil end
+    local data = { hold = {}, trigger = {} }
+    local ok1, conns1 = pcall(getconnections, prompt.PromptButtonHoldBegan)
+    if ok1 and type(conns1) == "table" then
+        for _, c in ipairs(conns1) do
+            if type(c.Function) == "function" then table.insert(data.hold, c.Function) end
+        end
+    end
+    local ok2, conns2 = pcall(getconnections, prompt.Triggered)
+    if ok2 and type(conns2) == "table" then
+        for _, c in ipairs(conns2) do
+            if type(c.Function) == "function" then table.insert(data.trigger, c.Function) end
+        end
+    end
+    if #data.hold == 0 and #data.trigger == 0 then return nil end
+    __stealCbCache[prompt] = data
+    return data
+end
+
+local __MIN_HOLD_TIME = 1.3
+local __POST_RAGDOLL_GAP = 0.01
+local __TRIGGER_AFTER_GREEN = 0.02
+local __RAGDOLL_FALLBACK = 3.0
+
+local function __pollRagdollEndTime(timeoutSec)
+    local lp = game.Players.LocalPlayer
+    local waitStart = tick()
+    while tick() - waitStart < timeoutSec do
+        local v = lp:GetAttribute("RagdollEndTime") or 0
+        if v > workspace:GetServerTimeNow() then return v end
+        task.wait()
+    end
+    return nil
+end
+
+local function __isWalkMethod() return semiv2cfg and semiv2cfg.stealMethod == "Walk" end
+local function __isPrimeMethod() return semiv2cfg and semiv2cfg.stealMethod == "Prime" end
+local function __isRagdollMethod() return not __isWalkMethod() and not __isPrimeMethod() end
+
+local function __startStealHold(prompt)
+    if not prompt or not prompt.Parent then return nil end
+    local cb = __buildStealCallbacks(prompt)
+    if not cb then return nil end
+
+    __stealActive = true
+    _G.__stealActive = true
+    __selfRagdoll()
+    local ragdollEnd = nil
+    local holdBeganAt = nil
+    local holdDone = false
+    if __isRagdollMethod() then
+        ragdollEnd = __pollRagdollEndTime(0.4)
+    else
+        for _, fn in ipairs(cb.hold) do task.spawn(fn) end
+        holdBeganAt = tick()
+        holdDone = true
+    end
+
+    return {
+        prompt = prompt,
+        cb = cb,
+        ragdollFireTime = tick(),
+        ragdollEnd = ragdollEnd,
+        startedAt = tick(),
+        holdBeganAt = holdBeganAt,
+        holdDone = holdDone,
+    }
+end
+
+local function __doHoldAndWait(ctx)
+    if ctx.holdDone then return end
+    if ctx.ragdollEnd then
+        while workspace:GetServerTimeNow() < ctx.ragdollEnd + __POST_RAGDOLL_GAP do task.wait() end
+    elseif __isRagdollMethod() then
+        local fb = ctx.ragdollFireTime + __RAGDOLL_FALLBACK + __POST_RAGDOLL_GAP
+        while tick() < fb do task.wait() end
+    end
+    for _, fn in ipairs(ctx.cb.hold) do task.spawn(fn) end
+    ctx.holdBeganAt = tick()
+    task.wait(__MIN_HOLD_TIME)
+    ctx.holdDone = true
+end
+
+local function __waitForStealTime(ctx, sec)
+    if not ctx then return end
+    if sec >= 1.0 then
+        if __isRagdollMethod() then __doHoldAndWait(ctx) end
+        return
+    end
+    local elapsed = tick() - ctx.ragdollFireTime
+    if elapsed < sec then task.wait(sec - elapsed) end
+end
+
+local function __finishStealHold(ctx)
+    if not ctx then return false end
+    if not ctx.holdBeganAt then __doHoldAndWait(ctx) end
+    local heldFor = tick() - (ctx.holdBeganAt or tick())
+    if heldFor < __MIN_HOLD_TIME then task.wait(__MIN_HOLD_TIME - heldFor) end
+    task.wait(__TRIGGER_AFTER_GREEN)
+    for _, fn in ipairs(ctx.cb.trigger) do task.spawn(fn) end
+    __stealActive = false
+    _G.__stealActive = false
+    return true
+end
+
+local function fireStealPrompt(prompt, finalizeFn)
+    local ctx = __startStealHold(prompt)
+    if not ctx then return false end
+    if finalizeFn then
+        __waitForStealTime(ctx, 1.3)
+        pcall(finalizeFn)
+    end
+    return __finishStealHold(ctx)
+end
+
+local REQUIRED = {"Assets","Classes","Client","Components","Controllers","Datas","Items","Models","Shared","Sounds","Utils","Vfx","Packages","Desync"}
+local SIGNALS = {"getgenv","getrenv","getrawmetatable","hookfunction","newcclosure","checkcaller","writefile","syn","KRNL_LOADED"}
+
+repeat task.wait() until game:IsLoaded() and game.PlaceId ~= 0
+
+local SAVE_FILE = "semiv2cfg.json"
+
+semiv2cfg = {
+    unlockAutoTp  = false,
+    autoDesync    = true,
+    smartTp       = true,
+    autoTpEnabled = false,
+    slotMode      = "First Slot",
+    timerAutoTp   = false,
+    allowAutoTp   = false,
+    autoPotion    = true,
+    autoWalk      = false,
+    speedBoost    = false,
+    autoAdminSpam = false,
+    autoInstantStealOnRespawn = false,
+    semiInstantMode = "Semi",
+    stealMethod   = "Ragdoll",
+    stealKey      = "E",
+    walkSpeed     = 27.6,
+    speedBoostStealingSpeed = 27.6,
+    speedBoostGiantSpeed = 34,
+    tpCooldown    = 0.8,
+    timerCooldown = 10,
+    spamOnSteal   = {"balloon","ragdoll","rocket","tiny","inverse"},
+    allSpamCmds   = {"balloon","ragdoll","rocket","inverse","tiny","jail","jumpscare","morph"},
+}
+
+local HS = game:GetService("HttpService")
+
+local function saveCfg()
+    if not writefile then return end
+    pcall(function()
+        writefile(SAVE_FILE, HS:JSONEncode({
+            autoTpEnabled = semiv2cfg.autoTpEnabled,
+            unlockAutoTp  = semiv2cfg.unlockAutoTp,
+            autoDesync    = semiv2cfg.autoDesync,
+            slotMode      = semiv2cfg.slotMode,
+            timerAutoTp   = semiv2cfg.timerAutoTp,
+            allowAutoTp   = semiv2cfg.allowAutoTp,
+            autoPotion    = semiv2cfg.autoPotion,
+            autoWalk      = semiv2cfg.autoWalk,
+            speedBoost    = semiv2cfg.speedBoost,
+            autoAdminSpam = semiv2cfg.autoAdminSpam,
+            autoInstantStealOnRespawn = semiv2cfg.autoInstantStealOnRespawn,
+            semiInstantMode = semiv2cfg.semiInstantMode,
+            stealMethod   = semiv2cfg.stealMethod,
+            stealKey      = semiv2cfg.stealKey,
+            walkSpeed     = semiv2cfg.walkSpeed,
+            speedBoostStealingSpeed = semiv2cfg.speedBoostStealingSpeed,
+            speedBoostGiantSpeed = semiv2cfg.speedBoostGiantSpeed,
+            spamOnSteal   = semiv2cfg.spamOnSteal,
+        }))
+    end)
+end
+local function loadCfg()
+    if not readfile or not isfile or not isfile(SAVE_FILE) then return end
+    local ok, raw = pcall(readfile, SAVE_FILE)
+    if not ok or not raw or raw == "" then return end
+    local ok2, data = pcall(HS.JSONDecode, HS, raw)
+    if not ok2 or type(data) ~= "table" then return end
+    for _, k in ipairs({"unlockAutoTp","timerAutoTp","allowAutoTp","autoPotion","autoWalk","speedBoost","autoAdminSpam","autoDesync","autoInstantStealOnRespawn"}) do
+        if data[k] ~= nil then semiv2cfg[k] = data[k] end
+    end
+    if data.autoTpEnabled ~= nil then
+        semiv2cfg.autoTpEnabled = data.autoTpEnabled
+    else
+        semiv2cfg.autoTpEnabled = semiv2cfg.unlockAutoTp or semiv2cfg.timerAutoTp or semiv2cfg.allowAutoTp or semiv2cfg.autoInstantStealOnRespawn
+    end
+    semiv2cfg.smartTp = true
+    if type(data.slotMode) == "string" and data.slotMode ~= "" then
+        semiv2cfg.slotMode = data.slotMode
+    end
+    if type(data.semiInstantMode) == "string" and data.semiInstantMode ~= "" then
+        semiv2cfg.semiInstantMode = data.semiInstantMode
+    end
+    if type(data.stealMethod) == "string" and data.stealMethod ~= "" then
+        semiv2cfg.stealMethod = data.stealMethod
+    end
+    if type(data.stealKey) == "string" and data.stealKey ~= "" then
+        semiv2cfg.stealKey = data.stealKey
+    end
+    if type(data.spamOnSteal) == "table" then
+        semiv2cfg.spamOnSteal = data.spamOnSteal
+    end
+    if type(data.walkSpeed) == "number" then
+        semiv2cfg.walkSpeed = math.clamp(data.walkSpeed, 16, 200)
+    end
+    if type(data.speedBoostStealingSpeed) == "number" then
+        semiv2cfg.speedBoostStealingSpeed = math.clamp(data.speedBoostStealingSpeed, 16, 200)
+    elseif type(data.speedBoostSpeed) == "number" then
+        semiv2cfg.speedBoostStealingSpeed = math.clamp(data.speedBoostSpeed, 16, 200)
+    end
+    if type(data.speedBoostGiantSpeed) == "number" then
+        semiv2cfg.speedBoostGiantSpeed = math.clamp(data.speedBoostGiantSpeed, 16, 200)
+    end
+end
+
+loadCfg()
+
+local RS               = game:GetService("ReplicatedStorage")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local Stats            = game:GetService("Stats")
+local Workspace        = game:GetService("Workspace")
+
+local REQUIRED = {"Assets","Classes","Client","Components","Controllers","Datas","Items","Models","Shared","Sounds","Utils","Vfx","Packages","Desync"}
+local SIGNALS  = {"getgenv","getrenv","getrawmetatable","hookfunction","newcclosure","checkcaller","writefile","syn","KRNL_LOADED"}
+
+repeat task.wait() until game:IsLoaded() and game.PlaceId ~= 0
+
+local function randStr()
+    local abc = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    local out  = ""
+    for i = 1, math.random(10,20) do local i2=math.random(1,#abc); out=out..abc:sub(i2,i2) end
+    return out
+end
+
+local player = Players.LocalPlayer
+local plots  = workspace:WaitForChild("Plots")
+task.spawn(function() while wait() do player = Players.LocalPlayer end end)
+local CharacterController = require(RS.Controllers.CharacterController)
+local JumpscareModule = require(RS.Datas.AdminCommands.jumpscare)
+local controls = require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule")):GetControls()
+local TF_FLOAT_ATTACHMENT_NAME = "CHIRAQ_TF_FLOAT_ATT"
+
+local fdesync = {
+    GameNetPVHeaderRotationalVelocityZeroCutoffExponent             = -5000,
+    LargeReplicatorWrite5                                           = true,
+    LargeReplicatorEnabled9                                         = true,
+    AngularVelociryLimit                                            = 360,
+    TimestepArbiterVelocityCriteriaThresholdTwoDt                   = 2147483646,
+    S2PhysicsSenderRate                                             = 15000,
+    DisableDPIScale                                                 = true,
+    MaxDataPacketPerSend                                            = 2147483647,
+    PhysicsSenderMaxBandwidthBps                                    = 20000,
+    TimestepArbiterHumanoidLinearVelThreshold                       = 21,
+    MaxMissedWorldStepsRemembered                                   = -2147483648,
+    PlayerHumanoidPropertyUpdateRestrict                            = true,
+    SimDefaultHumanoidTimestepMultiplier                            = 0,
+    StreamJobNOUVolumeLengthCap                                     = 2147483647,
+    DebugSendDistInSteps                                            = -2147483648,
+    GameNetDontSendRedundantNumTimes                                = 1,
+    CheckPVLinearVelocityIntegrateVsDeltaPositionThresholdPercent   = 1,
+    CheckPVDifferencesForInterpolationMinVelThresholdStudsPerSecHundredth = 1,
+    LargeReplicatorSerializeRead3                                   = true,
+    ReplicationFocusNouExtentsSizeCutoffForPauseStuds               = 2147483647,
+    CheckPVCachedVelThresholdPercent                                = 10,
+    CheckPVDifferencesForInterpolationMinRotVelThresholdRadsPerSecHundredth = 1,
+    GameNetDontSendRedundantDeltaPositionMillionth                  = 1,
+    InterpolationFrameVelocityThresholdMillionth                    = 5,
+    StreamJobNOUVolumeCap                                           = 2147483647,
+    InterpolationFrameRotVelocityThresholdMillionth                 = 5,
+    CheckPVCachedRotVelThresholdPercent                             = 10,
+    WorldStepMax                                                    = 30,
+    InterpolationFramePositionThresholdMillionth                    = 5,
+    TimestepArbiterHumanoidTurningVelThreshold                      = 1,
+    SimOwnedNOUCountThresholdMillionth                              = 2147483647,
+    GameNetPVHeaderLinearVelocityZeroCutoffExponent                 = -5000,
+    NextGenReplicatorEnabledWrite4                                  = true,
+    TimestepArbiterOmegaThou                                        = 1073741823,
+    MaxAcceptableUpdateDelay                                        = 1,
+    LargeReplicatorSerializeWrite4                                  = false,
+}
+
+local function applyFFlags(list)
+    for name, value in pairs(list) do
+        pcall(function() setfflag(tostring(name), tostring(value)) end)
+    end
+end
+
+local function respawnar(plr)
+    local rcdEnabled = false
+    if gethidden then
+        rcdEnabled = gethidden(workspace,'RejectCharacterDeletions') ~= Enum.RejectCharacterDeletions.Disabled
+    end
+    if rcdEnabled and replicatesignal then
+        replicatesignal(plr.ConnectDiedSignalBackend)
+        task.wait(Players.RespawnTime - 0.1)
+        replicatesignal(plr.Kill)
+    else
+        local char = plr.Character
+        local hum  = char and char:FindFirstChildWhichIsA('Humanoid')
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Dead) end
+        char:ClearAllChildren()
+        local tmp = Instance.new('Model'); tmp.Parent = workspace
+        plr.Character = tmp; task.wait(); plr.Character = char; tmp:Destroy()
+    end
+end
+
+local function equipCarpet()
+    local t = player.Character:FindFirstChild("Flying Carpet") or player.Backpack:FindFirstChild("Flying Carpet")
+    if t then player.Character.Humanoid:EquipTool(t) end
+end
+
+applyFFlags(fdesync)
+local desyncOn = true
+local respawned = false
+local autoResetQueued = semiv2cfg.autoDesync
+
+local function queueAutoReset()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local function findObfuscatedRemote(unobfuscatedName)
+    local Net = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Net")
+    local children = Net:GetChildren()
+    for i = 1, #children - 1 do
+        local current = children[i]
+        local nextFolder = children[i + 1]
+        if current and nextFolder and string.find(current.Name, unobfuscatedName) then
+            return nextFolder
+        end
+    end
+    return nil
+end
+    local remote = findObfuscatedRemote("Tools/Cooldown")
+    if not remote then return end
+    sending = true
+    LP.Character = nil
+    if loopConnection then loopConnection:Disconnect() end
+    loopConnection = RunService.Heartbeat:Connect(function()
+        if not sending then return end
+        for i = 1, 4 do
+            remote:FireServer("f888ee6e-c86d-46e1-93d7-0639d6635d42", LP, "balloon")
+        end
+        LP.Character = nil
+    end)
+
+    if not semiv2cfg.autoDesync then return end
+    if respawned then return end
+    autoResetQueued = true
+end
+
+task.spawn(function()
+    while wait(0.5) do
+        if autoResetQueued and semiv2cfg.autoDesync and not respawned then
+            autoResetQueued = false
+            respawned = true
+            respawnar(player)
+            task.wait(Players.RespawnTime + 1)
+            respawned = false
+        end
+    end
+end)
+
+local adminRemote      = nil
+local adminRemoteReady = false
+local RF_PLOT_KEY      = "f888ee6e-c86d-46e1-93d7-0639d6635d42"
+
+local function discoverAdmin()
+    local Net = RS:FindFirstChild("Packages") and RS.Packages:FindFirstChild("Net")
+    if not Net then return end
+    local byName, byIdx = {}, {}
+    for i, obj in ipairs(Net:GetChildren()) do byName[obj.Name]=i; byIdx[i]=obj end
+    local ai = byName["RF/a0e78691-cb9b-4efc-ac08-9c06fea70059"]
+    if ai then
+        local actual = byIdx[ai+1]
+        if actual then
+            adminRemote = actual
+            local ok = pcall(function() actual:InvokeServer(RF_PLOT_KEY, Players.LocalPlayer, "nightvision") end)
+            adminRemoteReady = ok
+        end
+    end
+end
+
+task.spawn(function()
+    discoverAdmin()
+    while task.wait(8) do if not adminRemoteReady then discoverAdmin() end end
+end)
+
+local function runSpamCmds(target, cmds)
+    if not target or not target.Parent then return end
+    if not adminRemoteReady or not adminRemote then return end
+    pcall(function()
+        for _, cmd in ipairs(cmds) do adminRemote:InvokeServer(RF_PLOT_KEY, target, cmd) end
+    end)
+end
+
+__selfRagdoll = function()
+    if semiv2cfg and (semiv2cfg.stealMethod == "Walk" or semiv2cfg.stealMethod == "Prime") then return end
+    if not adminRemoteReady or not adminRemote then return end
+    pcall(function() adminRemote:InvokeServer(RF_PLOT_KEY, Players.LocalPlayer, "ragdoll") end)
+end
+
+local adminabuseeffects = {
+    "Meteor", "Explosion", "Piles", "SnowWeather", "RainWeather", "Pinata", "Wall", "Web_Main", "Sammy", "Stage",
+    "Stock", "Tree", "Hole", "FireGoblets", "Events", "StarfallWeather", "1x1x1x1Map", "CandyWeather", "Part",
+    "NyanCat", "TacoAmbient", "GatitoMap", "MapVFX", "Nyan", "Ocean", "Strike", "ProximityPart", "Planesbg",
+    "Taco", "Glitch", "Crabs", "Cannon", "YinYangMap", "YinYangWeather", "BabyTungTung", "GalaxyMap",
+    "GalaxyWeather", "VFX", "Caves", "Caves2", "SammyBase", "UFO", "ExplosionBoom", "ufoemit", "CursedSpinWheels"
+}
+
+local function purgeAdminAbuseEffects()
+    for _, name in ipairs(adminabuseeffects) do
+        local obj = workspace:FindFirstChild(name)
+        if obj then
+            obj:Destroy()
+        end
+    end
+end
+
+workspace.DescendantAdded:Connect(function()
+    purgeAdminAbuseEffects()
+end)
+task.spawn(purgeAdminAbuseEffects)
+
+local originalScales = {}
+local originalHipHeight = nil
+local originalWalkSpeed = 16
+local scaleNames = {"HeadScale","BodyDepthScale","BodyHeightScale","BodyProportionScale","BodyTypeScale","BodyWidthScale"}
+
+local function captureOriginals()
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    originalHipHeight = hum.HipHeight
+    originalWalkSpeed = hum.WalkSpeed > 0 and hum.WalkSpeed or originalWalkSpeed
+    originalScales = {}
+    for _, name in ipairs(scaleNames) do
+        local sv = hum:FindFirstChild(name)
+        if sv then
+            originalScales[name] = sv.Value
+        end
+    end
+end
+
+player.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if not hum then return end
+    task.wait(0.1)
+    captureOriginals()
+end)
+task.spawn(captureOriginals)
+
+task.spawn(function()
+    while task.wait(0.1) do
+        local char = player.Character
+        if not char then continue end
+
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BallSocketConstraint") or v:IsA("HingeConstraint") then
+                v:Destroy()
+            elseif v:IsA("Attachment") then
+                if v.Name ~= TF_FLOAT_ATTACHMENT_NAME then
+                    v:Destroy()
+                end
+            elseif v:IsA("Motor6D") then
+                v.Enabled = true
+            end
+        end
+
+        local hum = char:FindFirstChild("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not hrp then continue end
+
+        controls:Enable()
+        local state = hum:GetState()
+        if state ~= Enum.HumanoidStateType.Running
+            and state ~= Enum.HumanoidStateType.Jumping
+            and state ~= Enum.HumanoidStateType.Freefall then
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+        end
+        if workspace.CurrentCamera and workspace.CurrentCamera.CameraSubject ~= hum then
+            workspace.CurrentCamera.CameraSubject = hum
+        end
+
+        local ragdollEnd = player:GetAttribute("RagdollEndTime") or 0
+        local serverTime = Workspace:GetServerTimeNow()
+        if ragdollEnd > serverTime and not __stealActive then
+            hrp.Velocity = Vector3.zero
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            player:SetAttribute("RagdollEndTime", 0)
+        end
+
+        if CharacterController then
+            local ctrl = require(player.PlayerScripts:WaitForChild("PlayerModule")):GetControls()
+            ctrl.moveFunction = function(p, x, z) CharacterController:RequestMove(p, x, z) end
+        end
+        if JumpscareModule and JumpscareModule.effects and JumpscareModule.effects.Victim then
+            JumpscareModule.effects.Victim = function() end
+        end
+
+        if originalHipHeight and hum.HipHeight ~= originalHipHeight then
+            hum.HipHeight = originalHipHeight
+        end
+        for _, name in ipairs(scaleNames) do
+            local sv = hum:FindFirstChild(name)
+            if sv and originalScales[name] and sv.Value ~= originalScales[name] then
+                sv.Value = originalScales[name]
+            end
+        end
+
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Model") and not v:IsA("BackpackItem") then
+                v:Destroy()
+            end
+        end
+    end
+end)
+
+local function getNearestEnemy()
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local nearest, dist = nil, math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (char.HumanoidRootPart.Position - p.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then dist = d; nearest = p end
+        end
+    end
+    return nearest
+end
+
+local bases = {
+    b1 = { refVec = Vector3.new(-337,-5,100), finalPos = Vector3.new(-337, -5, 103) },
+    b2 = { refVec = Vector3.new(-335,-5,20),  finalPos = Vector3.new(-334.80,-5.04,18.90)  },
+}
+
+local walkDirB1 = (function()
+    local cf = CFrame.new(-336.355286,-5.10107088,17.2327671,-0.999883354,-2.76150569e-08,0.0152716246,-2.88224964e-08,1,-7.88441525e-08,-0.0152716246,-7.9275118e-08,-0.999883354)
+    return Vector3.new(cf.LookVector.X + cf.RightVector.X*-0.1, 0, cf.LookVector.Z + cf.RightVector.Z*-0.1).Unit
+end)()
+
+local walkDirB2 = (function()
+    local cf = CFrame.new(-336.942902,-5.10106993,99.3276443,0.999914348,-3.63984611e-08,0.0130875716,3.67094941e-08,1,-2.35254749e-08,-0.0130875716,2.40038975e-08,0.999914348)
+    return Vector3.new(cf.LookVector.X + cf.RightVector.X*0.1, 0, cf.LookVector.Z + cf.RightVector.Z*0.1).Unit
+end)()
+
+local walkConn = nil
+local function stopWalk() if walkConn then walkConn:Disconnect(); walkConn = nil end end
+local function startWalk(dir)
+    stopWalk()
+    local d = Vector3.new(dir.X,0,dir.Z).Unit
+    walkConn = RunService.Heartbeat:Connect(function()
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        root.Velocity = Vector3.new(d.X*semiv2cfg.walkSpeed, root.Velocity.Y, d.Z*semiv2cfg.walkSpeed)
+    end)
+end
+local function doAutoWalk(isB1)
+    task.spawn(function()
+        startWalk(isB1 and walkDirB1 or walkDirB2); task.wait(2.5); stopWalk()
+    end)
+end
+
+local function getTargetBoostSpeed()
+    local isStealing = player:GetAttribute("Stealing") ~= nil
+    local isGiantPotion = player:GetAttribute("GiantPotion") ~= nil
+    if isGiantPotion then
+        return math.clamp(tonumber(semiv2cfg.speedBoostGiantSpeed) or 34, 16, 200)
+    end
+    if isStealing then
+        return math.clamp(tonumber(semiv2cfg.speedBoostStealingSpeed) or 27.6, 16, 200)
+    end
+    return nil
+end
+
+local rebindListening = false
+local kbLabel         = nil
+local lastTpTime      = 0
+local stealBusy       = false
+
+local function getMyPlot()
+    local out    = {}
+    local myName = player.DisplayName
+    for _, plot in ipairs(plots:GetChildren()) do
+        local sign  = plot:FindFirstChild("PlotSign")
+        local label = sign and sign:FindFirstChild("SurfaceGui")
+            and sign.SurfaceGui:FindFirstChild("Frame")
+            and sign.SurfaceGui.Frame:FindFirstChild("TextLabel")
+        if label then
+            local owner = label.Text:gsub("'s Base$",""):gsub("'s base$",""):gsub("%s+$","")
+            if owner == myName then table.insert(out, plot) end
+        end
+    end
+    return out
+end
+
+local function getCurrentBase()
+    local myPlots = getMyPlot()
+    if #myPlots == 0 then return bases.b1 end
+    local myPlot  = myPlots[1]
+    local plotPos = nil
+    for _, part in ipairs(myPlot:GetDescendants()) do
+        if part:IsA("BasePart") then plotPos = part.Position; break end
+    end
+    if not plotPos then return bases.b1 end
+    local d1 = (plotPos - bases.b1.refVec).Magnitude
+    local d2 = (plotPos - bases.b2.refVec).Magnitude
+    return d1 < d2 and bases.b1 or bases.b2
+end
+
+local M = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local gradients = {}
+local lblTexts  = {}
+local function trackGrad(g) table.insert(gradients, g) end
+local function setLbl(lbl, txt) lbl.Text = txt; lblTexts[lbl] = txt end
+local function watchLbl(lbl)    lblTexts[lbl] = lbl.Text end
+
+local ang = 0
+RunService.Heartbeat:Connect(function(dt)
+    ang = (ang + dt*120) % 360
+    for i = #gradients, 1, -1 do
+        local g = gradients[i]
+        if g and g.Parent then g.Rotation = ang else table.remove(gradients, i) end
+    end
+    for obj, expected in pairs(lblTexts) do
+        if obj and obj.Parent then
+            if obj.Text ~= expected then obj.Text = expected end
+        else lblTexts[obj] = nil end
+    end
+end)
+
+local function mkLabel(parent, props)
+    local lbl = Instance.new("TextLabel")
+    lbl.Name = randStr(); lbl.BackgroundTransparency = 1; lbl.Selectable = false
+    for k,v in pairs(props) do lbl[k] = v end
+    lbl.Parent = parent; watchLbl(lbl)
+    return lbl
+end
+local function mkCorner(parent, r)
+    local c = Instance.new("UICorner"); c.Name = randStr(); c.CornerRadius = UDim.new(0,r or 10); c.Parent = parent; return c
+end
+local function mkStroke(parent, color, thickness, trans)
+    local s = Instance.new("UIStroke"); s.Name = randStr()
+    s.Color = color or Color3.fromRGB(255,0,0); s.Thickness = thickness or 1.5
+    s.Transparency = trans or 0.4; s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = parent; return s
+end
+local function addAnimStroke(frame, thickness, color)
+    local s = mkStroke(frame, color or Color3.fromRGB(255,0,0), thickness or 2, 0.3)
+    local g = Instance.new("UIGradient"); g.Name = randStr(); g.Parent = s
+    g.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0,0.2), NumberSequenceKeypoint.new(0.5,0.7), NumberSequenceKeypoint.new(1,0.2),
+    })
+    trackGrad(g); return s
+end
+
+local sgui = Instance.new("ScreenGui")
+sgui.Name = randStr(); sgui.ResetOnSpawn = false
+sgui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sgui.DisplayOrder = 2147483647
+if get_hidden_gui or gethui then
+    sgui.Parent = (get_hidden_gui or gethui)()
+elseif COREGUI:FindFirstChild("RobloxGui") then
+    sgui.Parent = COREGUI.RobloxGui
+else
+    sgui.Parent = COREGUI
+end
+
+local uiScale = Instance.new("UIScale")
+uiScale.Scale = 0.72
+uiScale.Parent = sgui
+
+local bw = M and 270 or 330; local bh = M and 62 or 78
+
+local topBar = Instance.new("Frame")
+topBar.Name = randStr(); topBar.Size = UDim2.new(0,bw,0,bh)
+topBar.Position = UDim2.new(0.5,0,0,M and -80 or -100)
+topBar.AnchorPoint = Vector2.new(0.5,0)
+topBar.BackgroundColor3 = Color3.fromRGB(0,0,0)
+topBar.BackgroundTransparency = 0.1; topBar.BorderSizePixel = 0; topBar.Parent = sgui
+mkCorner(topBar, M and 10 or 14)
+mkStroke(topBar, Color3.fromRGB(255,0,0), M and 1.5 or 2, 0.3)
+local topGrad = Instance.new("UIGradient"); topGrad.Name = randStr()
+topGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+})
+topGrad.Rotation = 135; topGrad.Parent = topBar
+
+local titleLbl = mkLabel(topBar, {
+    Size = UDim2.new(1,0,0,M and 22 or 28), Position = UDim2.new(0,0,0,M and 8 or 12),
+    Text = "skidded by john pork", Font = Enum.Font.GothamBold,
+    TextSize = M and 14 or 19, TextColor3 = Color3.fromRGB(255,255,255),
+})
+local titleGrad = Instance.new("UIGradient"); titleGrad.Name = randStr()
+titleGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,100,100)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0)),
+})
+titleGrad.Parent = titleLbl
+
+mkLabel(topBar, {
+    Size = UDim2.new(1,0,0,M and 13 or 16), Position = UDim2.new(0,0,0,M and 30 or 42),
+    Text = ".gg/john porky", Font = Enum.Font.GothamMedium,
+    TextSize = M and 10 or 12, TextColor3 = Color3.fromRGB(200,200,200),
+})
+local statsLbl = mkLabel(topBar, {
+    Size = UDim2.new(1,0,0,M and 13 or 16), Position = UDim2.new(0,0,0,M and 44 or 58),
+    Text = "FPS: --  |  PING: --ms", Font = Enum.Font.GothamMedium,
+    TextSize = M and 9 or 11, TextColor3 = Color3.fromRGB(200,200,200),
+})
+
+local cw = M and 192 or 240
+
+local outer = Instance.new("Frame")
+outer.Name = randStr(); outer.Position = UDim2.new(1,-cw-16,0,M and 90 or 118)
+outer.BackgroundTransparency = 1; outer.Parent = sgui
+mkCorner(outer, M and 10 or 14)
+
+local card = Instance.new("Frame")
+card.Name = randStr(); card.Size = UDim2.new(1,0,1,0)
+card.BackgroundColor3 = Color3.fromRGB(0,0,0)
+card.BackgroundTransparency = 0.08; card.BorderSizePixel = 0
+card.ClipsDescendants = true; card.Parent = outer
+mkCorner(card, M and 10 or 14)
+local cg = Instance.new("UIGradient"); cg.Name = randStr()
+cg.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+})
+cg.Rotation = 135; cg.Parent = card
+addAnimStroke(card, M and 1.5 or 2, Color3.fromRGB(255,0,0))
+
+local HDR_H = M and 34 or 44
+local header = Instance.new("Frame")
+header.Name = randStr(); header.Size = UDim2.new(1,0,0,HDR_H)
+header.BackgroundColor3 = Color3.fromRGB(10,10,10)
+header.BackgroundTransparency = 0.2; header.BorderSizePixel = 0; header.Parent = card
+mkCorner(header, M and 10 or 14); addAnimStroke(header, M and 1 or 1.5, Color3.fromRGB(255,0,0))
+mkLabel(header, {
+    Size = UDim2.new(1,0,1,0), Text = M and "skidded by john pork" or "skidded by john pork",
+    Font = Enum.Font.GothamBold, TextSize = M and 12 or 15,
+    TextColor3 = Color3.fromRGB(235,240,255), TextXAlignment = Enum.TextXAlignment.Center,
+})
+
+local ROW_H  = M and 30 or 36
+local ROW_PX = M and 8  or 11
+local ROW_PD = M and 5  or 7
+
+local function mkRow(parent, posY)
+    local row = Instance.new("Frame"); row.Name = randStr()
+    row.Size = UDim2.new(1,-ROW_PX*2,0,ROW_H); row.Position = UDim2.new(0,ROW_PX,0,posY)
+    row.BackgroundColor3 = Color3.fromRGB(15,15,15); row.BackgroundTransparency = 0.2
+    row.BorderSizePixel = 0; row.Parent = parent
+    mkCorner(row, M and 7 or 9); mkStroke(row, Color3.fromRGB(180,0,0), M and 1 or 1.5, 0.55)
+    return row
+end
+
+local function mkToggle(parent, txt, posY)
+    local row = mkRow(parent, posY)
+    mkLabel(row, {
+        Position = UDim2.new(0, M and 8 or 11, 0, 0),
+        Size = UDim2.new(1, M and -56 or -68, 1, 0),
+        Text = txt, Font = Enum.Font.GothamBold,
+        TextSize = M and 10 or 12, TextColor3 = Color3.fromRGB(205,215,245),
+        TextXAlignment = Enum.TextXAlignment.Left,
+    })
+    local btn = Instance.new("TextButton"); btn.Name = randStr()
+    btn.Size = UDim2.new(0, M and 38 or 44, 0, M and 20 or 24)
+    btn.Position = UDim2.new(1, M and -9 or -11, 0.5, 0); btn.AnchorPoint = Vector2.new(1,0.5)
+    btn.BackgroundColor3 = Color3.fromRGB(36,42,60); btn.Text = ""; btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false; btn.ClipsDescendants = true; btn.Selectable = false; btn.Parent = row
+    mkCorner(btn, 999)
+    local dot = Instance.new("Frame"); dot.Name = randStr()
+    dot.Size = UDim2.new(0, M and 13 or 16, 0, M and 13 or 16)
+    dot.Position = UDim2.new(0,3,0.5,0); dot.AnchorPoint = Vector2.new(0,0.5)
+    dot.BackgroundColor3 = Color3.fromRGB(130,140,170); dot.BorderSizePixel = 0; dot.Parent = btn
+    mkCorner(dot, 999)
+    local rowStroke = mkStroke(row, Color3.fromRGB(180,0,0), M and 1 or 1.5, 0.55)
+    return {frame=row, button=btn, indicator=dot, stroke=rowStroke}
+end
+
+local GAP = ROW_H + ROW_PD
+local Y0  = HDR_H + ROW_PD
+
+local tAutoTp = mkToggle(card, "AUTO TP",           Y0)
+local tPotion = mkToggle(card, "AUTO POTION",       Y0 + GAP)
+local tWalk   = mkToggle(card, "AUTO WALK",         Y0 + GAP*2)
+local tSpeed  = mkToggle(card, "SPEED BOOST",       Y0 + GAP*3)
+local tAp     = mkToggle(card, "AUTO AP",           Y0 + GAP*4)
+local tDesync = mkToggle(card, "AUTO DESYNC",       Y0 + GAP*5)
+
+local autoTpGearBtn = Instance.new("TextButton"); autoTpGearBtn.Name = randStr()
+autoTpGearBtn.Size = UDim2.new(0, M and 18 or 22, 0, M and 18 or 22)
+autoTpGearBtn.Position = UDim2.new(1, M and -52 or -62, 0.5, 0); autoTpGearBtn.AnchorPoint = Vector2.new(1,0.5)
+autoTpGearBtn.BackgroundColor3 = Color3.fromRGB(30,36,54); autoTpGearBtn.BorderSizePixel = 0
+autoTpGearBtn.Text = utf8.char(0x2699, 0xFE0F); autoTpGearBtn.TextSize = M and 14 or 16; autoTpGearBtn.Font = Enum.Font.GothamBold
+autoTpGearBtn.TextColor3 = Color3.fromRGB(200,200,200)
+autoTpGearBtn.AutoButtonColor = false; autoTpGearBtn.Selectable = false; autoTpGearBtn.ZIndex = 6; autoTpGearBtn.Parent = tAutoTp.frame
+mkCorner(autoTpGearBtn, 5)
+
+local speedGearBtn = Instance.new("TextButton"); speedGearBtn.Name = randStr()
+speedGearBtn.Size = UDim2.new(0, M and 18 or 22, 0, M and 18 or 22)
+speedGearBtn.Position = UDim2.new(1, M and -52 or -62, 0.5, 0); speedGearBtn.AnchorPoint = Vector2.new(1,0.5)
+speedGearBtn.BackgroundColor3 = Color3.fromRGB(30,36,54); speedGearBtn.BorderSizePixel = 0
+speedGearBtn.Text = utf8.char(0x2699, 0xFE0F); speedGearBtn.TextSize = M and 14 or 16; speedGearBtn.Font = Enum.Font.GothamBold
+speedGearBtn.TextColor3 = Color3.fromRGB(200,200,200)
+speedGearBtn.AutoButtonColor = false; speedGearBtn.Selectable = false; speedGearBtn.ZIndex = 6; speedGearBtn.Parent = tSpeed.frame
+mkCorner(speedGearBtn, 5)
+
+local gearBtn = Instance.new("TextButton"); gearBtn.Name = randStr()
+gearBtn.Size = UDim2.new(0, M and 18 or 22, 0, M and 18 or 22)
+gearBtn.Position = UDim2.new(1, M and -52 or -62, 0.5, 0); gearBtn.AnchorPoint = Vector2.new(1,0.5)
+gearBtn.BackgroundColor3 = Color3.fromRGB(30,36,54); gearBtn.BorderSizePixel = 0
+gearBtn.Text = utf8.char(0x2699, 0xFE0F); gearBtn.TextSize = M and 14 or 16; gearBtn.Font = Enum.Font.GothamBold
+gearBtn.TextColor3 = Color3.fromRGB(200,200,200)
+gearBtn.AutoButtonColor = false; gearBtn.Selectable = false; gearBtn.ZIndex = 6; gearBtn.Parent = tAp.frame
+mkCorner(gearBtn, 5)
+
+local slotRowY = Y0 + GAP*6
+local slotRow  = mkRow(card, slotRowY)
+mkLabel(slotRow, {
+    Position = UDim2.new(0, M and 8 or 11, 0, 0), Size = UDim2.new(0.42,0,1,0),
+    Text = "STEAL SLOT", Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(150,162,205), TextXAlignment = Enum.TextXAlignment.Left,
+})
+local slotBtn = Instance.new("TextButton"); slotBtn.Name = randStr()
+slotBtn.Size = UDim2.new(0, M and 96 or 120, 0, M and 18 or 22)
+slotBtn.Position = UDim2.new(1, M and -8 or -10, 0.5, 0); slotBtn.AnchorPoint = Vector2.new(1,0.5)
+slotBtn.BackgroundColor3 = Color3.fromRGB(30,36,54); slotBtn.BorderSizePixel = 0
+slotBtn.Text = semiv2cfg.slotMode or "First Slot"; slotBtn.Font = Enum.Font.GothamBold
+slotBtn.TextSize = M and 15 or 17; slotBtn.TextColor3 = Color3.fromRGB(170,184,255)
+slotBtn.AutoButtonColor = false; slotBtn.Selectable = false; slotBtn.ZIndex = 6; slotBtn.Parent = slotRow
+mkCorner(slotBtn, 5); mkStroke(slotBtn, Color3.fromRGB(255,0,0), M and 1 or 1.5, 0.45)
+
+local modeRowY = Y0 + GAP*7
+local modeRow  = mkRow(card, modeRowY)
+mkLabel(modeRow, {
+    Position = UDim2.new(0, M and 8 or 11, 0, 0), Size = UDim2.new(0.42,0,1,0),
+    Text = "STEAL MODE", Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(150,162,205), TextXAlignment = Enum.TextXAlignment.Left,
+})
+local modeBtn = Instance.new("TextButton"); modeBtn.Name = randStr()
+modeBtn.Size = UDim2.new(0, M and 96 or 120, 0, M and 18 or 22)
+modeBtn.Position = UDim2.new(1, M and -8 or -10, 0.5, 0); modeBtn.AnchorPoint = Vector2.new(1,0.5)
+modeBtn.BackgroundColor3 = Color3.fromRGB(30,36,54); modeBtn.BorderSizePixel = 0
+modeBtn.Text = semiv2cfg.semiInstantMode or "Semi"; modeBtn.Font = Enum.Font.GothamBold
+modeBtn.TextSize = M and 15 or 17; modeBtn.TextColor3 = Color3.fromRGB(170,184,255)
+modeBtn.AutoButtonColor = false; modeBtn.Selectable = false; modeBtn.ZIndex = 6; modeBtn.Parent = modeRow
+mkCorner(modeBtn, 5); mkStroke(modeBtn, Color3.fromRGB(255,0,0), M and 1 or 1.5, 0.45)
+
+local methodRowY = Y0 + GAP*8
+local methodRow  = mkRow(card, methodRowY)
+mkLabel(methodRow, {
+    Position = UDim2.new(0, M and 8 or 11, 0, 0), Size = UDim2.new(0.42,0,1,0),
+    Text = "STEAL METHOD", Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(150,162,205), TextXAlignment = Enum.TextXAlignment.Left,
+})
+local methodBtn = Instance.new("TextButton"); methodBtn.Name = randStr()
+methodBtn.Size = UDim2.new(0, M and 96 or 120, 0, M and 18 or 22)
+methodBtn.Position = UDim2.new(1, M and -8 or -10, 0.5, 0); methodBtn.AnchorPoint = Vector2.new(1,0.5)
+methodBtn.BackgroundColor3 = Color3.fromRGB(30,36,54); methodBtn.BorderSizePixel = 0
+methodBtn.Text = semiv2cfg.stealMethod or "Ragdoll"; methodBtn.Font = Enum.Font.GothamBold
+methodBtn.TextSize = M and 15 or 17; methodBtn.TextColor3 = Color3.fromRGB(170,184,255)
+methodBtn.AutoButtonColor = false; methodBtn.Selectable = false; methodBtn.ZIndex = 6; methodBtn.Parent = methodRow
+mkCorner(methodBtn, 5); mkStroke(methodBtn, Color3.fromRGB(255,0,0), M and 1 or 1.5, 0.45)
+
+local tpBtnY = Y0 + GAP*9
+local tpRow  = mkRow(card, tpBtnY)
+mkStroke(tpRow, Color3.fromRGB(255,0,0), M and 1 or 1.5, 0.35)
+mkLabel(tpRow, {
+    Size = UDim2.new(1,0,1,0), Text = "DO INSTANT STEAL",
+    Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(225,232,255), TextXAlignment = Enum.TextXAlignment.Center,
+})
+local tpBtnClick = Instance.new("TextButton"); tpBtnClick.Name = randStr()
+tpBtnClick.Size = UDim2.new(1,0,1,0); tpBtnClick.BackgroundTransparency = 1
+tpBtnClick.Text = ""; tpBtnClick.ZIndex = 5; tpBtnClick.Parent = tpRow
+
+local kbRowY = tpBtnY + GAP
+local kbRow  = mkRow(card, kbRowY)
+mkLabel(kbRow, {
+    Position = UDim2.new(0, M and 8 or 11, 0, 0), Size = UDim2.new(0.5,0,1,0),
+    Text = "STEAL KEY", Font = Enum.Font.GothamBold, TextSize = M and 10 or 12,
+    TextColor3 = Color3.fromRGB(150,162,205), TextXAlignment = Enum.TextXAlignment.Left,
+})
+local kbBtn = Instance.new("TextButton"); kbBtn.Name = randStr()
+kbBtn.Size = UDim2.new(0, M and 44 or 52, 0, M and 18 or 22)
+kbBtn.Position = UDim2.new(1, M and -8 or -10, 0.5, 0); kbBtn.AnchorPoint = Vector2.new(1,0.5)
+kbBtn.BackgroundColor3 = Color3.fromRGB(30,36,54); kbBtn.BorderSizePixel = 0
+kbBtn.Text = "[ "..semiv2cfg.stealKey.." ]"; kbBtn.Font = Enum.Font.GothamBold
+kbBtn.TextSize = M and 13 or 15; kbBtn.TextColor3 = Color3.fromRGB(170,184,255)
+kbBtn.AutoButtonColor = false; kbBtn.Selectable = false; kbBtn.ZIndex = 6; kbBtn.Parent = kbRow
+mkCorner(kbBtn, 5); mkStroke(kbBtn, Color3.fromRGB(255,0,0), M and 1 or 1.5, 0.45)
+kbLabel = kbBtn
+
+local totalH = kbRowY + ROW_H + ROW_PD
+outer.Size = UDim2.new(0, cw, 0, totalH)
+local setAutoTpEnabled
+
+local function animToggle(t, on)
+    local tpos  = on and UDim2.new(1, M and -16 or -20, 0.5,0) or UDim2.new(0,3,0.5,0)
+    local tclr  = on and Color3.fromRGB(255,0,0)  or Color3.fromRGB(36,42,60)
+    local ticlr = on and Color3.fromRGB(255,255,255) or Color3.fromRGB(130,140,170)
+    local tsclr = on and Color3.fromRGB(255,0,0)  or Color3.fromRGB(180,0,0)
+    TweenService:Create(t.indicator, TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {Position=tpos}):Play()
+    TweenService:Create(t.button,    TweenInfo.new(0.2,Enum.EasingStyle.Quad), {BackgroundColor3=tclr}):Play()
+    TweenService:Create(t.indicator, TweenInfo.new(0.2,Enum.EasingStyle.Quad), {BackgroundColor3=ticlr}):Play()
+    TweenService:Create(t.stroke,    TweenInfo.new(0.2,Enum.EasingStyle.Quad), {Color=tsclr, Transparency=on and 0.25 or 0.55}):Play()
+end
+
+animToggle(tAutoTp, semiv2cfg.autoTpEnabled)
+animToggle(tPotion, semiv2cfg.autoPotion)
+animToggle(tWalk,   semiv2cfg.autoWalk)
+animToggle(tSpeed,  semiv2cfg.speedBoost)
+animToggle(tAp,     semiv2cfg.autoAdminSpam)
+animToggle(tDesync, semiv2cfg.autoDesync)
+
+tDesync.button.MouseButton1Click:Connect(function()
+    semiv2cfg.autoDesync = not semiv2cfg.autoDesync
+    animToggle(tDesync, semiv2cfg.autoDesync)
+    if semiv2cfg.autoDesync then
+        queueAutoReset()
+    else
+        autoResetQueued = false
+    end
+    saveCfg()
+end)
+
+tAutoTp.button.MouseButton1Click:Connect(function()
+    setAutoTpEnabled(not semiv2cfg.autoTpEnabled)
+    saveCfg()
+end)
+tPotion.button.MouseButton1Click:Connect(function()
+    semiv2cfg.autoPotion = not semiv2cfg.autoPotion; animToggle(tPotion, semiv2cfg.autoPotion); saveCfg()
+end)
+tWalk.button.MouseButton1Click:Connect(function()
+    semiv2cfg.autoWalk = not semiv2cfg.autoWalk; animToggle(tWalk, semiv2cfg.autoWalk); saveCfg()
+end)
+tSpeed.button.MouseButton1Click:Connect(function()
+    semiv2cfg.speedBoost = not semiv2cfg.speedBoost
+    animToggle(tSpeed, semiv2cfg.speedBoost)
+    saveCfg()
+end)
+tAp.button.MouseButton1Click:Connect(function()
+    semiv2cfg.autoAdminSpam = not semiv2cfg.autoAdminSpam; animToggle(tAp, semiv2cfg.autoAdminSpam); saveCfg()
+end)
+slotBtn.MouseButton1Click:Connect(function()
+    if semiv2cfg.slotMode == "First Slot" then
+        semiv2cfg.slotMode = "Second Slot"
+    elseif semiv2cfg.slotMode == "Second Slot" then
+        semiv2cfg.slotMode = "Top Floor First Slot"
+    else
+        semiv2cfg.slotMode = "First Slot"
+    end
+    slotBtn.Text = semiv2cfg.slotMode
+    saveCfg()
+end)
+modeBtn.MouseButton1Click:Connect(function()
+    semiv2cfg.semiInstantMode = (semiv2cfg.semiInstantMode == "Full") and "Semi" or "Full"
+    modeBtn.Text = semiv2cfg.semiInstantMode
+    saveCfg()
+end)
+methodBtn.MouseButton1Click:Connect(function()
+    if semiv2cfg.stealMethod == "Ragdoll" then
+        semiv2cfg.stealMethod = "Walk"
+    elseif semiv2cfg.stealMethod == "Walk" then
+        semiv2cfg.stealMethod = "Prime"
+    else
+        semiv2cfg.stealMethod = "Ragdoll"
+    end
+    methodBtn.Text = semiv2cfg.stealMethod
+    saveCfg()
+end)
+
+kbBtn.MouseButton1Click:Connect(function()
+    if rebindListening then return end
+    rebindListening = true; kbBtn.Text = "[ ... ]"; kbBtn.TextColor3 = Color3.fromRGB(255,200,60)
+end)
+
+local spamPanel     = nil
+local spamPanelOpen = false
+local autoTpPanel = nil
+local autoTpPanelOpen = false
+local speedPanel = nil
+local speedPanelOpen = false
+
+local function formatSpeedValue(value)
+    return string.format("%.1f", math.clamp(tonumber(value) or 16, 16, 200))
+end
+
+setAutoTpEnabled = function(enabled)
+    semiv2cfg.autoTpEnabled = enabled
+    animToggle(tAutoTp, semiv2cfg.autoTpEnabled)
+end
+
+local function buildAutoTpPanel()
+    if autoTpPanel then autoTpPanel:Destroy() end
+    local panel = Instance.new("Frame"); panel.Name = randStr()
+    panel.Size = UDim2.new(1,0,1,0); panel.Position = UDim2.new(1,0,0,0)
+    panel.BackgroundColor3 = Color3.fromRGB(0,0,0); panel.BackgroundTransparency = 0
+    panel.BorderSizePixel = 0; panel.ZIndex = 10; panel.ClipsDescendants = true; panel.Visible = false
+    panel.Parent = outer
+    mkCorner(panel, M and 10 or 14); addAnimStroke(panel, M and 1.5 or 2, Color3.fromRGB(255,0,0))
+
+    local backBtn = Instance.new("TextButton"); backBtn.Name = randStr()
+    backBtn.Size = UDim2.new(0, M and 22 or 26, 0, M and 22 or 26)
+    backBtn.Position = UDim2.new(0, M and 6 or 8, 0, M and 6 or 8)
+    backBtn.BackgroundColor3 = Color3.fromRGB(28,32,48); backBtn.BorderSizePixel = 0
+    backBtn.Text = utf8.char(0x2190); backBtn.Font = Enum.Font.GothamBold
+    backBtn.TextSize = M and 11 or 13; backBtn.TextColor3 = Color3.fromRGB(150,162,210)
+    backBtn.AutoButtonColor = false; backBtn.Selectable = false; backBtn.ZIndex = 11; backBtn.Parent = panel
+    mkCorner(backBtn, 5)
+    mkLabel(panel, {
+        Size = UDim2.new(1,-(M and 34 or 40),0,M and 22 or 26),
+        Position = UDim2.new(0, M and 30 or 36, 0, M and 6 or 8),
+        Text = "Auto TP Settings", Font = Enum.Font.GothamBold, TextSize = M and 9 or 11,
+        TextColor3 = Color3.fromRGB(225,232,255), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11,
+    })
+    local div = Instance.new("Frame"); div.Name = randStr()
+    div.Size = UDim2.new(1,-(M and 10 or 16),0,1); div.Position = UDim2.new(0, M and 5 or 8, 0, M and 32 or 38)
+    div.BackgroundColor3 = Color3.fromRGB(40,46,68); div.BorderSizePixel = 0; div.ZIndex = 11; div.Parent = panel
+
+    local items = {
+        {"ON UNLOCK", "unlockAutoTp"},
+        {"ON TIMER", "timerAutoTp"},
+        {"ON ALLOW", "allowAutoTp"},
+        {"ON RESPAWN", "autoInstantStealOnRespawn"},
+    }
+    for i, item in ipairs(items) do
+        local toggle = mkToggle(panel, item[1], (M and 46 or 54) + (i - 1) * GAP)
+        animToggle(toggle, semiv2cfg[item[2]])
+        toggle.button.MouseButton1Click:Connect(function()
+            semiv2cfg[item[2]] = not semiv2cfg[item[2]]
+            animToggle(toggle, semiv2cfg[item[2]])
+            saveCfg()
+        end)
+    end
+
+    local function openPanel()
+        panel.Visible = true; panel.Position = UDim2.new(1,0,0,0)
+        TweenService:Create(panel, TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {Position=UDim2.new(0,0,0,0)}):Play()
+        autoTpPanelOpen = true
+    end
+    local function closePanel()
+        local t = TweenService:Create(panel, TweenInfo.new(0.17,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position=UDim2.new(1,0,0,0)})
+        t:Play(); t.Completed:Connect(function() panel.Visible = false end); autoTpPanelOpen = false
+    end
+    backBtn.MouseButton1Click:Connect(closePanel)
+    autoTpPanel = panel
+    return openPanel
+end
+
+local function buildSpeedPanel()
+    if speedPanel then speedPanel:Destroy() end
+    local panel = Instance.new("Frame"); panel.Name = randStr()
+    panel.Size = UDim2.new(1,0,1,0); panel.Position = UDim2.new(1,0,0,0)
+    panel.BackgroundColor3 = Color3.fromRGB(0,0,0); panel.BackgroundTransparency = 0
+    panel.BorderSizePixel = 0; panel.ZIndex = 10; panel.ClipsDescendants = true; panel.Visible = false
+    panel.Parent = outer
+    mkCorner(panel, M and 10 or 14); addAnimStroke(panel, M and 1.5 or 2, Color3.fromRGB(255,0,0))
+
+    local backBtn = Instance.new("TextButton"); backBtn.Name = randStr()
+    backBtn.Size = UDim2.new(0, M and 22 or 26, 0, M and 22 or 26)
+    backBtn.Position = UDim2.new(0, M and 6 or 8, 0, M and 6 or 8)
+    backBtn.BackgroundColor3 = Color3.fromRGB(28,32,48); backBtn.BorderSizePixel = 0
+    backBtn.Text = utf8.char(0x2190); backBtn.Font = Enum.Font.GothamBold
+    backBtn.TextSize = M and 11 or 13; backBtn.TextColor3 = Color3.fromRGB(150,162,210)
+    backBtn.AutoButtonColor = false; backBtn.Selectable = false; backBtn.ZIndex = 11; backBtn.Parent = panel
+    mkCorner(backBtn, 5)
+    mkLabel(panel, {
+        Size = UDim2.new(1,-(M and 34 or 40),0,M and 22 or 26),
+        Position = UDim2.new(0, M and 30 or 36, 0, M and 6 or 8),
+        Text = "Speed Boost Settings", Font = Enum.Font.GothamBold, TextSize = M and 9 or 11,
+        TextColor3 = Color3.fromRGB(225,232,255), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11,
+    })
+    local div = Instance.new("Frame"); div.Name = randStr()
+    div.Size = UDim2.new(1,-(M and 10 or 16),0,1); div.Position = UDim2.new(0, M and 5 or 8, 0, M and 32 or 38)
+    div.BackgroundColor3 = Color3.fromRGB(40,46,68); div.BorderSizePixel = 0; div.ZIndex = 11; div.Parent = panel
+
+    local items = {
+        {"STEALING SPEED", "speedBoostStealingSpeed"},
+        {"GIANT SPEED", "speedBoostGiantSpeed"},
+    }
+    for i, item in ipairs(items) do
+        local row = mkRow(panel, (M and 46 or 54) + (i - 1) * GAP)
+        mkLabel(row, {
+            Position = UDim2.new(0, M and 8 or 11, 0, 0), Size = UDim2.new(0.56,0,1,0),
+            Text = item[1], Font = Enum.Font.GothamBold, TextSize = M and 9 or 11,
+            TextColor3 = Color3.fromRGB(150,162,205), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12,
+        })
+        local box = Instance.new("TextBox"); box.Name = randStr()
+        box.Size = UDim2.new(0, M and 96 or 120, 0, M and 18 or 22)
+        box.Position = UDim2.new(1, M and -8 or -10, 0.5, 0); box.AnchorPoint = Vector2.new(1,0.5)
+        box.BackgroundColor3 = Color3.fromRGB(30,36,54); box.BorderSizePixel = 0
+        box.Text = formatSpeedValue(semiv2cfg[item[2]])
+        box.PlaceholderText = "27.6"; box.ClearTextOnFocus = false
+        box.Font = Enum.Font.GothamBold; box.TextSize = M and 13 or 15
+        box.TextColor3 = Color3.fromRGB(170,184,255); box.Selectable = true
+        box.ZIndex = 13; box.Parent = row
+        mkCorner(box, 5); mkStroke(box, Color3.fromRGB(255,0,0), M and 1 or 1.5, 0.45)
+        box.FocusLost:Connect(function()
+            local value = tonumber((box.Text or ""):gsub(",", "."))
+            if value then
+                semiv2cfg[item[2]] = math.clamp(value, 16, 200)
+                saveCfg()
+            end
+            box.Text = formatSpeedValue(semiv2cfg[item[2]])
+        end)
+    end
+
+    local function openPanel()
+        panel.Visible = true; panel.Position = UDim2.new(1,0,0,0)
+        TweenService:Create(panel, TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {Position=UDim2.new(0,0,0,0)}):Play()
+        speedPanelOpen = true
+    end
+    local function closePanel()
+        local t = TweenService:Create(panel, TweenInfo.new(0.17,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position=UDim2.new(1,0,0,0)})
+        t:Play(); t.Completed:Connect(function() panel.Visible = false end); speedPanelOpen = false
+    end
+    backBtn.MouseButton1Click:Connect(closePanel)
+    speedPanel = panel
+    return openPanel
+end
+
+local function buildSpamPanel()
+    if spamPanel then spamPanel:Destroy() end
+    local panel = Instance.new("Frame"); panel.Name = randStr()
+    panel.Size = UDim2.new(1,0,1,0); panel.Position = UDim2.new(1,0,0,0)
+    panel.BackgroundColor3 = Color3.fromRGB(0,0,0); panel.BackgroundTransparency = 0
+    panel.BorderSizePixel = 0; panel.ZIndex = 10; panel.ClipsDescendants = true; panel.Visible = false
+    panel.Parent = outer
+    mkCorner(panel, M and 10 or 14); addAnimStroke(panel, M and 1.5 or 2, Color3.fromRGB(255,0,0))
+
+    local backBtn = Instance.new("TextButton"); backBtn.Name = randStr()
+    backBtn.Size = UDim2.new(0, M and 22 or 26, 0, M and 22 or 26)
+    backBtn.Position = UDim2.new(0, M and 6 or 8, 0, M and 6 or 8)
+    backBtn.BackgroundColor3 = Color3.fromRGB(28,32,48); backBtn.BorderSizePixel = 0
+    backBtn.Text = utf8.char(0x2190); backBtn.Font = Enum.Font.GothamBold
+    backBtn.TextSize = M and 11 or 13; backBtn.TextColor3 = Color3.fromRGB(150,162,210)
+    backBtn.AutoButtonColor = false; backBtn.Selectable = false; backBtn.ZIndex = 11; backBtn.Parent = panel
+    mkCorner(backBtn, 5)
+    mkLabel(panel, {
+        Size = UDim2.new(1,-(M and 34 or 40),0,M and 22 or 26),
+        Position = UDim2.new(0, M and 30 or 36, 0, M and 6 or 8),
+        Text = "Spam Commands On Steal", Font = Enum.Font.GothamBold, TextSize = M and 9 or 11,
+        TextColor3 = Color3.fromRGB(225,232,255), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11,
+    })
+    local div = Instance.new("Frame"); div.Name = randStr()
+    div.Size = UDim2.new(1,-(M and 10 or 16),0,1); div.Position = UDim2.new(0, M and 5 or 8, 0, M and 32 or 38)
+    div.BackgroundColor3 = Color3.fromRGB(40,46,68); div.BorderSizePixel = 0; div.ZIndex = 11; div.Parent = panel
+    local sy = M and 38 or 44
+    mkLabel(panel, {
+        Size = UDim2.new(1,-(M and 10 or 16),0,M and 12 or 14), Position = UDim2.new(0, M and 5 or 8, 0, sy),
+        Text = "tap to toggle", Font = Enum.Font.GothamMedium, TextSize = M and 8 or 9,
+        TextColor3 = Color3.fromRGB(80,90,135), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11,
+    })
+    sy = sy + (M and 14 or 17)
+
+    local scroll = Instance.new("ScrollingFrame"); scroll.Name = randStr()
+    scroll.Size = UDim2.new(1,-(M and 10 or 14),1,-(sy+(M and 5 or 6))); scroll.Position = UDim2.new(0, M and 5 or 7, 0, sy)
+    scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = M and 2 or 3; scroll.ScrollBarImageColor3 = Color3.fromRGB(255,0,0)
+    scroll.CanvasSize = UDim2.new(0,0,0,0); scroll.ZIndex = 11; scroll.Parent = panel
+    local layout = Instance.new("UIListLayout"); layout.Name = randStr()
+    layout.Padding = UDim.new(0, M and 4 or 5); layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.Parent = scroll
+
+    local RH   = M and 24 or 28
+    local BLUE = Color3.fromRGB(255,0,0)
+    local cboxes = {}
+
+    local function isActive(cmd)
+        for _, v in ipairs(semiv2cfg.spamOnSteal) do if v == cmd then return true end end; return false
+    end
+    local function setActive(box, active)
+        box.active = active
+        TweenService:Create(box.bg, TweenInfo.new(0.15), {
+            BackgroundColor3 = active and Color3.fromRGB(40,0,0) or Color3.fromRGB(22,26,38),
+            BackgroundTransparency = active and 0 or 0.25,
+        }):Play()
+        TweenService:Create(box.check, TweenInfo.new(0.15), {BackgroundColor3 = active and BLUE or Color3.fromRGB(44,50,70)}):Play()
+        TweenService:Create(box.checkStroke, TweenInfo.new(0.15), {Color = active and BLUE or Color3.fromRGB(50,58,82)}):Play()
+        box.tickLbl.TextTransparency = active and 0 or 1
+    end
+    local function rebuildAndSave()
+        local lst = {}
+        for cmd, box in pairs(cboxes) do if box.active then table.insert(lst, cmd) end end
+        semiv2cfg.spamOnSteal = lst; saveCfg()
+    end
+
+    for i, cmd in ipairs(semiv2cfg.allSpamCmds) do
+        local row = Instance.new("Frame"); row.Name = randStr()
+        row.Size = UDim2.new(1,0,0,RH); row.LayoutOrder = i
+        row.BackgroundColor3 = Color3.fromRGB(22,26,38); row.BackgroundTransparency = 0.25
+        row.BorderSizePixel = 0; row.ZIndex = 12; row.Parent = scroll
+        mkCorner(row, M and 5 or 7)
+        local rs = mkStroke(row, Color3.fromRGB(180,0,0), M and 1 or 1.5, 0.5); rs.ZIndex = 12
+        mkLabel(row, {
+            Position = UDim2.new(0, M and 7 or 9, 0, 0), Size = UDim2.new(1,-(M and 30 or 38),1,0),
+            Text = cmd, Font = Enum.Font.GothamBold, TextSize = M and 9 or 11,
+            TextColor3 = Color3.fromRGB(205,215,245), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13,
+        })
+        local cbS = M and 13 or 16
+        local cb  = Instance.new("Frame"); cb.Name = randStr()
+        cb.Size = UDim2.new(0,cbS,0,cbS); cb.Position = UDim2.new(1,-(M and 14 or 18),0.5,0)
+        cb.AnchorPoint = Vector2.new(1,0.5); cb.BackgroundColor3 = Color3.fromRGB(44,50,70)
+        cb.BorderSizePixel = 0; cb.ZIndex = 13; cb.Parent = row; mkCorner(cb, 3)
+        local cbs = mkStroke(cb, Color3.fromRGB(50,58,82), M and 1.5 or 2, 0); cbs.ZIndex = 13
+        local tickLbl = mkLabel(cb, {
+            Size = UDim2.new(1,0,1,0), Text = utf8.char(0x2713), Font = Enum.Font.GothamBold, TextSize = M and 9 or 11,
+            TextColor3 = Color3.fromRGB(255,255,255), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 14,
+        })
+        local box = {bg=row, check=cb, checkStroke=cbs, tickLbl=tickLbl, active=false}
+        cboxes[cmd] = box; setActive(box, isActive(cmd))
+        local clk = Instance.new("TextButton"); clk.Name = randStr()
+        clk.Size = UDim2.new(1,0,1,0); clk.BackgroundTransparency = 1
+        clk.Text = ""; clk.ZIndex = 15; clk.Parent = row
+        clk.MouseButton1Click:Connect(function() setActive(box, not box.active); rebuildAndSave() end)
+    end
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroll.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y+5)
+    end)
+    scroll.CanvasSize = UDim2.new(0,0,0,#semiv2cfg.allSpamCmds*(RH+(M and 4 or 5))+5)
+
+    local function openPanel()
+        panel.Visible = true; panel.Position = UDim2.new(1,0,0,0)
+        TweenService:Create(panel, TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {Position=UDim2.new(0,0,0,0)}):Play()
+        spamPanelOpen = true
+    end
+    local function closePanel()
+        local t = TweenService:Create(panel, TweenInfo.new(0.17,Enum.EasingStyle.Quad,Enum.EasingDirection.In), {Position=UDim2.new(1,0,0,0)})
+        t:Play(); t.Completed:Connect(function() panel.Visible = false end); spamPanelOpen = false
+    end
+    backBtn.MouseButton1Click:Connect(closePanel)
+    spamPanel = panel; return openPanel
+end
+
+local openSpam = buildSpamPanel()
+local openAutoTp = buildAutoTpPanel()
+local openSpeed = buildSpeedPanel()
+gearBtn.MouseButton1Click:Connect(openSpam)
+autoTpGearBtn.MouseButton1Click:Connect(openAutoTp)
+speedGearBtn.MouseButton1Click:Connect(openSpeed)
+
+local dragging = false; local dragStart, dragOrigin
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStart = input.Position; dragOrigin = outer.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        outer.Position = UDim2.new(dragOrigin.X.Scale, dragOrigin.X.Offset+delta.X, dragOrigin.Y.Scale, dragOrigin.Y.Offset+delta.Y)
+    end
+end)
+
+local enemyPlots  = {}
+local knownOwners = {}
+
+local function refreshEnemyPlots()
+    enemyPlots = {}
+    local myName  = player.DisplayName
+    local current = {}
+    local hasNew  = false
+    for _, plot in ipairs(plots:GetChildren()) do
+        local sign  = plot:FindFirstChild("PlotSign")
+        local label = sign and sign:FindFirstChild("SurfaceGui")
+            and sign.SurfaceGui:FindFirstChild("Frame")
+            and sign.SurfaceGui.Frame:FindFirstChild("TextLabel")
+        if label and label.Text ~= "Empty Base" then
+            local owner = label.Text:gsub("'s Base$",""):gsub("'s base$",""):gsub("%s+$","")
+            current[plot] = owner
+            if owner ~= myName then table.insert(enemyPlots, plot) end
+        end
+    end
+    for plot, owner in pairs(current) do
+        if not knownOwners[plot] or knownOwners[plot] ~= owner then hasNew = true; knownOwners[plot] = owner end
+    end
+    for plot in pairs(knownOwners) do
+        if not current[plot] then knownOwners[plot] = nil; hasNew = true end
+    end
+    return hasNew
+end
+
+local greenPos, redPos
+local redDot, greenDot, guideLine
+
+local function clearMarkers()
+    if redDot    then redDot:Destroy();    redDot    = nil end
+    if greenDot  then greenDot:Destroy();  greenDot  = nil end
+    if guideLine then guideLine:Destroy(); guideLine = nil end
+    redPos = nil; greenPos = nil
+end
+
+local function spawnMarkers()
+    clearMarkers(); refreshEnemyPlots()
+    if #enemyPlots == 0 then return end
+    local tPlot   = enemyPlots[1]
+    local podiums = tPlot:FindFirstChild("AnimalPodiums"); if not podiums then return end
+    local p1  = podiums:FindFirstChild("1"); local p10 = podiums:FindFirstChild("10")
+    if not p1 or not p10 then return end
+    local p1m  = p1:FindFirstChild("Claim")  and p1.Claim:FindFirstChild("Main")
+    local p10m = p10:FindFirstChild("Claim") and p10.Claim:FindFirstChild("Main")
+    if not p1m or not p10m then return end
+
+    local p1pos = p1m.Position; local p10pos = p10m.Position
+    local ro1 = Vector3.new(-337,-5,100); local ro2 = Vector3.new(-335,-5,20)
+    local go1 = Vector3.new(-347.12,-6.67,81.64); local go2 = Vector3.new(-349.43,-6.78,37.47)
+    if math.min((ro1-p1pos).Magnitude,(ro1-p10pos).Magnitude) < math.min((ro2-p1pos).Magnitude,(ro2-p10pos).Magnitude) then
+        redPos = ro1; greenPos = go1
+    else
+        redPos = ro2; greenPos = go2
+    end
+
+    redDot = Instance.new("Part"); redDot.Name = "LaserTargetDot"
+    redDot.Shape = Enum.PartType.Ball; redDot.Size = Vector3.new(2,2,2)
+    redDot.Color = Color3.fromRGB(255,60,60); redDot.Material = Enum.Material.Neon
+    redDot.Anchored = true; redDot.CanCollide = false; redDot.CFrame = CFrame.new(redPos); redDot.Parent = workspace
+    local rgl = Instance.new("PointLight"); rgl.Brightness=3; rgl.Range=15; rgl.Color=Color3.fromRGB(255,60,60); rgl.Parent=redDot
+    local rbb = Instance.new("BillboardGui"); rbb.Size=UDim2.new(0,100,0,40); rbb.StudsOffset=Vector3.new(0,2,0); rbb.AlwaysOnTop=true; rbb.Parent=redDot
+    mkLabel(rbb, {Size=UDim2.new(1,0,1,0), Text="STAND HERE", TextColor3=Color3.fromRGB(255,255,255), TextSize=18, Font=Enum.Font.GothamBold, TextStrokeTransparency=0.5})
+
+    greenDot = Instance.new("Part"); greenDot.Name = "GreenDot"
+    greenDot.Shape = Enum.PartType.Ball; greenDot.Size = Vector3.new(2,2,2)
+    greenDot.Color = Color3.fromRGB(60,255,100); greenDot.Material = Enum.Material.Neon
+    greenDot.Anchored = true; greenDot.CanCollide = false; greenDot.CFrame = CFrame.new(greenPos); greenDot.Parent = workspace
+    local ggl = Instance.new("PointLight"); ggl.Brightness=3; ggl.Range=15; ggl.Color=Color3.fromRGB(60,255,100); ggl.Parent=greenDot
+    local gbb = Instance.new("BillboardGui"); gbb.Size=UDim2.new(0,120,0,40); gbb.StudsOffset=Vector3.new(0,2,0); gbb.AlwaysOnTop=true; gbb.Parent=greenDot
+    mkLabel(gbb, {Size=UDim2.new(1,0,1,0), Text="TP HERE", TextColor3=Color3.fromRGB(255,255,255), TextSize=18, Font=Enum.Font.GothamBold, TextStrokeTransparency=0.5})
+
+    guideLine = Instance.new("Part"); guideLine.Name="GuideLine"; guideLine.Anchored=true; guideLine.CanCollide=false
+    guideLine.Material=Enum.Material.Neon; guideLine.Color=Color3.fromRGB(255,255,60)
+    guideLine.Size=Vector3.new(0.3,0.3,1); guideLine.Parent=workspace
+end
+
+task.spawn(function()
+    spawnMarkers()
+    while wait(1) do
+        if refreshEnemyPlots() or not redDot or not greenDot then spawnMarkers() end
+    end
+end)
+
+task.spawn(function()
+    for _, plot in ipairs(plots:GetChildren()) do
+        local sign = plot:FindFirstChild("PlotSign"); if not sign then continue end
+        local sg = sign:FindFirstChild("SurfaceGui"); if not sg then continue end
+        local fr = sg:FindFirstChild("Frame"); if not fr then continue end
+        local lbl = fr:FindFirstChild("TextLabel")
+        if lbl then lbl:GetPropertyChangedSignal("Text"):Connect(function() spawnMarkers() end) end
+    end
+    plots.ChildAdded:Connect(function(plot)
+        task.wait(1)
+        local sign = plot:WaitForChild("PlotSign",5); if not sign then return end
+        local sg   = sign:WaitForChild("SurfaceGui",5); if not sg then return end
+        local fr   = sg:WaitForChild("Frame",5); if not fr then return end
+        local lbl  = fr:WaitForChild("TextLabel",5)
+        if lbl then lbl:GetPropertyChangedSignal("Text"):Connect(function() task.wait(0.5); spawnMarkers() end) end
+        spawnMarkers()
+    end)
+end)
+
+local function drinkPotion()
+    if not semiv2cfg.autoPotion then return end
+    local tool = player.Character:FindFirstChild("Giant Potion") or player.Backpack:FindFirstChild("Giant Potion")
+    if tool then player.Character.Humanoid:EquipTool(tool); tool:activate() end
+end
+
+local canDirectTp
+local doApproachPath
+local tpThroughWaypoints
+
+local lastFrame = tick()
+local frameCnt  = 0
+
+RunService.RenderStepped:Connect(function()
+    frameCnt += 1
+    local now = tick()
+    if now - lastFrame >= 0.5 then
+        local fps  = math.floor(frameCnt / (now - lastFrame))
+        local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        setLbl(statsLbl, string.format("FPS: %d  |  PING: %dms", fps, ping))
+        frameCnt = 0; lastFrame = now
+    end
+    titleGrad.Rotation = (tick() * 80) % 360
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+    if not redPos or not guideLine then return end
+    local hrp    = player.Character.HumanoidRootPart
+    local ppos   = hrp.Position
+    local d = (ppos - redPos).Magnitude
+    guideLine.Size  = Vector3.new(0.3,0.3,d)
+    guideLine.CFrame = CFrame.new(ppos, redPos) * CFrame.new(0,0,-d/2)
+    guideLine.Color = canDirectTp(hrp, redPos) and Color3.fromRGB(60,255,100) or Color3.fromRGB(255,255,60)
+end)
+
+task.spawn(function()
+    topBar.BackgroundTransparency = 1
+    outer.Position = UDim2.new(1,-cw-16,0,M and 50 or 68)
+    card.Size = UDim2.new(0,0,0,0); card.Position = UDim2.new(0.5,0,0.5,0); card.AnchorPoint = Vector2.new(0.5,0.5)
+    TweenService:Create(topBar, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position=UDim2.new(0.5,0,0,M and 8 or 14)}):Play()
+    TweenService:Create(topBar, TweenInfo.new(0.4,Enum.EasingStyle.Quad,Enum.EasingDirection.Out), {BackgroundTransparency=0.1}):Play()
+    task.wait(0.12)
+    TweenService:Create(outer, TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Position=UDim2.new(1,-cw-16,0,M and 88 or 116)}):Play()
+    task.wait(0.12)
+    local et = TweenService:Create(card, TweenInfo.new(0.4,Enum.EasingStyle.Back,Enum.EasingDirection.Out), {Size=UDim2.new(1,0,1,0),Position=UDim2.new(0,0,0,0)})
+    et:Play(); et.Completed:Connect(function() card.AnchorPoint = Vector2.new(0,0) end)
+end)
+
+local function getHRP()
+    local c = player.Character; if not c then return nil end
+    return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("UpperTorso")
+end
+
+local function getClosestPodium()
+    local hrp = getHRP(); if not hrp then return nil end
+    refreshEnemyPlots(); if #enemyPlots == 0 then return nil end
+    local best, bestDist = nil, math.huge
+    local myBase = getCurrentBase()
+    local topFloorPodiumName = myBase == bases.b2 and "11" or "16"
+    for _, plot in ipairs(enemyPlots) do
+        local podiums = plot:FindFirstChild("AnimalPodiums"); if not podiums then continue end
+        local plotPos = nil
+        for _, part in ipairs(plot:GetDescendants()) do
+            if part:IsA("BasePart") then plotPos = part.Position break end
+        end
+        local plotIsBase1 = true
+        if plotPos then
+            local d1 = (plotPos - bases.b1.refVec).Magnitude
+            local d2 = (plotPos - bases.b2.refVec).Magnitude
+            plotIsBase1 = d1 < d2
+        end
+        local podiumNames
+        if semiv2cfg.slotMode == "Second Slot" then
+            podiumNames = {plotIsBase1 and "2" or "9"}
+        elseif semiv2cfg.slotMode == "Top Floor First Slot" then
+            podiumNames = {topFloorPodiumName}
+        else
+            podiumNames = {"1","10"}
+        end
+        for _, pname in ipairs(podiumNames) do
+            local podium = podiums:FindFirstChild(pname); if not podium then continue end
+            local cm = podium:FindFirstChild("Claim") and podium.Claim:FindFirstChild("Main"); if not cm then continue end
+            local d = (hrp.Position - cm.Position).Magnitude
+            if d < bestDist then
+                bestDist = d
+                local spawn  = podium:FindFirstChild("Base") and podium.Base:FindFirstChild("Spawn")
+                local pa     = spawn and spawn:FindFirstChild("PromptAttachment")
+                local prompt = pa and pa:FindFirstChildWhichIsA("ProximityPrompt")
+                if prompt then
+                    best = {plot=plot, podiumName=pname, position=cm.Position, prompt=prompt, promptPos=pa.WorldPosition, distance=d, isEnemyBase1=plotIsBase1}
+                end
+            end
+        end
+    end
+    return best
+end
+
+local isstealing = false
+
+local function getCeilingAlignedPos(HRP, finalPos)
+    if not HRP or not finalPos then return finalPos end
+
+    local startPos = HRP.Position
+    local ceilingY = math.max(startPos.Y, finalPos.Y)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {player.Character, redDot, greenDot, guideLine}
+    params.IgnoreWater = true
+
+    local result = workspace:Raycast(startPos, Vector3.new(0, 512, 0), params)
+    if result then
+        ceilingY = math.max(ceilingY, result.Position.Y - 3)
+    end
+
+    return Vector3.new(finalPos.X, ceilingY, finalPos.Z), Vector3.new(startPos.X, ceilingY, startPos.Z)
+end
+
+local function floatUpToCeiling(HRP, anchorPos)
+    if not HRP then return end
+
+    local _, raisedStartPos = getCeilingAlignedPos(HRP, anchorPos or HRP.Position)
+    if not raisedStartPos then return end
+
+    while HRP.Parent and raisedStartPos.Y - HRP.Position.Y > 6 do
+        HRP.CFrame = CFrame.new(HRP.Position.X, HRP.Position.Y + 6, HRP.Position.Z)
+        task.wait(0.04)
+    end
+
+    HRP.CFrame = CFrame.new(HRP.Position.X, raisedStartPos.Y, HRP.Position.Z)
+end
+
+local function doPodium11TopFloorSteal(HRP, prompt)
+    if not HRP or not prompt then return false end
+
+    local ctx = __startStealHold(prompt)
+    if not ctx then return false end
+
+    __waitForStealTime(ctx, 0.5)
+
+    HRP.CFrame = CFrame.new(-349, -7, 114)
+    task.wait(0.3)
+    HRP.CFrame = CFrame.new(-334, 3, 92)
+
+    __waitForStealTime(ctx, 1.3)
+
+    local att = Instance.new("Attachment")
+    att.Name = TF_FLOAT_ATTACHMENT_NAME
+    att.Parent = HRP
+
+    local lv = Instance.new("LinearVelocity")
+    lv.Attachment0 = att
+    lv.MaxForce = math.huge
+    lv.RelativeTo = Enum.ActuatorRelativeTo.World
+    lv.VectorVelocity = Vector3.new(0, 8, 0)
+    lv.Parent = HRP
+
+    task.wait(0.2)
+
+    lv:Destroy()
+    att:Destroy()
+
+    __finishStealHold(ctx)
+    task.wait(0.015)
+    HRP.CFrame = CFrame.new(-345, 4.5, 92)
+    return true
+end
+
+local function doPodium16TopFloorSteal(HRP, prompt)
+    if not HRP or not prompt then return false end
+
+    local ctx = __startStealHold(prompt)
+    if not ctx then return false end
+
+    __waitForStealTime(ctx, 1.3)
+
+    HRP.CFrame = CFrame.new(-333, 3, 28)
+
+    __waitForStealTime(ctx, 1.3)
+
+    local att = Instance.new("Attachment")
+    att.Name = TF_FLOAT_ATTACHMENT_NAME
+    att.Parent = HRP
+
+    local lv = Instance.new("LinearVelocity")
+    lv.Attachment0 = att
+    lv.MaxForce = math.huge
+    lv.RelativeTo = Enum.ActuatorRelativeTo.World
+    lv.VectorVelocity = Vector3.new(0, 8, 0)
+    lv.Parent = HRP
+
+    task.wait(0.2)
+
+    lv:Destroy()
+    att:Destroy()
+
+    __finishStealHold(ctx)
+
+    task.wait(0.015)
+
+    HRP.CFrame = CFrame.new(-347, 4, 26)
+    return true
+end
+
+local function isFullInstantMode()
+    return semiv2cfg.semiInstantMode == "Full"
+end
+
+local function isWalkMode()
+    return semiv2cfg.stealMethod == "Walk"
+end
+
+local function walkTo(HRP, targetPos, speed, arriveDist, timeout)
+    if not HRP or not HRP.Parent or not targetPos then return end
+    speed = speed or 180
+    arriveDist = arriveDist or 6
+    timeout = timeout or 6
+    equipCarpet()
+    if controls then pcall(function() controls:Disable() end) end
+    local start = tick()
+    while HRP and HRP.Parent do
+        local d = targetPos - HRP.Position
+        local flat = Vector3.new(d.X, 0, d.Z)
+        local mag = flat.Magnitude
+        if mag < arriveDist then break end
+        if tick() - start > timeout then break end
+        local effSpeed = speed
+        if mag < 25 then effSpeed = math.max(60, speed * (mag / 25)) end
+        local dir = flat.Unit
+        local vy = HRP.AssemblyLinearVelocity.Y
+        HRP.AssemblyLinearVelocity = Vector3.new(dir.X * effSpeed, vy, dir.Z * effSpeed)
+        task.wait()
+    end
+    if HRP and HRP.Parent then
+        HRP.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        HRP.CFrame = CFrame.new(targetPos)
+    end
+    if controls then pcall(function() controls:Enable() end) end
+end
+
+local function beginFullPromptHold(prompt)
+    if not prompt or not prompt.Parent then return false end
+    prompt.RequiresLineOfSight = false
+    prompt.MaxActivationDistance = math.huge
+    return pcall(function()
+        prompt:InputHoldBegin()
+    end)
+end
+
+local function doSecondSlotSteal(HRP, podium)
+    if not HRP or not podium or not podium.prompt or not podium.prompt.Parent then
+        stealBusy = false
+        return
+    end
+    local char = player.Character
+    local hum = char and char:FindFirstChild("Humanoid")
+    if not char or not hum then
+        stealBusy = false
+        return
+    end
+    stopWalk()
+    task.spawn(function()
+        podium.prompt.RequiresLineOfSight = false
+        podium.prompt.MaxActivationDistance = math.huge
+        local ctx = __startStealHold(podium.prompt)
+        if ctx then __waitForStealTime(ctx, 0.7) end
+        equipCarpet()
+        local stealPos
+        if podium.isEnemyBase1 then
+            tpThroughWaypoints(HRP, {
+                Vector3.new(-352.54, -6.83, 6.66),
+                Vector3.new(-351.49, -6.65, 113.72),
+                Vector3.new(-329.485, -5.303, 102.672)
+            })
+            task.wait(0.25)
+            stealPos = Vector3.new(-351.856, -7.302, 88.026)
+        else
+            tpThroughWaypoints(HRP, {
+                Vector3.new(-351.49, -6.65, 113.72),
+                Vector3.new(-352.54, -6.83, 6.66),
+                Vector3.new(-329.48773193359375, -5.302868843078613, 17.61540985107422)
+            })
+            task.wait(0.25)
+            stealPos = Vector3.new(-350.48486328125, -7.3017988204956055, 34.883060455322266)
+        end
+        __waitForStealTime(ctx, 1.3)
+        HRP.CFrame = CFrame.new(stealPos)
+        __finishStealHold(ctx)
+
+        local startTime = tick()
+        while player:GetAttribute("Stealing") == nil do
+            if tick() - startTime >= 1 then break end
+            task.wait(0.1)
+        end
+        if player:GetAttribute("Stealing") ~= nil then
+            isstealing = true
+        end
+        if semiv2cfg.autoWalk then
+            local base = getCurrentBase()
+            doAutoWalk(base == bases.b1)
+        end
+        if semiv2cfg.autoAdminSpam then
+            task.spawn(function()
+                local enemy = getNearestEnemy()
+                if enemy then runSpamCmds(enemy, semiv2cfg.spamOnSteal) end
+            end)
+        end
+        stealBusy = false
+    end)
+end
+
+local function doPodium11TopFloorOnly(HRP, podium)
+    if not HRP or not podium or not podium.prompt or not podium.prompt.Parent then
+        stealBusy = false
+        return
+    end
+
+    task.spawn(function()
+        doPodium11TopFloorSteal(HRP, podium.prompt)
+
+        local startTime = tick()
+        while player:GetAttribute("Stealing") == nil do
+            if tick() - startTime >= 1 then
+                break
+            end
+            task.wait(0.1)
+        end
+
+        if player:GetAttribute("Stealing") ~= nil then
+            isstealing = true
+        end
+
+        if semiv2cfg.autoWalk then
+            local base = getCurrentBase()
+            doAutoWalk(base == bases.b1)
+        end
+
+        if semiv2cfg.autoAdminSpam then
+            task.spawn(function()
+                local enemy = getNearestEnemy()
+                if enemy then runSpamCmds(enemy, semiv2cfg.spamOnSteal) end
+            end)
+        end
+
+        stealBusy = false
+    end)
+end
+
+local function doTopFloorOnly(HRP, podium)
+    if not HRP or not podium or not podium.prompt or not podium.prompt.Parent then
+        stealBusy = false
+        return
+    end
+
+    local isAtBase1 = false
+    if podium then
+        local dB1 = (podium.position - bases.b1.refVec).Magnitude
+        local dB2 = (podium.position - bases.b2.refVec).Magnitude
+        isAtBase1 = dB1 < dB2
+    else
+        isAtBase1 = getCurrentBase() == bases.b1
+    end
+
+    stopWalk()
+    task.spawn(function()
+        doApproachPath(HRP, podium, isAtBase1)
+        task.wait(0.05)
+
+        if podium.podiumName == "11" then
+            doPodium11TopFloorSteal(HRP, podium.prompt)
+        elseif podium.podiumName == "16" then
+            doPodium16TopFloorSteal(HRP, podium.prompt)
+        end
+
+        local startTime = tick()
+        while player:GetAttribute("Stealing") == nil do
+            if tick() - startTime >= 1 then
+                break
+            end
+            task.wait(0.1)
+        end
+
+        if player:GetAttribute("Stealing") ~= nil then
+            isstealing = true
+            local base = getCurrentBase()
+            local intermediate = (base == bases.b1) and right_base or left_base
+            HRP.CFrame = intermediate
+            task.wait(0.11)
+            if base and base.finalPos then
+                HRP.CFrame = CFrame.new(base.finalPos)
+            end
+        end
+
+        if semiv2cfg.autoWalk then
+            local base = getCurrentBase()
+            doAutoWalk(base == bases.b1)
+        end
+
+        if semiv2cfg.autoAdminSpam then
+            task.spawn(function()
+                local enemy = getNearestEnemy()
+                if enemy then runSpamCmds(enemy, semiv2cfg.spamOnSteal) end
+            end)
+        end
+
+        stealBusy = false
+    end)
+end
+
+canDirectTp = function(HRP, targetPos)
+    if not HRP or not targetPos then return false end
+    local origin = HRP.Position
+    local ignored = {player.Character, redDot, greenDot, guideLine}
+
+    for _ = 1, 12 do
+        local direction = targetPos - origin
+        if direction.Magnitude <= 0.05 then return true end
+
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        params.FilterDescendantsInstances = ignored
+        params.IgnoreWater = true
+
+        local result = workspace:Raycast(origin, direction, params)
+        if not result then return true end
+
+        local hit = result.Instance
+        if not hit then return true end
+        if hit == redDot or hit == greenDot or hit == guideLine then return true end
+
+        if hit:IsA("BasePart") and not hit.CanCollide then
+            table.insert(ignored, hit)
+            origin = result.Position + direction.Unit * 0.1
+        else
+            return (result.Position - targetPos).Magnitude <= 3
+        end
+    end
+
+    return false
+end
+
+tpThroughWaypoints = function(HRP, waypoints)
+    if #waypoints == 0 then return end
+    local startIndex = 1
+    for i = #waypoints, 1, -1 do
+        if canDirectTp(HRP, waypoints[i]) then
+            startIndex = i
+            break
+        end
+    end
+
+    for i = startIndex, #waypoints do
+        HRP.CFrame = CFrame.new(waypoints[i])
+        if i < #waypoints then
+            task.wait(0.135)
+        end
+    end
+end
+
+doApproachPath = function(HRP, podium, isAtBase1)
+    local waypoints
+    if not isAtBase1 then
+        waypoints = {
+            Vector3.new(-351.49, -6.65, 113.72),
+            Vector3.new(-352.54, -6.83, 6.66),
+            Vector3.new(-334.80,-5.04,18.90),
+        }
+    else
+        waypoints = {
+            Vector3.new(-352.54, -6.83, 6.66),
+            Vector3.new(-351.49, -6.65, 113.72),
+            Vector3.new(-337, -5, 103),
+        }
+    end
+    if isWalkMode() then
+        local startIndex = 1
+        for i = #waypoints, 1, -1 do
+            if canDirectTp(HRP, waypoints[i]) then
+                startIndex = i
+                break
+            end
+        end
+        for i = startIndex, #waypoints do
+            walkTo(HRP, waypoints[i], 180)
+        end
+        return
+    end
+    if podium and redPos and canDirectTp(HRP, redPos) then
+        HRP.CFrame = CFrame.new(redPos)
+    else
+        tpThroughWaypoints(HRP, waypoints)
+    end
+end
+
+local function doTpSequence(HRP, finalPos, podium)
+    isstealing = false
+    local isAtBase1 = false
+    if podium then
+        local dB1 = (podium.position - bases.b1.refVec).Magnitude
+        local dB2 = (podium.position - bases.b2.refVec).Magnitude
+        isAtBase1 = dB1 < dB2
+    else
+        isAtBase1 = getCurrentBase() == bases.b1
+    end
+    stopWalk()
+    task.spawn(function()
+        if __isPrimeMethod() then
+            local prompt = podium and podium.prompt
+            if not prompt or not prompt.Parent then return end
+            prompt.RequiresLineOfSight = false
+            prompt.MaxActivationDistance = math.huge
+            equipCarpet()
+            HRP.CFrame = isAtBase1 and CFrame.new(-343.08, -6.84, 93.20) or CFrame.new(-342.91, -6.81, 28.00)
+            task.wait(0.25)
+            HRP.CFrame = isAtBase1 and CFrame.new(-340.16, -7.29, 48.82) or CFrame.new(-340.16, -7.29, 72.40)
+            task.wait(0.12)
+            HRP.CFrame = isAtBase1 and CFrame.new(-341.26, -7.29, 66.95) or CFrame.new(-341.26, -7.29, 54.27)
+            task.wait(0.12)
+            HRP.CFrame = isAtBase1 and CFrame.new(-339.93, -7.29, 82.14) or CFrame.new(-339.63, -7.29, 39.33)
+            task.wait(0.18)
+            local ctx = __startStealHold(prompt)
+            HRP.CFrame = isAtBase1 and CFrame.new(-354.04, -7.21, 90.42) or CFrame.new(-354.04, -7.21, 28.00)
+            task.wait(0.45)
+            HRP.CFrame = isAtBase1 and CFrame.new(-334.60, -5.00, 101.30) or CFrame.new(-334.60, -5.00, 19.30)
+            if ctx and ctx.holdBeganAt then
+                while tick() - ctx.holdBeganAt < 1.3 do task.wait() end
+            end
+            drinkPotion()
+            equipCarpet()
+            HRP.CFrame = isAtBase1 and CFrame.new(-351.53, -7.29, 83.66) or CFrame.new(-350.62, -7.29, 35.91)
+            if ctx then __finishStealHold(ctx) end
+        else
+            local ctx
+            if podium and podium.prompt and podium.prompt.Parent then
+                podium.prompt.RequiresLineOfSight = false
+                podium.prompt.MaxActivationDistance = math.huge
+                ctx = __startStealHold(podium.prompt)
+            end
+
+            if ctx then __waitForStealTime(ctx, 0.8) end
+
+            doApproachPath(HRP, podium, isAtBase1)
+
+            if semiv2cfg.slotMode == "Top Floor First Slot" and (not podium or podium.podiumName ~= "11") then
+                task.wait(0.05)
+                floatUpToCeiling(HRP, podium and podium.position or finalPos)
+            end
+
+            task.wait(0.25)
+            drinkPotion()
+            equipCarpet()
+
+            if podium and podium.prompt and podium.prompt.Parent and ctx then
+                if greenPos then
+                    __waitForStealTime(ctx, 1.3)
+                    HRP.CFrame = CFrame.new(greenPos)
+                end
+                __finishStealHold(ctx)
+                if isFullInstantMode() then
+                    HRP.CFrame = isAtBase1 and right_base or left_base
+                    task.wait(0.09)
+                    HRP.CFrame = CFrame.new(finalPos)
+                end
+            end
+        end
+
+        local startTime = tick()
+        while player:GetAttribute("Stealing") == nil do
+            if tick() - startTime >= 1 then
+                break
+            end
+            task.wait(0.1)
+        end
+
+        if player:GetAttribute("Stealing") ~= nil then
+            isstealing = true
+            if semiv2cfg.slotMode == "Top Floor First Slot" and finalPos then
+                local raisedFinalPos, raisedStartPos = getCeilingAlignedPos(HRP, finalPos)
+                if raisedStartPos then
+                    HRP.CFrame = CFrame.new(raisedStartPos)
+                    task.wait(0.05)
+                end
+                if raisedFinalPos then
+                    HRP.CFrame = CFrame.new(raisedFinalPos)
+                end
+            end
+        end
+
+        if semiv2cfg.autoWalk then
+            local base = getCurrentBase()
+            doAutoWalk(base == bases.b1)
+        end
+
+        if semiv2cfg.autoAdminSpam then
+            task.spawn(function()
+                local enemy = getNearestEnemy()
+                if enemy then runSpamCmds(enemy, semiv2cfg.spamOnSteal) end
+            end)
+        end
+
+        stealBusy = false
+    end)
+end
+
+local function doSteal()
+    if stealBusy then return end
+    if tick() - lastTpTime < semiv2cfg.tpCooldown then return end
+    local char = player.Character; if not char then return end
+    local hum  = char:FindFirstChild("Humanoid")
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not hrp then return end
+
+    stealBusy  = true
+    lastTpTime = tick()
+
+    local carpet = char:FindFirstChild("Flying Carpet") or player.Backpack:FindFirstChild("Flying Carpet")
+    local podium = getClosestPodium()
+    if semiv2cfg.slotMode == "Second Slot" and podium then
+        if carpet then hum:EquipTool(carpet) end
+        doSecondSlotSteal(hrp, podium)
+        return
+    end
+    if semiv2cfg.slotMode == "Top Floor First Slot" and podium and (podium.podiumName == "11" or podium.podiumName == "16") then
+        if carpet then hum:EquipTool(carpet) end
+        doTopFloorOnly(hrp, podium)
+        return
+    end
+
+    local finalPos
+    if podium then
+        local dB1 = (podium.position - bases.b1.refVec).Magnitude
+        local dB2 = (podium.position - bases.b2.refVec).Magnitude
+        finalPos = dB1 < dB2 and bases.b1.finalPos or bases.b2.finalPos
+    else
+        local base = getCurrentBase()
+        if not base then stealBusy = false return end
+        finalPos = base.finalPos
+    end
+
+    if carpet then hum:EquipTool(carpet) end
+    doTpSequence(hrp, finalPos, podium)
+end
+
+do
+    local autoRespawnToken = 0
+    local function hasRespawnTools(char)
+        if char and char:FindFirstChildWhichIsA("Tool") then
+            return true
+        end
+        local backpack = player:FindFirstChild("Backpack")
+        return backpack and backpack:FindFirstChildWhichIsA("Tool") ~= nil
+    end
+    player.CharacterAdded:Connect(function(char)
+        autoRespawnToken = autoRespawnToken + 1
+        local token = autoRespawnToken
+        task.spawn(function()
+            if not semiv2cfg.autoTpEnabled or not semiv2cfg.autoInstantStealOnRespawn then
+                return
+            end
+            local hum = char and char:WaitForChild("Humanoid", 8)
+            local hrp = char and char:WaitForChild("HumanoidRootPart", 8)
+            if token ~= autoRespawnToken or not semiv2cfg.autoTpEnabled or not semiv2cfg.autoInstantStealOnRespawn then
+                return
+            end
+            if not hum or not hrp or hum.Health <= 0 then
+                return
+            end
+            local startedWaiting = tick()
+            while token == autoRespawnToken and semiv2cfg.autoTpEnabled and semiv2cfg.autoInstantStealOnRespawn and hum.Health > 0 and not hasRespawnTools(char) do
+                if tick() - startedWaiting >= 8 then
+                    return
+                end
+                task.wait(0.3)
+            end
+            if token ~= autoRespawnToken or not semiv2cfg.autoTpEnabled or not semiv2cfg.autoInstantStealOnRespawn or stealBusy or player:GetAttribute("Stealing") ~= nil then
+                return
+            end
+            doSteal()
+        end)
+    end)
+end
+
+tpBtnClick.MouseButton1Click:Connect(doSteal)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if rebindListening then
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            local kc   = input.KeyCode
+            local name = tostring(kc):gsub("Enum.KeyCode.","")
+            semiv2cfg.stealKey = name; rebindListening = false
+            kbBtn.Text = "[ "..name.." ]"; kbBtn.TextColor3 = Color3.fromRGB(170,184,255)
+            saveCfg()
+        end
+        return
+    end
+    if gpe then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local name = tostring(input.KeyCode):gsub("Enum.KeyCode.","")
+        if name == semiv2cfg.stealKey then doSteal() end
+    end
+end)
+
+for _, obj in ipairs(RS:GetDescendants()) do
+    if obj:IsA("RemoteEvent") then
+        obj.OnClientEvent:Connect(function(...)
+            for _, arg in ipairs({...}) do
+                if type(arg) == "string" then
+                    if string.find(string.lower(arg), "you successfully broke into") then
+                        if semiv2cfg.autoTpEnabled and semiv2cfg.unlockAutoTp then doSteal() end
+                    end
+                end
+            end
+        end)
+    end
+end
+
+task.spawn(function()
+    local lastFired = 0
+    while task.wait() do
+        if not semiv2cfg.autoTpEnabled or not semiv2cfg.timerAutoTp or not desyncOn then continue end
+        if tick() - lastFired < semiv2cfg.timerCooldown then continue end
+        refreshEnemyPlots()
+        for _, plot in ipairs(enemyPlots) do
+            local purchases = plot:FindFirstChild("Purchases"); if not purchases then continue end
+            for _, child in ipairs(purchases:GetChildren()) do
+                if child:IsA("Model") then
+                    local board = child:FindFirstChild("Main") and child.Main:FindFirstChild("BillboardGui")
+                    local lbl   = board and board:FindFirstChild("RemainingTime")
+                    if lbl and lbl.ContentText == "0s" then
+                        lastFired = tick(); task.wait(0.1); doSteal(); break
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local stealCooldown = 10
+local lastSteal = 0
+
+task.spawn(function()
+    while task.wait(0.4) do
+        if not semiv2cfg.autoTpEnabled or not semiv2cfg.allowAutoTp then continue end
+        refreshEnemyPlots()
+
+        for _, plot in ipairs(enemyPlots) do
+            local panel = plot:FindFirstChild("FriendPanel")
+            if not panel then continue end
+
+            local main = panel:FindFirstChild("Main")
+            local img = main and main:FindFirstChild("SurfaceGui") and main.SurfaceGui:FindFirstChild("ImageLabel")
+
+            if img and img.Image ~= "rbxassetid://110783679426495" then
+                if tick() - lastSteal >= stealCooldown then
+                    doSteal()
+                    lastSteal = tick()
+                end
+                break
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        local dt = task.wait(0.05)
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hum and hrp then
+            local spd = semiv2cfg.speedBoost and not walkConn and getTargetBoostSpeed() or nil
+            if spd then
+                local moveDir = hum.MoveDirection
+                local vy = math.clamp(hrp.Velocity.Y, -500, 500)
+                local newVY = vy
+                if moveDir == Vector3.zero then
+                    hrp.Velocity = Vector3.new(0, newVY, 0)
+                else
+                    local dir = moveDir.Unit
+                    hrp.Velocity = Vector3.new(dir.X * spd, newVY, dir.Z * spd)
+                end
+                if hum.WalkSpeed ~= originalWalkSpeed then
+                    hum.WalkSpeed = originalWalkSpeed
+                end
+            elseif hum.WalkSpeed ~= originalWalkSpeed then
+                hum.WalkSpeed = originalWalkSpeed
+            end
+        end
+    end
+end)
+
+do
+    local _REPLACEMENT = ".gg/john porky"
+    local _PATTERNS = {"discord", "%.gg/", "hub"}
+    local function _matches(text)
+        local lower = text:lower()
+        if lower:find("chiraq") then return false end
+        for _, pat in ipairs(_PATTERNS) do if lower:find(pat:lower()) then return true end end
+        return false
+    end
+    local function _scanInst(obj)
+        pcall(function()
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+                if obj.Text and #obj.Text > 0 and _matches(obj.Text) then obj.Text = _REPLACEMENT end
+            end
+        end)
+    end
+    local function _scanTree(root)
+        pcall(function()
+            for _, d in ipairs(root:GetDescendants()) do _scanInst(d) end
+            root.DescendantAdded:Connect(function(d) task.wait() _scanInst(d) end)
+        end)
+    end
+    local _p = game:GetService("Players").LocalPlayer
+    _scanTree(_p.PlayerGui)
+    pcall(function() if gethui then _scanTree(gethui()) end end)
+    pcall(function() _scanTree(game:GetService("CoreGui")) end)
+end
+
+task.spawn(function() while task.wait(5) do sgui.Name = randStr() end end)
