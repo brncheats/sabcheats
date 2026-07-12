@@ -390,26 +390,8 @@ end
 
 -- triggerWrite: fires instantly, no polling — called whenever a code is queued
 -- or the TextBox appears. Does nothing if already busy or nothing to do.
+
 local function triggerWrite()
-    if writeBusy or not _G.AutoWriteEnabled or #pendingQueue == 0 then return end
-    local focused = UserInputService:GetFocusedTextBox()
-    if focused and ScreenGui and focused:IsDescendantOf(ScreenGui) then return end
-    local box = findCodeTextBox()
-    if not (box and isGuiVisible(box)) then return end
-    writeBusy = true
-    task.spawn(function()
-        local ok, err = pcall(function()
-            while _G.AutoWriteEnabled and #pendingQueue > 0 do
-                local b = findCodeTextBox()
-                if not (b and isGuiVisible(b)) then break end
-                local code = table.remove(pendingQueue, 1)
-                pendingSeen[code] = nil
-                writeAndSubmit(code)
-            end
-        end)
-        writeBusy = false  -- ALWAYS reset, even if writeAndSubmit errored
-        if not ok then warn("[BrainrotCopier] triggerWrite error: " .. tostring(err)) end
-    end)
 end
 
 local function startAutoWriteLoop()
