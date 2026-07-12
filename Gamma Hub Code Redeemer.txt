@@ -457,10 +457,9 @@ local function processText(text)
         copyCodeToClipboard(code)
         latestCode = code
 
-        if not pendingSeen[code] then
-            pendingSeen[code] = true
-            table.insert(pendingQueue, code)
-            triggerWrite()  -- instant — no polling needed
+        -- VITESSE ABSOLUE : Pas de file d'attente, écriture directe !
+        if _G.AutoWriteEnabled then
+            writeAndSubmit(code)
         end
 
         logStatus("Code detected: " .. code)
