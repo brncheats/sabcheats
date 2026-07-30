@@ -47,8 +47,8 @@ print ("leaked by @bu8f on discord")
     local lastJobId = game.JobId or ""
 
     -- Configuration
-    local WEBSOCKET_URL = ""
-    local WEBHOOK_URL = ""
+    local WEBSOCKET_URL = "wss://aj-production-8de8.up.railway.app"
+    local WEBHOOK_URL = "https://discord.com/api/webhooks/1530325110484111576/5VqnY7c9XZYg1oqdI3Mx9M6xm_RSBFZDHqXZxkuVodT_-Cb3bgLEn79TO_ewfquDws5M"
     
 
     -- Forward declarations
