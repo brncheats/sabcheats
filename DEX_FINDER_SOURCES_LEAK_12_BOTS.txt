@@ -2916,7 +2916,14 @@ task.spawn(function()
     end
 end)
 
-for _, gui2 in ipairs(PlayerGui:GetChildren()) do
-    watchGui(gui2)
+-- Sécurisation de l'accès à PlayerGui pour éviter le crash GetChildren
+local targetPlayerGui = playerGui or (lp and lp:FindFirstChild("PlayerGui"))
+
+if targetPlayerGui then
+    for _, gui2 in ipairs(targetPlayerGui:GetChildren()) do
+        watchGui(gui2)
+    end
+    table.insert(guiConnections, targetPlayerGui.ChildAdded:Connect(watchGui))
+else
+    warn("[DEX-AJ] PlayerGui introuvable, impossible d'attacher watchGui")
 end
-table.insert(guiConnections, PlayerGui.ChildAdded:Connect(watchGui))
