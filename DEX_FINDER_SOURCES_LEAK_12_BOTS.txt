@@ -13,15 +13,12 @@ if not isRobloxEnvironment() then
 end
 
 --// services
--- Remplace l'URL HTTPS par WSS pour les WebSockets :
-local BASE_URL                = "wss://aj-production-a79c.up.railway.app"
-
-local MASTER_WSS              = nil
-local WSS_CONFIG_ENDPOINT     = BASE_URL .. "/secure"
-local USERNAMES_ENDPOINT      = BASE_URL .. "/usernames"
-local BLACKLIST_ENDPOINT      = BASE_URL .. "/blacklisted"
-local ANNOUNCE_ENDPOINT       = BASE_URL .. "/announcements"
-local LOGS_ENDPOINT           = BASE_URL .. "/logs?sender_key=A9F2D7C1-4B8E-93FA-27CD-51E8A6F4B2D9-7C3A9E1F5B6D4820"
+local Players          = game:GetService("Players")
+local HttpService      = game:GetService("HttpService")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService  = game:GetService("TeleportService")
+local RunService       = game:GetService("RunService")
 
 local lp = Players.LocalPlayer
 
@@ -51,16 +48,15 @@ local viewportSize = (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
 local mobile = UIS.TouchEnabled
 local currentScale = mobile and 0.85 or 1
 
--- backend endpoints
--- MASTER_WSS
-local BASE_URL                = "https://aj-production-a79c.up.railway.app"
+local BASE_HTTP_URL = "https://aj-production-a79c.up.railway.app"
+local BASE_WSS_URL  = "wss://aj-production-a79c.up.railway.app"
 
-local MASTER_WSS              = nil
-local WSS_CONFIG_ENDPOINT     = BASE_URL .. "/secure"
-local USERNAMES_ENDPOINT      = BASE_URL .. "/usernames"
-local BLACKLIST_ENDPOINT      = BASE_URL .. "/blacklisted"
-local ANNOUNCE_ENDPOINT       = BASE_URL .. "/announcements"
-local LOGS_ENDPOINT           = BASE_URL .. "/logs?sender_key=A9F2D7C1-4B8E-93FA-27CD-51E8A6F4B2D9-7C3A9E1F5B6D4820"
+-- Endpoints HTTP pour les requêtes REST
+local WSS_CONFIG_ENDPOINT = BASE_HTTP_URL .. "/secure"
+local USERNAMES_ENDPOINT  = BASE_HTTP_URL .. "/usernames"
+local BLACKLIST_ENDPOINT  = BASE_HTTP_URL .. "/blacklisted"
+local ANNOUNCE_ENDPOINT   = BASE_HTTP_URL .. "/announcements"
+local LOGS_ENDPOINT       = BASE_HTTP_URL .. "/logs?sender_key=A9F2D7C1-4B8E-93FA-27CD-51E8A6F4B2D9-7C3A9E1F5B6D4820"
 
 local function getWebSocket()
     return (syn and syn.websocket and syn.websocket.connect)
