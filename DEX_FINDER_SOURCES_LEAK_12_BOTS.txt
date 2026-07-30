@@ -1,6 +1,3 @@
--- 12 finder
--- gui rewrite over the original by Lyubomyr2012
-
 repeat task.wait() until game:IsLoaded()
 
 local function isRobloxEnvironment()
@@ -16,13 +13,15 @@ if not isRobloxEnvironment() then
 end
 
 --// services
-local Players      = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UIS          = game:GetService("UserInputService")
-local RunService   = game:GetService("RunService")
-local Http         = game:GetService("HttpService")
-local Teleport     = game:GetService("TeleportService")
-local StarterGui   = game:GetService("StarterGui")
+-- Remplace l'URL HTTPS par WSS pour les WebSockets :
+local BASE_URL                = "wss://aj-production-a79c.up.railway.app"
+
+local MASTER_WSS              = nil
+local WSS_CONFIG_ENDPOINT     = BASE_URL .. "/secure"
+local USERNAMES_ENDPOINT      = BASE_URL .. "/usernames"
+local BLACKLIST_ENDPOINT      = BASE_URL .. "/blacklisted"
+local ANNOUNCE_ENDPOINT       = BASE_URL .. "/announcements"
+local LOGS_ENDPOINT           = BASE_URL .. "/logs?sender_key=A9F2D7C1-4B8E-93FA-27CD-51E8A6F4B2D9-7C3A9E1F5B6D4820"
 
 local lp = Players.LocalPlayer
 
