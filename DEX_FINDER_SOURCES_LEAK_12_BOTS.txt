@@ -57,13 +57,11 @@ local BASE_WSS_URL  = "wss://aj-production-a79c.up.railway.app"
 
 -- Endpoints HTTP pour les requêtes REST
 -- backend endpoints
-local wsUrl                   = "ws://104.194.156.27:8765"
-local MASTER_WSS              = wsUrl
-local WSS_CONFIG_ENDPOINT     = "http://104.194.156.27:8765/secure"
-local USERNAMES_ENDPOINT      = "http://104.194.156.27:8765/usernames"
-local BLACKLIST_ENDPOINT      = "http://104.194.156.27:8765/blacklisted"
-local ANNOUNCE_ENDPOINT       = "http://104.194.156.27:8765/announcements"
-local LOGS_ENDPOINT           = "http://104.194.156.27:8765/logs?sender_key=A9F2D7C1-4B8E-93FA-27CD-51E8A6F4B2D9-7C3A9E1F5B6D4820"
+local WSS_CONFIG_ENDPOINT = BASE_HTTP_URL .. "/secure"
+local USERNAMES_ENDPOINT  = BASE_HTTP_URL .. "/usernames"
+local BLACKLIST_ENDPOINT  = BASE_HTTP_URL .. "/blacklisted"
+local ANNOUNCE_ENDPOINT   = BASE_HTTP_URL .. "/announcements"
+local LOGS_ENDPOINT       = BASE_HTTP_URL .. "/logs?sender_key=A9F2D7C1-4B8E-93FA-27CD-51E8A6F4B2D9-7C3A9E1F5B6D4820"
 
 local function getWebSocket()
     return (syn and syn.websocket and syn.websocket.connect)
