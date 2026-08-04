@@ -27,9 +27,44 @@ local lastAttemptedCode = nil
 local lastSubmittedBatch = {}
 local autoWriteConn = nil
 
-local pendingQueue = {}
+-- remplace pendingQueue par une file rapide
+local pendingQueue = {}   -- table used as circular queue
+local pendingHead = 1
+local pendingTail = 0
 local pendingSeen = {}
 local writeBusy = false
+
+local function queuePush(val)
+    pendingTail = pendingTail + 1
+    pendingQueue[pendingTail] = val
+end
+
+local function queuePop()
+    if pendingHead > pendingTail then return nil end
+    local v = pendingQueue[pendingHead]
+    pendingQueue[pendingHead] = nil
+    pendingHead = pendingHead + 1
+    -- optional reset to avoid growth
+    if pendingHead > 1000 then
+        -- compact
+        local newQ = {}
+        local i = 1
+        for idx = pendingHead, pendingTail do
+            newQ[i] = pendingQueue[idx]
+            i = i + 1
+        end
+        pendingQueue = newQ
+        pendingTail = i - 1
+        pendingHead = 1
+    end
+    return v
+end
+
+local function queueClear()
+    pendingQueue = {}
+    pendingHead = 1
+    pendingTail = 0
+end
 
 local collectedCodes = {}
 local collectedSeen = {}
