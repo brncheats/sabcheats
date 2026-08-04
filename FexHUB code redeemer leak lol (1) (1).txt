@@ -594,25 +594,12 @@ local function getRedemptionRF()
 end
 
 -- ========== ULTRA-FAST REDEEM ==========
-local function redeemViaRF(code)
-    local rf = getRedemptionRF()
-    if not rf then return false end
-    local formatted = formatCode(code)
-    local ok, result = pcall(function()
-        return rf:InvokeServer(formatted)
-    end)
-    if ok then
-        return true
-    else
-        return false
-    end
-end
-
--- ========== MAXIMUM SPEED writeAndSubmit ==========
 local function writeAndSubmit(code)
     lastAttemptedCode = code
 
+    -- Try single-code RF fast path first (keeps original single-call behavior)
     if redeemViaRF(code) then return true end
+
     local textBox = findCodeTextBox()
     if not textBox then
         return false
@@ -634,6 +621,56 @@ local function writeAndSubmit(code)
         for _, c in ipairs(collectedCodes) do
             table.insert(lastSubmittedBatch, c)
         end
+
+        -- Attempt batch RF invoke if available (faster: 1 network roundtrip)
+        local rf = getRedemptionRF()
+        if rf then
+            local ok, res = pcall(function()
+                -- try sending the table of codes at once; servers that accept batch will succeed
+                return rf:InvokeServer(collectedCodes)
+            end)
+            if ok then
+                -- assume server processed them, clear collected and exit
+                table.clear(collectedCodes)
+                table.clear(collectedSeen)
+                return true
+            end
+        end
+
+        -- Fallback to GUI submission if batch RF not available / failed
+        local box = textBox -- reuse earlier found textbox
+        if box and isGuiVisible(box) then
+            for i = 1, _G.SubmitAttempts do
+                pcall(function()
+                    box:CaptureFocus()
+                    box.Text = fullText
+                    box.CursorPosition = #fullText + 1
+                end)
+                pcall(function() box:ReleaseFocus(true) end)
+                RunService.Heartbeat:Wait()
+                fireSubmitButton(box)
+            end
+        end
+        table.clear(collectedCodes)
+        table.clear(collectedSeen)
+    else
+        -- write into the box but don't submit yet
+        RunService.Heartbeat:Wait()
+        local ok = pcall(function()
+            textBox:CaptureFocus()
+            textBox.Text = fullText
+            textBox.CursorPosition = #fullText + 1
+        end)
+        if not ok then
+            pcall(function() textBox.Text = fullText end)
+        end
+        if ready then
+            table.clear(collectedCodes)
+            table.clear(collectedSeen)
+        end
+    end
+    return true
+end
 
         local count = #collectedCodes
         local box = findCodeTextBox()
