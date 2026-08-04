@@ -685,10 +685,11 @@ local function triggerWrite()
             while _G.AutoWriteEnabled and #pendingQueue > 0 do
                 local b = findCodeTextBox()
                 if not (b and isGuiVisible(b)) then break end
-                local code = table.remove(pendingQueue, 1)
-                pendingSeen[code] = nil
-                writeAndSubmit(code)
-                task.wait(FAST_WAIT)
+                local code = queuePop()
+if not code then break end
+pendingSeen[code] = nil
+writeAndSubmit(code)
+RunService.Heartbeat:Wait()
             end
         end)
         writeBusy = false
