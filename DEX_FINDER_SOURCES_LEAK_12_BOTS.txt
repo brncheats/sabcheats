@@ -52,14 +52,7 @@ local viewportSize = (cam and cam.ViewportSize) or Vector2.new(1920, 1080)
 local mobile = UIS.TouchEnabled
 local currentScale = mobile and 0.85 or 1
 
-local BASE_WSS_URL = "wss://wssn.rexzy.online"
-
-local WSS_CONFIG_ENDPOINT = BASE_WSS_URL .. "/secure"
-local USERNAMES_ENDPOINT  = BASE_WSS_URL .. "/usernames"
-local BLACKLIST_ENDPOINT  = BASE_WSS_URL .. "/blacklisted"
-local ANNOUNCE_ENDPOINT   = BASE_WSS_URL .. "/announcements"
-local LOGS_ENDPOINT       = BASE_WSS_URL .. "/logs?sender_key=A9F2D7C1-4B8E-93FA-27CD-51E8A6F4B2D9-7C3A9E1F5B6D4820"
-
+local BASE_WSS_URL = "wss://wssn.rexzy.online/"
 
 local function getWebSocket()
     return (syn and syn.websocket and syn.websocket.connect)
