@@ -1,0 +1,2545 @@
+pcall(function()
+    if setthreadidentity then
+        setthreadidentity(8)
+    end
+end)
+local P = game:GetService("Players")
+local C = P.LocalPlayer
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+local P = {
+    SelectedPetData = nil,
+    AllAnimalsCache = nil,
+    ListNeedsRedraw = true,
+    MobileScaleObjects = {},
+    RefreshMobileScale = nil,
+}
+do
+    local C = { AUTO_STEAL = false, RADIUS = 12 }
+    local r = {
+        {
+            min = Vector3.new(-337.448303, -3.898971, -122.397758),
+            max = Vector3.new(-328.004578, -3.898971, 242.625626),
+        },
+        {
+            min = Vector3.new(-327.25766, -3.899109, -122.228622),
+            max = Vector3.new(-320.600891, -3.899109, 242.612259),
+        },
+        {
+            min = Vector3.new(-319.783386, -3.89897, -122.227089),
+            max = Vector3.new(-312.908325, -3.89897, 242.585617),
+        },
+        {
+            min = Vector3.new(-312.445648, -3.899108, -122.389832),
+            max = Vector3.new(-305.489899, -3.899108, 242.456818),
+        },
+        {
+            min = Vector3.new(-305.037048, -3.89897, -122.230743),
+            max = Vector3.new(-293.957489, -3.89897, 242.606873),
+        },
+        {
+            min = Vector3.new(-491.448608, -3.898972, -122.253258),
+            max = Vector3.new(-481.811737, -3.898972, 242.615005),
+        },
+        {
+            min = Vector3.new(-498.971069, -3.89897, -122.382767),
+            max = Vector3.new(-491.74884, -3.89897, 242.612061),
+        },
+        {
+            min = Vector3.new(-506.436737, -3.898972, -122.411476),
+            max = Vector3.new(-499.318542, -3.898972, 242.615982),
+        },
+        {
+            min = Vector3.new(-513.783569, -3.898972, -122.223297),
+            max = Vector3.new(-506.801849, -3.898972, 242.62709),
+        },
+        {
+            min = Vector3.new(-525.236938, -3.898972, -122.409813),
+            max = Vector3.new(-514.265015, -3.898972, 242.608932),
+        },
+    }
+    local R = game:GetService("Players")
+    local d = game:GetService("RunService")
+    local n = R.LocalPlayer
+    do
+        local R
+        local function f()
+            n.DevEnableMouseLock = true
+            n.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam
+            if R then
+                R:Disconnect()
+            end
+            R = d.RenderStepped:Connect(function()
+                local R = workspace.CurrentCamera
+                if R and R.CameraSubject and R.CameraType == Enum.CameraType.Custom then
+                    R.CFrame = R.CFrame
+                end
+            end)
+        end
+        f()
+        n.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            f()
+        end)
+    end
+    local R = {}
+    local d = {}
+    local f = 0
+    function _G.getSafePollRate()
+        if os.clock() < f then
+            return 0.27
+        end
+        return 0.1
+    end
+    function _G.triggerSafePollBoost()
+        f = os.clock() + 3
+    end
+    local f = {}
+    local function J()
+        local a = n.Character
+        return a and a:FindFirstChild("HumanoidRootPart")
+    end
+    local function n(a)
+        for e, x in ipairs(r) do
+            if
+                a.X >= math.min(x.min.X, x.max.X)
+                and a.X <= math.max(x.min.X, x.max.X)
+                and a.Z >= math.min(x.min.Z, x.max.Z)
+                and a.Z <= math.max(x.min.Z, x.max.Z)
+            then
+                return e
+            end
+        end
+    end
+    local function r(a)
+        local e = a.Parent
+        if not e then
+            return
+        end
+        if e:IsA("Attachment") and e.Parent then
+            e = e.Parent
+        end
+        if e:IsA("BasePart") then
+            return e.Position
+        elseif e:IsA("Model") then
+            return e:GetPivot().Position
+        end
+    end
+    local function a(e)
+        if not P then
+            return false
+        end
+        local x = P.SelectedPetData
+        if not x then
+            return false
+        end
+        local Q = e:FindFirstAncestorOfClass("Model")
+        if not Q then
+            return false
+        end
+        if x.plot then
+            local V = e:FindFirstAncestor(x.plot)
+            if not V then
+                return false
+            end
+        end
+        if x.slot then
+            local V = e:FindFirstAncestor(x.slot)
+            if V then
+                return true
+            end
+            if Q.Name == x.slot then
+                return true
+            end
+            if Q.Parent and Q.Parent.Name == x.slot then
+                return true
+            end
+        end
+        if x.name then
+            local e = string.lower(x.name)
+            local x = Q
+            while x do
+                if x.Name and string.lower(x.Name) == e then
+                    return true
+                end
+                x = x.Parent
+            end
+        end
+        return false
+    end
+    local function e(x, Q)
+        if not x or not x.Parent then
+            return false
+        end
+        if not x.Enabled then
+            return false
+        end
+        local V = r(x)
+        if not V then
+            return false
+        end
+        local r = x:FindFirstAncestorOfClass("Model")
+        if r then
+            local r = workspace:FindFirstChild("Plots")
+            if r then
+                local i = x:FindFirstAncestorWhichIsA("Model")
+                while i and i.Parent ~= r do
+                    i = i.Parent
+                end
+                if i then
+                    local r = i:FindFirstChild("PlotSign")
+                    if r then
+                        local i = r:FindFirstChildWhichIsA("SurfaceGui", true)
+                        local r = i and i:FindFirstChildWhichIsA("TextLabel", true)
+                        if r then
+                            local i = r.Text:lower()
+                            if
+                                i:find(game.Players.LocalPlayer.Name:lower(), 1, true)
+                                or i:find(game.Players.LocalPlayer.DisplayName:lower(), 1, true)
+                            then
+                                return false
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        if _G.NEAREST_INSTANT_MODE == true then
+            local r = n(Q)
+            local i = n(V)
+            if not r or r ~= i then
+                return false
+            end
+        end
+        if _G.NEAREST_INSTANT_MODE ~= true then
+            if not a(x) then
+                return false
+            end
+        end
+        local r = typeof(x.MaxActivationDistance) == "number"
+                and x.MaxActivationDistance > 0
+                and x.MaxActivationDistance
+            or C.RADIUS
+        local n = math.min(C.RADIUS, r)
+        return (V - Q).Magnitude <= n
+    end
+    local function r(n, a)
+        local x = os.clock()
+        local Q = d[n]
+        if Q and x - Q < a then
+            return false
+        end
+        d[n] = x
+        return true
+    end
+    local function n(a, x, Q)
+        if not a or not a.Parent then
+            return
+        end
+        if not a.Enabled then
+            return
+        end
+        if not r(a, Q) then
+            return
+        end
+        for r = 1, x do
+            pcall(function()
+                fireproximityprompt(a, 0)
+            end)
+        end
+    end
+    local function r(a)
+        if R[a] then
+            return
+        end
+        R[a] = true
+        local function x()
+            local Q = J()
+            if not Q then
+                return
+            end
+            local V = Q.Position
+            if e(a, V) then
+                C.AUTO_STEAL = true
+                local Q = os.clock()
+                local V = f[a]
+                if not V or Q - V >= 0.08 then
+                    f[a] = Q
+                    n(a, 25, 0)
+                end
+            end
+        end
+        task.defer(function()
+            x()
+        end)
+        pcall(function()
+            a:GetPropertyChangedSignal("Enabled"):Connect(function()
+                if a.Enabled then
+                    x()
+                end
+            end)
+        end)
+        a.AncestryChanged:Connect(function()
+            if not a:IsDescendantOf(workspace) then
+                R[a] = nil
+                d[a] = nil
+                f[a] = nil
+            end
+        end)
+    end
+    local function d()
+        local f = workspace:FindFirstChild("Plots")
+        if not f then
+            return
+        end
+        for a, a in ipairs(f:GetChildren()) do
+            local f = a:FindFirstChild("AnimalPodiums")
+            if f then
+                for a, a in ipairs(f:GetDescendants()) do
+                    if a:IsA("ProximityPrompt") then
+                        r(a)
+                    end
+                end
+            end
+        end
+    end
+    d()
+    workspace.DescendantAdded:Connect(function(d)
+        if d:IsA("ProximityPrompt") and d:FindFirstAncestor("AnimalPodiums") then
+            r(d)
+        end
+    end)
+    task.spawn(function()
+        while task.wait(_G.getSafePollRate()) do
+            local r = J()
+            if not r then
+                C.AUTO_STEAL = false
+                continue
+            end
+            local d = r.Position
+            local r = false
+            for f in pairs(R) do
+                if e(f, d) then
+                    r = true
+                    if C.AUTO_STEAL then
+                        n(f, 3, 0.12)
+                    end
+                end
+            end
+            C.AUTO_STEAL = r
+        end
+    end)
+end
+local C = {
+    Players = game:GetService("Players"),
+    RunService = game:GetService("RunService"),
+    UserInputService = game:GetService("UserInputService"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
+    TweenService = game:GetService("TweenService"),
+    HttpService = game:GetService("HttpService"),
+    Workspace = game:GetService("Workspace"),
+    Lighting = game:GetService("Lighting"),
+    GuiService = game:GetService("GuiService"),
+    TeleportService = game:GetService("TeleportService"),
+}
+local r = C.Players
+local R = C.RunService
+local d = C.UserInputService
+local n = C.ReplicatedStorage
+local f = C.TweenService
+local J = C.HttpService
+local a = C.Workspace
+local e = C.Lighting
+local e = C.GuiService
+local e = C.TeleportService
+local C = r.LocalPlayer
+local x = C:WaitForChild("PlayerGui")
+local Q
+Q = setmetatable({}, {
+    __index = function(V, V)
+        local i = n.Packages.Net
+        local O, U
+        if V:sub(1, 3) == "RE/" then
+            O = "RE/"
+            U = V:sub(4)
+        elseif V:sub(1, 3) == "RF/" then
+            O = "RF/"
+            U = V:sub(4)
+        else
+            return nil
+        end
+        local O
+        for U, y in i:GetChildren() do
+            if y.Name == V then
+                O = i:GetChildren()[U + 1]
+                break
+            end
+        end
+        if O and not rawget(Q, V) then
+            rawset(Q, V, O)
+        end
+        return rawget(Q, V)
+    end,
+})
+local V = {}
+function V:LarpNet(V)
+    return Q[V]
+end
+local Q = a.CurrentCamera
+local V = C:GetMouse()
+local function V()
+    return d.TouchEnabled and not d.KeyboardEnabled and not d.MouseEnabled
+end
+local d = V()
+local V = {
+    Positions = {
+        AutoSteal = { X = 0.02, Y = 0.35, OffsetX = 0, OffsetY = 0 },
+        TargetControls = { X = 0.26, Y = 0.35, OffsetX = 0, OffsetY = 0 },
+    },
+    MenuKey = "LeftControl",
+    MobileGuiScale = 0.5,
+    StealNearest = false,
+    DefaultToNearest = false,
+    UILocked = false,
+    HideAutoSteal = false,
+    CompactAutoSteal = false,
+    InstantSteal = false,
+}
+function DeepCopy(i)
+    if type(i) ~= "table" then
+        return i
+    end
+    local O = {}
+    for U, y in pairs(i) do
+        O[U] = DeepCopy(y)
+    end
+    return O
+end
+function MergeDefaults(i, O)
+    for U, y in pairs(O) do
+        if type(y) == "table" then
+            if type(i[U]) ~= "table" then
+                i[U] = DeepCopy(y)
+            else
+                MergeDefaults(i[U], y)
+            end
+        elseif i[U] == nil then
+            i[U] = y
+        end
+    end
+end
+local i = DeepCopy(V)
+function NormalizeKeyName(O, U)
+    if type(O) ~= "string" or O == "" then
+        return U
+    end
+    local y = {
+        ALT = "LeftAlt",
+        LALT = "LeftAlt",
+        RALT = "RightAlt",
+        CTRL = "LeftControl",
+        CONTROL = "LeftControl",
+        LCTRL = "LeftControl",
+        RCTRL = "RightControl",
+        SHIFT = "LeftShift",
+        LSHIFT = "LeftShift",
+        RSHIFT = "RightShift",
+        WIN = "LeftSuper",
+        CMD = "LeftSuper",
+        META = "LeftSuper",
+    }
+    local K = string.upper(O)
+    local q = y[K] or O
+    return Enum.KeyCode[q] and q or O
+end
+function PrettyKeyName(O)
+    local U = {
+        LeftAlt = "ALT",
+        RightAlt = "RALT",
+        LeftControl = "CTRL",
+        RightControl = "RCTRL",
+        LeftShift = "SHIFT",
+        RightShift = "RSHIFT",
+        LeftSuper = "WIN",
+        RightSuper = "RWIN",
+    }
+    return U[O] or tostring(O or "")
+end
+if isfile and isfile("SlicedzHub.json") then
+    pcall(function()
+        local O = readfile("SlicedzHub.json")
+        if not O or O == "" then
+            return
+        end
+        local U = J:JSONDecode(O)
+        if type(U) ~= "table" then
+            return
+        end
+        MergeDefaults(U, V)
+        U.PriorityList = nil
+        U.DefaultToPriority = nil
+        U.DefaultToHighest = nil
+        U.StealPriority = nil
+        U.StealHighest = nil
+        i = U
+    end)
+end
+if i.Positions then
+    i.Positions.Settings = { X = 0.5, Y = 0.5, OffsetX = 0, OffsetY = 0 }
+end
+function EnsureSavedKeybinds()
+    i.SavedKeybinds = i.SavedKeybinds or {}
+    i.SavedKeybinds.MenuKey =
+        NormalizeKeyName(i.SavedKeybinds.MenuKey or i.MenuKey, V.MenuKey or "LeftControl")
+end
+function ApplySavedKeybindsToConfig()
+    EnsureSavedKeybinds()
+    i.MenuKey = i.SavedKeybinds.MenuKey
+end
+function NormalizeAllKeybinds()
+    EnsureSavedKeybinds()
+    ApplySavedKeybindsToConfig()
+end
+NormalizeAllKeybinds()
+local function U()
+    if writefile then
+        pcall(function()
+            NormalizeAllKeybinds()
+            local y = DeepCopy(i)
+            y.MenuKey = i.SavedKeybinds.MenuKey
+            writefile("SlicedzHub.json", J:JSONEncode(y))
+        end)
+    end
+end
+if _needMigrationSave then
+    U()
+end
+local function q()
+    local c = C:WaitForChild("PlayerScripts")
+    local z = require(c:WaitForChild("PlayerModule"))
+    return z:GetControls()
+end
+local c = q()
+local function c()
+    local z = pcall(function()
+        game:Shutdown()
+    end)
+    if z then
+        return
+    end
+    pcall(function()
+        C:Kick("")
+    end)
+end
+local W = {
+    Background = Color3.fromRGB(18, 10, 28),
+    Surface = Color3.fromRGB(28, 14, 40),
+    SurfaceHighlight = Color3.fromRGB(48, 22, 68),
+    Accent1 = Color3.fromRGB(170, 85, 255),
+    Accent2 = Color3.fromRGB(110, 45, 190),
+    TextPrimary = Color3.fromRGB(240, 240, 240),
+    TextSecondary = Color3.fromRGB(140, 140, 150),
+    Success = Color3.fromRGB(30, 150, 90),
+    Error = Color3.fromRGB(210, 100, 255),
+}
+local function F(E, m)
+    local A = x:FindFirstChild("lMWjwEoSnCPj")
+    if A then
+        A:Destroy()
+    end
+    local A = Instance.new("ScreenGui", x)
+    A.Name = "lMWjwEoSnCPj"
+    A.ResetOnSpawn = false
+    local H = Instance.new("Frame", A)
+    H.Size = UDim2.new(0, 290, 0, 54)
+    H.Position = UDim2.new(0.5, -145.0, 0, 80)
+    H.BackgroundColor3 = Color3.fromRGB(6, 6, 12)
+    H.BackgroundTransparency = 1
+    H.BorderSizePixel = 0
+    Instance.new("UICorner", H).CornerRadius = UDim.new(0, 9)
+    local _ = Instance.new("UIStroke", H)
+    _.Thickness = 1
+    _.Color = W.Accent2
+    _.Transparency = 1
+    local Z = Instance.new("Frame", H)
+    Z.Size = UDim2.new(0, 3, 1, -12.0)
+    Z.Position = UDim2.new(0, 5, 0, 6)
+    Z.BackgroundColor3 = W.Accent1
+    Z.BorderSizePixel = 0
+    Z.BackgroundTransparency = 1
+    Instance.new("UICorner", Z).CornerRadius = UDim.new(1, 0)
+    local k = Instance.new("TextLabel", H)
+    k.Size = UDim2.new(1, -22.0, 0, 18)
+    k.Position = UDim2.new(0, 16, 0, 7)
+    k.BackgroundTransparency = 1
+    k.Text = E:upper()
+    k.Font = Enum.Font.Arcade
+    k.TextSize = 11
+    k.TextColor3 = W.Accent1
+    k.TextXAlignment = Enum.TextXAlignment.Left
+    k.TextTransparency = 1
+    local E = Instance.new("TextLabel", H)
+    E.Size = UDim2.new(1, -22.0, 0, 15)
+    E.Position = UDim2.new(0, 16, 0, 27)
+    E.BackgroundTransparency = 1
+    E.Text = m or ""
+    E.Font = Enum.Font.Arcade
+    E.TextSize = 10
+    E.TextColor3 = W.TextSecondary
+    E.TextXAlignment = Enum.TextXAlignment.Left
+    E.TextTransparency = 1
+    local m = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    f:Create(H, m, { BackgroundTransparency = 0.08 }):Play()
+    f:Create(_, m, { Transparency = 0.3 }):Play()
+    f:Create(Z, m, { BackgroundTransparency = 0 }):Play()
+    f:Create(k, m, { TextTransparency = 0 }):Play()
+    f:Create(E, m, { TextTransparency = 0 }):Play()
+    task.delay(2, function()
+        if not A.Parent then
+            return
+        end
+        local m = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        f:Create(H, m, { BackgroundTransparency = 1 }):Play()
+        f:Create(_, m, { Transparency = 1 }):Play()
+        f:Create(Z, m, { BackgroundTransparency = 1 }):Play()
+        f:Create(k, m, { TextTransparency = 1 }):Play()
+        local H = f:Create(E, m, { TextTransparency = 1 })
+        H:Play()
+        H.Completed:Wait()
+        if A.Parent then
+            A:Destroy()
+        end
+    end)
+end
+local function z(I, p)
+    local l, G = pcall(function()
+        if type(I) ~= "string" or I == "" then
+            return p
+        end
+        local b = Enum.KeyCode[I]
+        if b then
+            return b
+        end
+        if #I == 1 then
+            local CG = string.upper(I)
+            b = Enum.KeyCode[CG]
+            if b then
+                return b
+            end
+        end
+        return p
+    end)
+    return l and G or p
+end
+local I = 0
+local X = {}
+local function t()
+    for v = #X, 1, -1.0 do
+        X[v] = nil
+    end
+end
+t()
+local function M(w)
+    if not w then
+        return nil
+    end
+    local b = a:FindFirstChild("Plots") and a.Plots:FindFirstChild(w.plot)
+    if b then
+        local D = b:FindFirstChild("AnimalPodiums")
+        if D then
+            local b = D:FindFirstChild(w.slot)
+            if b then
+                local w = b:FindFirstChild("Base")
+                if w then
+                    local b = w:FindFirstChild("Spawn")
+                    if b then
+                        return b
+                    end
+                    return w:FindFirstChildWhichIsA("BasePart") or w
+                end
+            end
+        end
+    end
+    return nil
+end
+local function w(b)
+    if not b then
+        return
+    end
+    if not d then
+        return
+    end
+    local D = b:FindFirstChildOfClass("UIScale")
+    if D then
+        D:Destroy()
+    end
+    local D = Instance.new("UIScale")
+    D.Parent = b
+    P.MobileScaleObjects[b] = D
+    if P.RefreshMobileScale then
+        P.RefreshMobileScale()
+    else
+        D.Scale = math.clamp(tonumber(i.MobileGuiScale) or 0.5, 0, 1)
+    end
+end
+P.RefreshMobileScale = function()
+    local b = math.clamp(tonumber(i.MobileGuiScale) or 0.5, 0, 1)
+    for D, F in pairs(P.MobileScaleObjects) do
+        if D and D.Parent and F and F.Parent == D then
+            F.Scale = b
+        else
+            P.MobileScaleObjects[D] = nil
+        end
+    end
+end
+local j = game:GetService("UserInputService")
+local function D(F, E, m)
+    local A, H, _, Z
+    F.InputBegan:Connect(function(k)
+        if i.UILocked then
+            return
+        end
+        if
+            k.UserInputType == Enum.UserInputType.MouseButton1
+            or k.UserInputType == Enum.UserInputType.Touch
+        then
+            A = true
+            _ = k.Position
+            Z = E.Position
+            k.Changed:Connect(function()
+                if k.UserInputState == Enum.UserInputState.End then
+                    A = false
+                    if m then
+                        i.Positions[m] = {
+                            X = E.Position.X.Scale,
+                            Y = E.Position.Y.Scale,
+                            OffsetX = E.Position.X.Offset,
+                            OffsetY = E.Position.Y.Offset,
+                        }
+                        U()
+                    end
+                end
+            end)
+        end
+    end)
+    F.InputChanged:Connect(function(F)
+        if
+            F.UserInputType == Enum.UserInputType.MouseMovement
+            or F.UserInputType == Enum.UserInputType.Touch
+        then
+            H = F
+        end
+    end)
+    j.InputChanged:Connect(function(F)
+        if F == H and A then
+            local m = F.Position - _
+            E.Position = UDim2.new(Z.X.Scale, Z.X.Offset + m.X, Z.Y.Scale, Z.Y.Offset + m.Y)
+        end
+    end)
+end
+task.spawn(function()
+    local S = n:WaitForChild("Packages")
+    local CG = n:WaitForChild("Datas")
+    local rG = n:WaitForChild("Shared")
+    local rG = n:WaitForChild("Utils")
+    local rG = require(S:WaitForChild("Synchronizer"))
+    local function S(dG)
+        if not dG then
+            return false
+        end
+        if typeof(dG) == "Instance" then
+            return dG == C
+        end
+        if type(dG) == "string" then
+            return dG == C.Name
+        end
+        return false
+    end
+    local function dG(nG)
+        local fG, JG = pcall(function()
+            local aG = getthreadidentity and getthreadidentity() or nil
+            if setthreadidentity then
+                setthreadidentity(8)
+            end
+            local eG = rG:GetTableFromChannel(nG)
+            if aG and setthreadidentity then
+                pcall(setthreadidentity, aG)
+            end
+            return eG
+        end)
+        if fG and type(JG) == "table" then
+            return JG
+        end
+        return nil
+    end
+    local rG = require(CG:WaitForChild("Animals"))
+    local nG = require(CG:WaitForChild("Mutations"))
+    local fG = require(CG:WaitForChild("Traits"))
+    local CG = {
+        "",
+        "K",
+        "M",
+        "B",
+        "T",
+        "Qa",
+        "Qi",
+        "Sx",
+        "Sp",
+        "Oc",
+        "No",
+        "Dc",
+        "Ud",
+        "Dd",
+        "Td",
+        "Qad",
+        "Qid",
+        "Sxd",
+        "Spd",
+        "Ocd",
+        "Nod",
+        "Vg",
+        "Uvg",
+        "Dvg",
+        "Tvg",
+    }
+    local function JG(aG, eG)
+        eG = eG or 1
+        local xG = math.abs(aG)
+        local QG = math.max(1, xG)
+        local xG = math.floor(math.log(QG, 1000))
+        local QG = CG[xG + 1] or "e+" .. xG
+        local CG = aG * (10 ^ eG / 1000 ^ xG)
+        local aG = math.floor(CG) / 10 ^ eG
+        return (("%." .. eG .. "f"):format(aG)):gsub("%.?0+$", "") .. QG
+    end
+    local function CG(aG, eG, xG)
+        local QG = rG[aG]
+        if not QG then
+            return 0
+        end
+        local aG = QG.Generation or QG.Price * 0.1
+        local QG = 1
+        if eG and eG ~= "None" then
+            local VG = nG[eG]
+            if VG and VG.Modifier then
+                QG = QG + VG.Modifier
+            end
+        end
+        local nG = false
+        if type(xG) == "table" then
+            for eG, eG in ipairs(xG) do
+                if eG == "Sleepy" then
+                    nG = true
+                else
+                    local xG = fG[eG]
+                    if xG and xG.MultiplierModifier then
+                        QG = QG + xG.MultiplierModifier
+                    end
+                end
+            end
+        end
+        local fG = math.round(aG * QG)
+        if nG then
+            fG = math.round(fG * 0.5)
+        end
+        return fG
+    end
+    local nG = true
+    -- Nearest is the only target mode.
+    i.DefaultToNearest = true
+    i.StealNearest = true
+    local fG = false
+    local aG = false
+    local eG = false
+    fG = true
+    if i.InstantSteal == nil then
+        i.InstantSteal = false
+    end
+    local xG = i.InstantSteal == true
+    _G.NEAREST_INSTANT_MODE = (i.StealNearest == true and i.InstantSteal == true)
+    local QG = false
+    local VG = false
+    local iG = 1
+    local OG = nil
+    local UG = nil
+    local yG = {}
+    local function KG()
+        nG = fG == true or aG == true or eG == true
+    end
+    KG()
+    local qG = {}
+    local cG = {}
+    local zG = nil
+    local BG = nil
+    local oG = {}
+    local function YG(TG)
+        if not TG or not TG.plot then
+            return false
+        end
+        local IG = a:FindFirstChild("Plots")
+        if not IG then
+            return false
+        end
+        local pG = IG:FindFirstChild(TG.plot)
+        if not pG then
+            return false
+        end
+        local TG = dG(pG.Name)
+        if TG then
+            return S(TG.Owner)
+        end
+        return false
+    end
+    local function TG(IG)
+        if not IG or IG == "None" then
+            return ""
+        end
+        local pG = ""
+        if IG == "Cursed" then
+            pG = "<font color='rgb(200,0,0)'>Cur</font><font color='rgb(0,0,0)'>sed</font>"
+        elseif IG == "Gold" then
+            pG = "<font color='rgb(255,215,0)'>Gold</font>"
+        elseif IG == "Diamond" then
+            pG = "<font color='rgb(0,255,255)'>Diamond</font>"
+        elseif IG == "YinYang" then
+            pG = "<font color='rgb(255,255,255)'>Yin</font><font color='rgb(0,0,0)'>Yang</font>"
+        elseif IG == "Candy" then
+            pG = "<font color='rgb(255,105,180)'>Candy</font>"
+        elseif IG == "Divine" then
+            pG = "<font color='rgb(255,255,255)'>Divine</font>"
+        elseif IG == "Rainbow" then
+            local jG = {
+                "rgb(255,0,0)",
+                "rgb(255,127,0)",
+                "rgb(255,255,0)",
+                "rgb(0,255,0)",
+                "rgb(0,0,255)",
+                "rgb(75,0,130)",
+                "rgb(148,0,211)",
+            }
+            for lG = 1, #IG do
+                pG = pG .. "<font color='" .. jG[(lG - 1) % #jG + 1] .. "'>" .. IG:sub(lG, lG) .. "</font>"
+            end
+        elseif IG == "Radioactive" then
+            pG = "<font color='rgb(132,255,0)'>Radioactive</font>"
+        elseif IG == "Galaxy" then
+            pG = "<font color='rgb(170,85,255)'>Galaxy</font>"
+        else
+            pG = IG
+        end
+        return "<font weight='800'>" .. pG .. " </font>"
+    end
+    local function IG(pG)
+        if pG == "Gold" then
+            return Color3.fromRGB(255, 215, 0)
+        elseif pG == "Diamond" then
+            return Color3.fromRGB(0, 255, 255)
+        elseif pG == "Cursed" then
+            return Color3.fromRGB(145, 65, 220)
+        elseif pG == "YinYang" then
+            return Color3.fromRGB(255, 255, 255)
+        elseif pG == "Candy" then
+            return Color3.fromRGB(255, 105, 180)
+        elseif pG == "Divine" then
+            return Color3.fromRGB(255, 255, 255)
+        elseif pG == "Rainbow" then
+            return Color3.fromRGB(148, 0, 211)
+        elseif pG == "Radioactive" then
+            return Color3.fromRGB(132, 255, 0)
+        elseif pG == "Galaxy" then
+            return Color3.fromRGB(170, 85, 255)
+        end
+        return Color3.fromRGB(205, 120, 255)
+    end
+    local function pG(jG)
+        local lG = jG and jG.petName or "Unknown"
+        return lG
+    end
+    local function jG(lG)
+        local WG = lG and lG.mutation
+        if WG and WG ~= "None" and WG ~= "" then
+            return TG(WG), true
+        end
+        return "", false
+    end
+    local function TG()
+        local lG = {}
+        for WG, WG in ipairs(yG) do
+            if WG.genValue >= 1 and not YG(WG) then
+                table.insert(
+                    lG,
+                    {
+                        petName = WG.name,
+                        mpsText = WG.genText,
+                        mpsValue = WG.genValue,
+                        owner = WG.owner,
+                        plot = WG.plot,
+                        slot = WG.slot,
+                        uid = WG.uid,
+                        mutation = WG.mutation,
+                        animalData = WG,
+                    }
+                )
+            end
+        end
+        return lG
+    end
+    local lG = (gethui and gethui()) or game:GetService("CoreGui")
+    local WG = Instance.new("ScreenGui")
+    WG.Name = "cJPcVLFpwxgI"
+    WG.ResetOnSpawn = false
+    WG.Parent = lG
+    local XG = Instance.new("Frame")
+    local tG = d and 0.6 or 1
+    local GG = {
+        BG = Color3.fromRGB(18, 10, 28),
+        SURF = Color3.fromRGB(26, 14, 40),
+        SURF2 = Color3.fromRGB(44, 20, 64),
+        TEXT = Color3.fromRGB(255, 255, 255),
+        DIM = Color3.fromRGB(185, 140, 220),
+        AQUA = Color3.fromRGB(170, 85, 255),
+        AQUA2 = Color3.fromRGB(110, 45, 190),
+        AQUA_STROKE = Color3.fromRGB(155, 75, 235),
+    }
+    -- COMPACT: AutoSteal panel now portrait (230w x 460h, ~2x smaller than original 420x580)
+    XG.Size = UDim2.new(0, 230 * tG, 0, 460 * tG)
+    XG.Position = UDim2.new(
+        i.Positions.AutoSteal.X,
+        i.Positions.AutoSteal.OffsetX or 0,
+        i.Positions.AutoSteal.Y,
+        i.Positions.AutoSteal.OffsetY or 0
+    )
+    XG.BackgroundColor3 = GG.BG
+    XG.BackgroundTransparency = 0
+    XG.BorderSizePixel = 0
+    XG.ClipsDescendants = true
+    XG.Parent = WG
+    -- The old Steal Target panel is hidden; target-selection mechanics remain active.
+    XG.Visible = false
+    w(XG)
+    Instance.new("UICorner", XG).CornerRadius = UDim.new(0, 14)
+    local WG = Instance.new("UIStroke", XG)
+    WG.Color = GG.AQUA_STROKE
+    WG.Thickness = 1.3
+    WG.Transparency = 0.25
+    local WG = Instance.new("Frame", XG)
+    WG.Size = UDim2.new(1, 0, 0, 44)
+    WG.BackgroundTransparency = 1
+    D(WG, XG, "AutoSteal")
+    local vG = Instance.new("TextLabel", WG)
+    vG.Size = UDim2.new(1, -20.0, 0, 26)
+    vG.Position = UDim2.new(0, 10, 0, 8)
+    vG.BackgroundTransparency = 1
+    vG.Text = "STEAL TARGET"
+    vG.Font = Enum.Font.Arcade
+    -- COMPACT: title 28 → 16
+    vG.TextSize = 16
+    vG.TextColor3 = GG.TEXT
+    vG.TextXAlignment = Enum.TextXAlignment.Center
+    local WG = Instance.new("Frame", XG)
+    WG.AnchorPoint = Vector2.new(0.5, 0)
+    WG.Position = UDim2.new(0.5, 0, 0, 42)
+    WG.Size = UDim2.new(0, 90, 0, 2)
+    WG.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    WG.BackgroundTransparency = 0.15
+    WG.BorderSizePixel = 0
+    local WG = Instance.new("ScrollingFrame", XG)
+    -- COMPACT: scroll area taller to use portrait space
+    WG.Size = UDim2.new(1, -10.0, 0, 360)
+    WG.Position = UDim2.new(0, 5, 0, 58)
+    WG.BackgroundTransparency = 1
+    WG.BorderSizePixel = 0
+    WG.ClipsDescendants = true
+    WG.ScrollingDirection = Enum.ScrollingDirection.Y
+    WG.AutomaticCanvasSize = Enum.AutomaticSize.None
+    WG.ScrollBarImageTransparency = 1
+    WG.ScrollBarThickness = 0
+    WG.CanvasSize = UDim2.new(0, 0, 0, 0)
+    local XG = Instance.new("Frame", WG)
+    XG.Name = "Holder"
+    XG.BackgroundTransparency = 1
+    XG.BorderSizePixel = 0
+    XG.Position = UDim2.new(0, 0, 0, 0)
+    XG.Size = UDim2.new(1, 0, 0, 0)
+    XG.ClipsDescendants = false
+    local vG = Instance.new("UIListLayout", XG)
+    vG.Padding = UDim.new(0, 3)
+    vG.SortOrder = Enum.SortOrder.LayoutOrder
+    local MG = x:FindFirstChild("bRXgmsaEVfze")
+    if MG then
+        MG:Destroy()
+    end
+    local MG = Instance.new("ScreenGui")
+    MG.Name = "bRXgmsaEVfze"
+    MG.ResetOnSpawn = false
+    MG.IgnoreGuiInset = true
+    MG.DisplayOrder = 998
+    MG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    MG.Parent = x
+    local wG = {
+        PANEL = Color3.fromRGB(26, 14, 40),
+        PANEL2 = Color3.fromRGB(44, 20, 64),
+        TEXT = Color3.fromRGB(255, 255, 255),
+        STROKE = Color3.fromRGB(155, 75, 235),
+        GLOW = Color3.fromRGB(170, 85, 255),
+        TRACK = Color3.fromRGB(36, 20, 52),
+        TRACK2 = Color3.fromRGB(50, 26, 70),
+        FILL1 = Color3.fromRGB(145, 65, 220),
+        FILL2 = Color3.fromRGB(205, 135, 255),
+    }
+    local bG = Instance.new("Frame", MG)
+    bG.Name = "CurrentTargetHUD"
+    bG.AnchorPoint = Vector2.new(0.5, 1)
+    -- Horizontal Auto grab progress HUD, styled like a compact status bar.
+    bG.Size = UDim2.new(0, 300 * tG, 0, 54 * tG)
+    -- Move the progress HUD lower, closer to the bottom edge.
+    bG.Position = UDim2.new(0.5, 0, 1, -110.0)
+    bG.BackgroundColor3 = wG.PANEL
+    bG.BackgroundTransparency = 0.02
+    bG.BorderSizePixel = 0
+    bG.ZIndex = 70
+    Instance.new("UICorner", bG).CornerRadius = UDim.new(0, math.floor(13 * tG))
+    local MG = Instance.new("UIStroke", bG)
+    MG.Color = wG.STROKE
+    MG.Thickness = 1
+    MG.Transparency = 0.35
+    local MG = Instance.new("UIStroke", bG)
+    MG.Color = wG.GLOW
+    MG.Thickness = 2
+    MG.Transparency = 0.78
+    MG.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    local MG = Instance.new("TextLabel", bG)
+    MG.Name = "TargetName"
+    MG.Size = UDim2.new(1, -24.0, 0, 17 * tG)
+    MG.Position = UDim2.fromOffset(12 * tG, 3 * tG)
+    MG.BackgroundTransparency = 1
+    MG.Font = Enum.Font.Arcade
+    MG.TextSize = 11 * tG
+    MG.TextColor3 = wG.TEXT
+    MG.TextXAlignment = Enum.TextXAlignment.Center
+    MG.TextTruncate = Enum.TextTruncate.AtEnd
+    MG.ZIndex = 72
+    MG.Text = "No target"
+    local DG = Instance.new("Frame", bG)
+    DG.Name = "ProgressBg"
+    DG.Size = UDim2.new(1, -16.0 * tG, 0, 23 * tG)
+    DG.Position = UDim2.fromOffset(8 * tG, 26 * tG)
+    DG.BackgroundColor3 = wG.TRACK
+    DG.BorderSizePixel = 0
+    DG.ZIndex = 72
+    Instance.new("UICorner", DG).CornerRadius = UDim.new(0, math.floor(11 * tG))
+    local bG = Instance.new("UIStroke", DG)
+    bG.Color = wG.STROKE
+    bG.Thickness = 1
+    bG.Transparency = 0.55
+    local bG = Instance.new("Frame", DG)
+    bG.Name = "InnerTrack"
+    bG.Size = UDim2.new(1, -2.0, 1, -2.0)
+    bG.Position = UDim2.fromOffset(1, 1)
+    bG.BackgroundColor3 = wG.TRACK2
+    bG.BackgroundTransparency = 0.15
+    bG.BorderSizePixel = 0
+    bG.ZIndex = 72
+    Instance.new("UICorner", bG).CornerRadius = UDim.new(0, math.floor(9 * tG))
+    local bG = Instance.new("Frame", DG)
+    bG.Name = "ProgressFill"
+    bG.Size = UDim2.new(0, 0, 1, 0)
+    bG.BackgroundColor3 = wG.FILL1
+    bG.BorderSizePixel = 0
+    bG.ZIndex = 73
+    Instance.new("UICorner", bG).CornerRadius = UDim.new(0, math.floor(9 * tG))
+    local FG = Instance.new("UIGradient", bG)
+    FG.Color =
+        ColorSequence.new({ ColorSequenceKeypoint.new(0, wG.FILL1), ColorSequenceKeypoint.new(1, wG.FILL2) })
+    local FG = Instance.new("UIStroke", bG)
+    FG.Color = Color3.fromRGB(220, 175, 255)
+    FG.Thickness = 1
+    FG.Transparency = 0.45
+    local FG = Instance.new("TextLabel", DG)
+    FG.Name = "Percent"
+    FG.Size = UDim2.new(1, 0, 1, 0)
+    FG.BackgroundTransparency = 1
+    FG.Font = Enum.Font.Arcade
+    FG.TextSize = 11 * tG
+    FG.TextColor3 = wG.TEXT
+    FG.TextStrokeTransparency = 0.7
+    FG.TextXAlignment = Enum.TextXAlignment.Center
+    FG.ZIndex = 74
+    FG.Text = "0%"
+    local wG = bG
+    local DG = x:FindFirstChild("kzBUJxAKwhtf")
+    if DG then
+        DG:Destroy()
+    end
+    local DG = Instance.new("ScreenGui")
+    DG.Name = "kzBUJxAKwhtf"
+    DG.ResetOnSpawn = false
+    DG.IgnoreGuiInset = true
+    DG.DisplayOrder = 999
+    DG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    DG.Parent = lG
+    local lG = Instance.new("Frame", DG)
+    lG.Name = "AutoGrabFrame"
+    lG.AutomaticSize = Enum.AutomaticSize.Y
+    -- Extra-wide Auto grab controls panel.
+    -- The mobile scale is applied below, so this remains visibly wider there too.
+    lG.Size = UDim2.new(0, math.floor(500 * tG), 0, 0)
+    local tG = i.Positions.TargetControls and i.Positions.TargetControls.X
+    local DG = i.Positions.TargetControls and i.Positions.TargetControls.Y
+    local EG = i.Positions.TargetControls and i.Positions.TargetControls.OffsetX
+    local mG = i.Positions.TargetControls and i.Positions.TargetControls.OffsetY
+    if tG == nil or DG == nil then
+        tG = i.Positions.AutoSteal.X + 0.28
+        DG = i.Positions.AutoSteal.Y
+        if tG > 0.78 then
+            tG = math.max(0.02, i.Positions.AutoSteal.X - 0.28)
+        end
+        if DG > 0.72 then
+            DG = 0.72
+        end
+        i.Positions.TargetControls = { X = tG, Y = DG }
+    end
+    lG.Position = UDim2.new(tG or 0.26, EG or 10, DG or 0.35, mG or 0)
+    lG.BackgroundColor3 = Color3.fromRGB(18, 10, 28)
+    lG.BackgroundTransparency = 0
+    lG.BorderSizePixel = 0
+    lG.ClipsDescendants = false
+    lG.ZIndex = 100
+    w(lG)
+    local b = {
+        BG = Color3.fromRGB(18, 10, 28),
+        SURF = Color3.fromRGB(26, 14, 40),
+        SURF2 = Color3.fromRGB(44, 20, 64),
+        TEXT = Color3.fromRGB(255, 255, 255),
+        DIM = Color3.fromRGB(185, 140, 220),
+        AQUA = Color3.fromRGB(170, 85, 255),
+        AQUA2 = Color3.fromRGB(110, 45, 190),
+        AQUA_STROKE = Color3.fromRGB(155, 75, 235),
+        GREEN1 = Color3.fromRGB(18, 88, 58),
+        GREEN2 = Color3.fromRGB(21, 120, 76),
+        GREEN_STROKE = Color3.fromRGB(60, 185, 120),
+        OFF_BG = Color3.fromRGB(52, 26, 70),
+        OFF_TEXT = Color3.fromRGB(185, 140, 220),
+    }
+    local function tG(DG, EG)
+        local mG = Instance.new("UICorner")
+        mG.CornerRadius = UDim.new(0, EG)
+        mG.Parent = DG
+        return mG
+    end
+    local function DG(EG, mG, AG, HG)
+        local ZG = Instance.new("UIStroke")
+        ZG.Color = mG
+        ZG.Thickness = AG or 1
+        ZG.Transparency = HG or 0
+        ZG.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        ZG.Parent = EG
+        return ZG
+    end
+    local function EG(mG, AG, HG, ZG, kG)
+        f:Create(
+            mG,
+            TweenInfo.new(AG or 0.2, ZG or Enum.EasingStyle.Quint, kG or Enum.EasingDirection.Out),
+            HG
+        ):Play()
+    end
+    local function mG(AG, HG, ZG, kG)
+        local uG = Instance.new("UIGradient")
+        uG.Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, HG), ColorSequenceKeypoint.new(1, ZG) })
+        uG.Rotation = kG or 0
+        uG.Parent = AG
+        return uG
+    end
+    tG(lG, 16)
+    DG(lG, b.AQUA_STROKE, 1.2, 0.4)
+    local AG = Instance.new("Frame", lG)
+    AG.Size = UDim2.new(1, 0, 0, 40)
+    AG.BackgroundTransparency = 1
+    AG.ZIndex = 101
+    D(AG, lG, "AutoGrab")
+    local autoGrabPanel = lG
+    autoGrabPanel.ClipsDescendants = true
+    local HG = Instance.new("TextLabel", AG)
+    HG.Size = UDim2.new(1, -64.0, 0, 30)
+    HG.Position = UDim2.new(0, 8, 0, 8)
+    HG.ZIndex = 102
+    HG.BackgroundTransparency = 1
+    HG.Text = "• AUTO GRAB"
+    HG.Font = Enum.Font.Arcade
+    -- COMPACT: title 22 → 14
+    HG.TextSize = 18
+    HG.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HG.TextXAlignment = Enum.TextXAlignment.Left
+    local minimizeButton = Instance.new("TextButton", AG)
+    minimizeButton.Name = "MinimizeButton"
+    minimizeButton.Size = UDim2.fromOffset(24, 24)
+    minimizeButton.Position = UDim2.new(1, -32, 0, 8)
+    minimizeButton.BackgroundColor3 = b.AQUA2
+    minimizeButton.BorderSizePixel = 0
+    minimizeButton.AutoButtonColor = false
+    minimizeButton.Text = "−"
+    minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minimizeButton.Font = Enum.Font.Arcade
+    minimizeButton.TextSize = 16
+    minimizeButton.ZIndex = 103
+    tG(minimizeButton, 6)
+    local AG = Instance.new("Frame", lG)
+    AG.AutomaticSize = Enum.AutomaticSize.Y
+    local controlsBody = AG
+    local isAutoGrabMinimized = false
+    local expandedBodyHeight = 0
+    AG.Size = UDim2.new(1, -12.0, 0, 0)
+    AG.Position = UDim2.fromOffset(6, 42)
+    AG.BackgroundColor3 = b.SURF
+    AG.BorderSizePixel = 0
+    AG.ClipsDescendants = true
+    AG.ZIndex = 101
+    tG(AG, 12)
+    DG(AG, b.AQUA_STROKE, 1, 0.48)
+    local lG = Instance.new("Frame", AG)
+    lG.AutomaticSize = Enum.AutomaticSize.Y
+    lG.Size = UDim2.new(1, -6.0, 0, 0)
+    lG.Position = UDim2.fromOffset(3, 3)
+    lG.BackgroundTransparency = 1
+    lG.ZIndex = 102
+    local AG = Instance.new("UIListLayout")
+    AG.Padding = UDim.new(0, 4)
+    AG.SortOrder = Enum.SortOrder.LayoutOrder
+    AG.Parent = lG
+    local AG = d and 1.2 or 1
+    local function HG(ZG, kG, uG)
+        local gG = Instance.new("Frame", ZG)
+        gG.Name = kG:gsub("%s+", "") .. "Row"
+        -- COMPACT: row height 42 → 30
+        gG.Size = UDim2.new(1, 0, 0, math.floor(30 * AG))
+        gG.BackgroundColor3 = b.SURF2
+        gG.BackgroundTransparency = 0.02
+        gG.BorderSizePixel = 0
+        gG.LayoutOrder = math.floor((uG or 0) / math.max(1, 30 * AG)) + 1
+        gG.ZIndex = 103
+        tG(gG, 8)
+        local ZG = DG(gG, b.AQUA_STROKE, 1, 0.52)
+        local uG = Instance.new("TextLabel", gG)
+        uG.BackgroundTransparency = 1
+        uG.Position = UDim2.fromOffset(8, 0)
+        uG.Size = UDim2.new(1, -68.0, 1, 0)
+        uG.Font = Enum.Font.Arcade
+        uG.Text = kG
+        uG.TextColor3 = b.TEXT
+        -- COMPACT: row label 13 → 10
+        uG.TextSize = 13 * AG
+        uG.TextXAlignment = Enum.TextXAlignment.Left
+        uG.ZIndex = 104
+        local hG = Instance.new("TextButton", gG)
+        hG.Name = kG:gsub("%s+", "") .. "Toggle"
+        hG.AutoButtonColor = false
+        -- COMPACT: toggle button 72x26 → 52x20
+        hG.Size = UDim2.fromOffset(math.floor(52 * AG), math.floor(20 * AG))
+        hG.Position = UDim2.new(1, -math.floor(58 * AG), 0.5, -math.floor(10 * AG))
+        hG.BackgroundColor3 = b.OFF_BG
+        hG.BorderSizePixel = 0
+        hG.Text = ""
+        hG.ZIndex = 104
+        tG(hG, 5)
+        local kG = DG(hG, b.AQUA_STROKE, 1, 0.55)
+        local LG = Instance.new("Frame", hG)
+        LG.Size = UDim2.new(1, 0, 1, 0)
+        LG.BackgroundTransparency = 1
+        LG.BorderSizePixel = 0
+        LG.ZIndex = 104
+        tG(LG, 5)
+        mG(LG, b.GREEN1, b.GREEN2, 0)
+        local sG = Instance.new("TextLabel", hG)
+        sG.BackgroundTransparency = 1
+        sG.Size = UDim2.fromScale(1, 1)
+        sG.Font = Enum.Font.Arcade
+        -- COMPACT: toggle text 11 → 9
+        sG.TextSize = 11 * AG
+        sG.Text = "OFF"
+        sG.TextColor3 = b.OFF_TEXT
+        sG.ZIndex = 105
+        gG.MouseEnter:Connect(function()
+            EG(gG, 0.14, { BackgroundColor3 = Color3.fromRGB(58, 26, 82) })
+            EG(ZG, 0.14, { Transparency = 0.38 })
+        end)
+        gG.MouseLeave:Connect(function()
+            EG(gG, 0.14, { BackgroundColor3 = b.SURF2 })
+            EG(ZG, 0.14, { Transparency = 0.52 })
+        end)
+        return { row = gG, label = uG, button = hG, knob = LG, stateLabel = sG, stroke = kG, rowStroke = ZG }
+    end
+    local ZG = HG(lG, "NEAREST", 0)
+    local LG
+    LG = HG(lG, "INSTANT STEAL", 90 * AG)
+    local slotESPRow = HG(lG, "SLOT ESP", 120 * AG)
+    local nextBaseESPRow = HG(lG, "NEXT BASE ESP", 150 * AG)
+    local slotESPEnabled = false
+    local nextBaseESPEnabled = false
+    local slotESPStop
+    local nextBaseESPStop
+    local function setSlotESP(enabled)
+        if slotESPStop then
+            pcall(slotESPStop)
+            slotESPStop = nil
+        end
+        if not enabled then return end
+        local RunService = game:GetService("RunService")
+        local Plots = workspace:WaitForChild("Plots")
+        local hui = (gethui and gethui()) or game:GetService("CoreGui")
+        local markers, fills, conns = {}, {}, {}
+        local alive = true
+        local solids
+        local purple = Color3.fromRGB(175, 95, 255)
+        local template = {
+            {18.500,1.531,-14.476,90},{18.500,1.531,-6.976,90},{18.500,1.531,.524,90},
+            {18.500,1.531,8.024,90},{18.500,1.531,15.524,90},{-18.536,1.531,15.524,-90},
+            {-18.536,1.531,8.024,-90},{-18.536,1.531,.524,-90},{-18.536,1.531,-6.976,-90},
+            {-18.536,1.531,-14.476,-90},{18.500,19.531,-14.476,90},{18.500,19.531,-6.976,90},
+            {18.500,19.531,.524,90},{18.500,19.531,8.024,90},{18.500,19.531,15.524,90},
+            {-18.380,19.531,-14.452,-90},{-18.380,19.531,-6.952,-90},{-18.380,19.531,.548,-90},
+            {18.500,36.531,-12.476,90},{18.500,36.531,-4.976,90},{18.500,36.531,2.524,90},
+            {18.500,36.531,10.024,90},{18.500,36.531,17.524,90},{-18.472,36.531,-12.501,-90},
+            {-18.471,36.531,-5.001,-90},{-18.471,36.531,2.499,-90},{-18.471,36.531,9.999,-90},
+            {-18.471,36.531,17.499,-90}
+        }
+        local function keep(x) markers[#markers+1]=x; x.Parent=hui; return x end
+        local function clear()
+            for _,x in ipairs(markers) do pcall(function() x:Destroy() end) end
+            table.clear(markers); table.clear(fills)
+            if solids then solids:ClearAllChildren() end
+        end
+        local function box(root,cf,size,trans,fill)
+            local x=Instance.new("BoxHandleAdornment"); x.Adornee=root; x.CFrame=cf
+            x.Size=size; x.Color3=purple; x.Transparency=trans; x.AlwaysOnTop=false
+            keep(x); if fill then fills[#fills+1]={a=x,base=trans} end
+        end
+        local function outline(part)
+            local x=Instance.new("SelectionBox"); x.Adornee=part; x.Color3=purple
+            x.SurfaceColor3=purple; x.LineThickness=.05; x.Transparency=0; x.SurfaceTransparency=1; keep(x)
+        end
+        local function solid(cf)
+            if not solids then solids=Instance.new("Folder"); solids.Name="__PodiumCollide"; solids.Parent=workspace end
+            local x=Instance.new("Part"); x.Anchored=true; x.CanCollide=true; x.CanQuery=false
+            x.CanTouch=false; x.Transparency=1; x.Size=Vector3.new(6,.25,6); x.CFrame=cf; x.Parent=solids
+        end
+        local function draw(root,cf,size,ghost)
+            box(root,cf,size,ghost and .65 or .55,true)
+            if ghost then box(root,cf*CFrame.new(0,.25,0),Vector3.new(4,.25,4),.52,true)
+            end
+        end
+        local function build()
+            if not alive then return end
+            clear()
+            for _,plot in ipairs(Plots:GetChildren()) do
+                local root=plot:FindFirstChild("MainRoot"); local pods=plot:FindFirstChild("AnimalPodiums")
+                if root and pods then
+                    for idx,e in ipairs(template) do
+                        local sl=pods:FindFirstChild(tostring(idx))
+                        local base=sl and (sl:FindFirstChild("Base") or sl)
+                        local decos=base and base:FindFirstChild("Decorations")
+                        local parts={}
+                        if decos then for _,p in ipairs(decos:GetChildren()) do
+                            if p:IsA("BasePart") and p.Transparency<1 then parts[#parts+1]=p end
+                        end end
+                        if #parts>0 then
+                            local anchor=parts[1]
+                            for _,p in ipairs(parts) do
+                                local rel=anchor.CFrame:Inverse()*p.CFrame
+                                box(anchor,rel,p.Size+Vector3.new(.03,.03,.03),.55,true); outline(p)
+                            end
+                        else
+                            local cf=CFrame.new(e[1],e[2],e[3])*CFrame.Angles(0,math.rad(e[4]),0)
+                            draw(root,cf,Vector3.new(6,.25,6),true); solid(root.CFrame*cf)
+                        end
+                    end
+                end
+            end
+        end
+        build()
+        local pending=false
+        local function rebuild()
+            if pending or not alive then return end
+            pending=true; task.delay(.4,function() pending=false; build() end)
+        end
+        for _,plot in ipairs(Plots:GetChildren()) do
+            local pods=plot:FindFirstChild("AnimalPodiums")
+            if pods then conns[#conns+1]=pods.ChildAdded:Connect(rebuild); conns[#conns+1]=pods.ChildRemoved:Connect(rebuild) end
+        end
+        conns[#conns+1]=Plots.ChildAdded:Connect(function() task.defer(rebuild) end)
+        conns[#conns+1]=RunService.Heartbeat:Connect(function()
+            for _,f in ipairs(fills) do if f.a.Parent then f.a.Transparency=math.clamp(f.base+math.sin(os.clock()*2)*.12,0,1) end end
+        end)
+        slotESPStop=function()
+            alive=false; for _,c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+            clear(); if solids then solids:Destroy(); solids=nil end
+        end
+    end
+    local function setNextBaseESP(enabled)
+        if nextBaseESPStop then pcall(nextBaseESPStop); nextBaseESPStop=nil end
+        if not enabled then return end
+        local Plots=workspace:WaitForChild("Plots"); local CoreGui=game:GetService("CoreGui")
+        local positions={
+            Vector3.new(-342.439,10.399,113.107),Vector3.new(-342.439,10.465,6.107),
+            Vector3.new(-476.752,10.465,114.107),Vector3.new(-476.752,10.465,7.107),
+            Vector3.new(-342.440,10.464,220.107),Vector3.new(-476.752,10.465,221.107),
+            Vector3.new(-342.439,10.465,-100.893),Vector3.new(-476.752,10.465,-99.893)}
+        local conns={}; local bases={}; local connected={}; local anchor=Instance.new("Part")
+        anchor.Name="__NextBaseAnchor"; anchor.Anchored=true; anchor.CanCollide=false; anchor.CanQuery=false
+        anchor.CanTouch=false; anchor.Transparency=1; anchor.Size=Vector3.new(1,1,1); anchor.Parent=CoreGui
+        local bb=Instance.new("BillboardGui",anchor); bb.Name="NextBaseBillboard"; bb.Size=UDim2.fromScale(32,13)
+        bb.StudsOffset=Vector3.new(0,10,0); bb.MaxDistance=math.huge; bb.AlwaysOnTop=true; bb.Enabled=false
+        local top=Instance.new("TextLabel",bb); top.BackgroundTransparency=1; top.Size=UDim2.fromScale(.95,.5)
+        top.Position=UDim2.fromScale(.5,.3); top.AnchorPoint=Vector2.new(.5,.5); top.Font=Enum.Font.Arcade
+        top.Text="↓  NEXT  ↓"; top.TextScaled=true; top.TextColor3=Color3.fromRGB(175,95,255)
+        top.TextStrokeColor3=Color3.new(0,0,0); top.TextStrokeTransparency=0
+        local bottom=Instance.new("TextLabel",bb); bottom.BackgroundTransparency=1; bottom.Size=UDim2.fromScale(.95,.42)
+        bottom.Position=UDim2.fromScale(.5,.72); bottom.AnchorPoint=Vector2.new(.5,.5); bottom.Font=Enum.Font.Arcade
+        bottom.Text="EMPTY BASE"; bottom.TextScaled=true; bottom.TextColor3=Color3.new(1,1,1)
+        bottom.TextStrokeColor3=Color3.new(0,0,0); bottom.TextStrokeTransparency=0
+        local function recompute()
+            local target
+            for n=1,#positions do local b=bases[n]
+                if b and b.label and b.label.Text:gsub("^%s+",""):gsub("%s+$","")=="Empty Base" then target=n; break end
+            end
+            if target then anchor.CFrame=bases[target].cf; bb.Enabled=true else bb.Enabled=false end
+        end
+        local function scan()
+            for _,plot in ipairs(Plots:GetChildren()) do local sign=plot:FindFirstChild("PlotSign")
+                local model=sign and sign:FindFirstChild("Model"); local gui=sign and sign:FindFirstChild("SurfaceGui")
+                local fr=gui and gui:FindFirstChild("Frame"); local label=fr and fr:FindFirstChild("TextLabel")
+                if model and label then local cf=model:GetBoundingBox(); local best,bestD
+                    for n,p in ipairs(positions) do local q=model:GetPivot().Position; local d=math.sqrt((q.X-p.X)^2+(q.Z-p.Z)^2)
+                        if not bestD or d<bestD then best,bestD=n,d end end
+                    if bestD and bestD<=6 then bases[best]={label=label,cf=cf}; if not connected[label] then
+                        connected[label]=true; conns[#conns+1]=label:GetPropertyChangedSignal("Text"):Connect(recompute) end end
+                end
+            end
+            recompute()
+        end
+        scan(); conns[#conns+1]=Plots.DescendantAdded:Connect(function(x) if x:IsA("TextLabel") then task.defer(scan) end end)
+        conns[#conns+1]=Plots.ChildAdded:Connect(function() task.defer(scan) end)
+        nextBaseESPStop=function() for _,c in ipairs(conns) do pcall(function() c:Disconnect() end) end; anchor:Destroy() end
+    end
+    local function sG(SG, NG)
+        KG()
+        local function PB(CB, rB, RB)
+            local dB = RB or b.AQUA
+            if rB then
+                CB.button.BackgroundColor3 = b.GREEN1
+                CB.knob.BackgroundTransparency = 0
+                CB.stateLabel.Text = "ON"
+                CB.stateLabel.TextColor3 = Color3.fromRGB(232, 255, 240)
+                CB.stroke.Color = b.GREEN_STROKE
+                CB.stroke.Transparency = 0.22
+            else
+                CB.button.BackgroundColor3 = b.OFF_BG
+                CB.knob.BackgroundTransparency = 1
+                CB.stateLabel.Text = "OFF"
+                CB.stateLabel.TextColor3 = b.OFF_TEXT
+                CB.stroke.Color = b.AQUA_STROKE
+                CB.stroke.Transparency = 0.55
+            end
+            if CB.rowStroke then
+                CB.rowStroke.Transparency = rB and 0.38 or 0.52
+            end
+            if CB.label then
+                CB.label.TextColor3 = rB and b.TEXT or b.TEXT
+            end
+        end
+        PB(ZG, fG, W.Accent1)
+        PB(slotESPRow, slotESPEnabled, W.Accent1)
+        PB(nextBaseESPRow, nextBaseESPEnabled, W.Accent1)
+        if LG then
+            if xG then
+                LG.stateLabel.Text = "ON"
+                LG.stateLabel.TextColor3 = Color3.fromRGB(232, 255, 240)
+                LG.button.BackgroundColor3 = b.GREEN1
+                LG.knob.BackgroundTransparency = 0
+                LG.stroke.Color = b.GREEN_STROKE
+                LG.stroke.Transparency = 0.22
+            else
+                LG.stateLabel.Text = "OFF"
+                LG.stateLabel.TextColor3 = b.OFF_TEXT
+                LG.button.BackgroundColor3 = b.OFF_BG
+                LG.knob.BackgroundTransparency = 1
+                LG.stroke.Color = b.AQUA_STROKE
+                LG.stroke.Transparency = 0.55
+            end
+            if LG.rowStroke then
+                LG.rowStroke.Transparency = xG and 0.38 or 0.52
+            end
+        end
+        if OG and NG then
+            local PB = false
+            for CB, rB in ipairs(NG) do
+                if rB.uid == OG then
+                    iG = CB
+                    PB = true
+                    break
+                end
+            end
+        end
+        if P.ListNeedsRedraw then
+            for PB, PB in ipairs(XG:GetChildren()) do
+                if PB:IsA("TextButton") then
+                    PB:Destroy()
+                end
+            end
+            oG = {}
+            if NG and #NG > 0 then
+                for PB = 1, #NG do
+                    local CB = NG[PB]
+                    local rB = Instance.new("TextButton")
+                    -- COMPACT: list item row 38 → 26
+                    rB.Size = UDim2.new(1, 0, 0, 26)
+                    rB.BackgroundColor3 = GG.SURF2
+                    rB.BorderSizePixel = 0
+                    rB.Text = ""
+                    rB.AutoButtonColor = false
+                    rB.Parent = XG
+                    rB.Position = UDim2.new(0, 0, 0, 0)
+                    rB.ClipsDescendants = true
+                    rB.ZIndex = 1
+                    Instance.new("UICorner", rB).CornerRadius = UDim.new(0, 6)
+                    local RB = Instance.new("Frame", rB)
+                    RB.Name = "SelectedOverlay"
+                    RB.Size = UDim2.new(1, 0, 1, 0)
+                    RB.Position = UDim2.new(0, 0, 0, 0)
+                    RB.BackgroundColor3 = Color3.fromRGB(8, 10, 12)
+                    RB.BackgroundTransparency = 0.82
+                    RB.BorderSizePixel = 0
+                    RB.Visible = false
+                    RB.ZIndex = 2
+                    Instance.new("UICorner", RB).CornerRadius = UDim.new(0, 6)
+                    local dB = Instance.new("UIGradient", RB)
+                    dB.Rotation = 90
+                    dB.Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+                        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(18, 22, 18)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0)),
+                    })
+                    dB.Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 0.12),
+                        NumberSequenceKeypoint.new(0.18, 0.3),
+                        NumberSequenceKeypoint.new(0.55, 0.52),
+                        NumberSequenceKeypoint.new(1, 0.18),
+                    })
+                    -- COMPACT: rank box 24x24 → 16x16
+                    local dB = Instance.new("Frame", rB)
+                    dB.Size = UDim2.fromOffset(16, 16)
+                    dB.Position = UDim2.fromOffset(5, 5)
+                    dB.BackgroundColor3 = GG.SURF
+                    dB.ZIndex = 3
+                    dB.BorderSizePixel = 0
+                    Instance.new("UICorner", dB).CornerRadius = UDim.new(0, 3)
+                    local nB = Instance.new("UIStroke", dB)
+                    nB.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                    nB.Color = GG.AQUA_STROKE
+                    nB.Thickness = 1
+                    nB.Transparency = 0.45
+                    local fB = Instance.new("TextLabel", dB)
+                    fB.Size = UDim2.new(1, 0, 1, 0)
+                    fB.BackgroundTransparency = 1
+                    fB.Text = "#" .. PB
+                    fB.Font = Enum.Font.Arcade
+                    fB.TextSize = 8
+                    fB.TextColor3 = GG.TEXT
+                    fB.TextXAlignment = Enum.TextXAlignment.Center
+                    fB.ZIndex = 4
+                    local JB = CB and CB.petName or "Unknown"
+                    local aB = CB and CB.mpsText or "$0/s"
+                    local eB = Instance.new("TextLabel", rB)
+                    -- COMPACT: name label
+                    eB.Size = UDim2.new(1, -80.0, 0, 12)
+                    eB.Position = UDim2.fromOffset(26, 1)
+                    eB.BackgroundTransparency = 1
+                    eB.RichText = false
+                    eB.Text = JB
+                    eB.Font = Enum.Font.Arcade
+                    eB.TextSize = 9
+                    eB.TextColor3 = GG.TEXT
+                    eB.TextXAlignment = Enum.TextXAlignment.Left
+                    eB.TextTruncate = Enum.TextTruncate.None
+                    eB.ClipsDescendants = false
+                    eB.ZIndex = 4
+                    local JB = Instance.new("UITextSizeConstraint", eB)
+                    JB.MinTextSize = 7
+                    JB.MaxTextSize = 9
+                    -- COMPACT: rate label
+                    local JB = Instance.new("TextLabel", rB)
+                    JB.Size = UDim2.new(0, 60, 0, 12)
+                    JB.Position = UDim2.new(1, -64.0, 0, 1)
+                    JB.BackgroundTransparency = 1
+                    JB.RichText = false
+                    JB.Text = aB
+                    JB.Font = Enum.Font.Arcade
+                    JB.TextSize = 9
+                    JB.TextColor3 = Color3.fromRGB(56, 214, 110)
+                    JB.TextXAlignment = Enum.TextXAlignment.Right
+                    JB.TextTruncate = Enum.TextTruncate.AtEnd
+                    JB.ZIndex = 4
+                    -- COMPACT: mutation label
+                    local aB = Instance.new("TextLabel", rB)
+                    aB.Size = UDim2.new(1, -80.0, 0, 11)
+                    aB.Position = UDim2.fromOffset(26, 13)
+                    aB.BackgroundTransparency = 1
+                    local xB, QB = jG(CB)
+                    aB.RichText = QB
+                    aB.Text = xB
+                    aB.Font = Enum.Font.Arcade
+                    aB.TextSize = 8
+                    aB.TextColor3 = IG(CB.mutation)
+                    aB.TextXAlignment = Enum.TextXAlignment.Left
+                    aB.TextTruncate = Enum.TextTruncate.None
+                    aB.ClipsDescendants = false
+                    aB.ZIndex = 4
+                    local QB = Instance.new("UITextSizeConstraint", aB)
+                    QB.MinTextSize = 7
+                    QB.MaxTextSize = 9
+                    aB.Visible = xB ~= ""
+                    oG[PB] = {
+                        button = rB,
+                        selectedOverlay = RB,
+                        rankBox = dB,
+                        rankBoxStroke = nB,
+                        rank = fB,
+                        info = eB,
+                        rate = JB,
+                        mutation = aB,
+                        petData = CB,
+                    }
+                    rB.MouseButton1Click:Connect(function()
+                        if UG == CB.uid then
+                            UG = nil
+                            OG = nil
+                            _G.NEAREST_INSTANT_MODE = (fG and xG)
+                        else
+                            iG = PB
+                            OG = CB.uid
+                            UG = CB.uid
+                            nG = true
+                            _G.NEAREST_INSTANT_MODE = false
+                        end
+                        P.ListNeedsRedraw = true
+                        sG(nG, TG())
+                    end)
+                end
+            end
+            P.ListNeedsRedraw = false
+            local PB = #oG
+            local CB = 0
+            if PB > 0 then
+                CB = PB * 26 + (PB - 1) * 3
+            end
+            XG.Size = UDim2.new(1, -0.0, 0, CB)
+            WG.CanvasSize = UDim2.new(0, 0, 0, CB + 0)
+        end
+        for PB, PB in ipairs(oG) do
+            local oG = PB.petData and UG and PB.petData.uid == UG
+            PB.button.ZIndex = 1
+            PB.button.BackgroundTransparency = 0
+            PB.button.BackgroundColor3 = oG and Color3.fromRGB(44, 128, 79) or GG.SURF2
+            if PB.selectedOverlay then
+                PB.selectedOverlay.Visible = oG
+                PB.selectedOverlay.ZIndex = 2
+                PB.selectedOverlay.BackgroundColor3 = Color3.fromRGB(8, 10, 12)
+                PB.selectedOverlay.BackgroundTransparency = oG and 0.9 or 1
+            end
+            if PB.rankBox then
+                PB.rankBox.BackgroundColor3 = oG and Color3.fromRGB(33, 97, 60) or GG.SURF
+                PB.rankBox.ZIndex = 3
+            end
+            if PB.rankBoxStroke then
+                PB.rankBoxStroke.Color = oG and Color3.fromRGB(33, 97, 60) or GG.AQUA_STROKE
+                PB.rankBoxStroke.Thickness = 1
+                PB.rankBoxStroke.Transparency = oG and 1 or 0.45
+            end
+            if PB.rank then
+                PB.rank.ZIndex = 4
+                PB.rank.TextColor3 = oG and Color3.fromRGB(240, 255, 240) or GG.TEXT
+            end
+            if PB.info then
+                PB.info.ZIndex = 4
+                PB.info.RichText = false
+                if PB.petData then
+                    PB.info.Text = pG(PB.petData)
+                end
+                PB.info.TextColor3 = oG and Color3.fromRGB(0, 0, 0) or GG.TEXT
+            end
+            if PB.mutation then
+                PB.mutation.ZIndex = 4
+                if PB.petData then
+                    local pG, GG = jG(PB.petData)
+                    PB.mutation.RichText = GG
+                    PB.mutation.Text = pG
+                    PB.mutation.Visible = pG ~= ""
+                end
+                PB.mutation.TextColor3 = oG and Color3.fromRGB(0, 0, 0)
+                    or IG(PB.petData and PB.petData.mutation)
+            end
+            if PB.rate then
+                PB.rate.ZIndex = 4
+                if PB.petData and PB.petData.mpsText then
+                    PB.rate.Text = PB.petData.mpsText
+                end
+                PB.rate.TextColor3 = oG and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(56, 214, 110)
+            end
+        end
+        local oG = NG and NG[iG]
+        P.SelectedPetData = oG
+        if SG then
+            if not fG then
+                if oG then
+                    MG.Text = string.format("%s - %s", oG.petName or "Unknown", oG.mpsText or "")
+                else
+                    MG.Text = "Searching..."
+                end
+            end
+        else
+            MG.Text = "Disabled"
+            if zG then
+                zG:Cancel()
+                zG = nil
+            end
+            wG.Size = UDim2.new(0, 0, 1, 0)
+        end
+        FG.Text = string.format("%d%%", math.clamp(math.floor(wG.Size.X.Scale * 100 + 0.5), 0, 100))
+        XG.Size = UDim2.new(1, -0.0, 0, math.max(0, vG.AbsoluteContentSize.Y))
+        WG.CanvasSize = UDim2.new(0, 0, 0, math.max(0, vG.AbsoluteContentSize.Y) + 0)
+    end
+    vG:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        XG.Size = UDim2.new(1, -0.0, 0, math.max(0, vG.AbsoluteContentSize.Y))
+        WG.CanvasSize = UDim2.new(0, 0, 0, math.max(0, vG.AbsoluteContentSize.Y) + 0)
+    end)
+    P.UpdateAutoStealUI = function()
+        sG(nG, TG())
+    end
+    task.spawn(function()
+        while bG and bG.Parent do
+            local oG = math.clamp(math.floor(wG.Size.X.Scale * 100 + 0.5), 0, 100)
+            FG.Text = tostring(oG) .. "%"
+            task.wait(0.05)
+        end
+    end)
+    ZG.button.MouseButton1Click:Connect(function()
+        fG = not fG
+        if fG then
+            aG = false
+            eG = false
+            UG = nil
+        end
+        i.StealNearest = fG
+        KG()
+        _G.NEAREST_INSTANT_MODE = (fG and xG)
+        U()
+        P.ListNeedsRedraw = false
+        sG(nG, TG())
+    end)
+    minimizeButton.MouseButton1Click:Connect(function()
+        if isAutoGrabMinimized then
+            isAutoGrabMinimized = false
+            controlsBody.Visible = true
+            controlsBody.AutomaticSize = Enum.AutomaticSize.None
+            controlsBody.Size = UDim2.new(1, -12.0, 0, 0)
+            local expandTween = f:Create(
+                controlsBody,
+                TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+                { Size = UDim2.new(1, -12.0, 0, expandedBodyHeight) }
+            )
+            expandTween.Completed:Connect(function()
+                if not isAutoGrabMinimized then
+                    controlsBody.AutomaticSize = Enum.AutomaticSize.Y
+                end
+            end)
+            expandTween:Play()
+            minimizeButton.Text = "−"
+        else
+            expandedBodyHeight = math.max(controlsBody.AbsoluteSize.Y, 1)
+            isAutoGrabMinimized = true
+            controlsBody.AutomaticSize = Enum.AutomaticSize.None
+            local collapseTween = f:Create(
+                controlsBody,
+                TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.InOut),
+                { Size = UDim2.new(1, -12.0, 0, 0) }
+            )
+            collapseTween.Completed:Connect(function()
+                if isAutoGrabMinimized then
+                    controlsBody.Visible = false
+                end
+            end)
+            collapseTween:Play()
+            minimizeButton.Text = "+"
+        end
+    end)
+    slotESPRow.button.MouseButton1Click:Connect(function()
+        slotESPEnabled = not slotESPEnabled
+        setSlotESP(slotESPEnabled)
+        sG(nG, TG())
+    end)
+    nextBaseESPRow.button.MouseButton1Click:Connect(function()
+        nextBaseESPEnabled = not nextBaseESPEnabled
+        setNextBaseESP(nextBaseESPEnabled)
+        sG(nG, TG())
+    end)
+    LG.button.MouseButton1Click:Connect(function()
+        xG = not xG
+        if xG then
+            QG = false
+            VG = false
+        else
+            QG = false
+            VG = false
+        end
+        i.InstantSteal = xG
+        _G.NEAREST_INSTANT_MODE = (fG and xG)
+        U()
+        P.ListNeedsRedraw = false
+        sG(nG, TG())
+    end)
+    task.spawn(function()
+        while true do
+            task.wait(1.5)
+            if not xG then
+                continue
+            end
+            xG = false
+            QG = false
+            VG = false
+            i.InstantSteal = false
+            _G.NEAREST_INSTANT_MODE = false
+            task.wait(0.05)
+            xG = true
+            i.InstantSteal = true
+            _G.NEAREST_INSTANT_MODE = (fG and true)
+        end
+    end)
+    local function b(KG)
+        if not KG then
+            return nil
+        end
+        local oG = cG[KG.uid]
+        if oG and oG.Parent then
+            return oG
+        end
+        local oG = a.Plots:FindFirstChild(KG.plot)
+        if not oG then
+            return nil
+        end
+        local IG = oG:FindFirstChild("AnimalPodiums")
+        if not IG then
+            return nil
+        end
+        local pG = dG(oG.Name)
+        local jG = pG and pG.AnimalList
+        if not jG then
+            local pG = IG:FindFirstChild(KG.slot)
+            if pG then
+                local lG = pG:FindFirstChild("Base")
+                local pG = lG and lG:FindFirstChild("Spawn")
+                if pG then
+                    local lG = pG:FindFirstChild("PromptAttachment")
+                    if lG then
+                        for pG, pG in ipairs(lG:GetChildren()) do
+                            if pG:IsA("ProximityPrompt") then
+                                cG[KG.uid] = pG
+                                return pG
+                            end
+                        end
+                    end
+                end
+            end
+            return nil
+        end
+        if not jG then
+            return nil
+        end
+        local pG = KG.name and KG.name:lower() or ""
+        local lG = KG.slot
+        local WG = nil
+        for XG, tG in pairs(jG) do
+            if type(tG) == "table" and tostring(XG) == lG then
+                local jG, lG = tG.Index, rG[tG.Index]
+                if lG and (lG.DisplayName or jG):lower() == pG then
+                    WG = IG:FindFirstChild(tostring(XG))
+                    break
+                end
+            end
+        end
+        if not WG then
+            WG = IG:FindFirstChild(KG.slot)
+        end
+        if WG then
+            local IG = WG:FindFirstChild("Base")
+            local jG = IG and IG:FindFirstChild("Spawn")
+            if jG then
+                local IG = jG:FindFirstChild("PromptAttachment")
+                if IG then
+                    for lG, lG in ipairs(IG:GetChildren()) do
+                        if lG:IsA("ProximityPrompt") and lG.Enabled and lG.ActionText == "Steal" then
+                            cG[KG.uid] = lG
+                            return lG
+                        end
+                    end
+                end
+                local IG = jG.Position
+                local jG, lG = IG.X, IG.Z
+                local WG = nil
+                local XG = math.huge
+                for tG, tG in pairs(oG:GetDescendants()) do
+                    if tG:IsA("ProximityPrompt") and tG.Enabled and tG.ActionText == "Steal" then
+                        local oG = tG.Parent
+                        local GG = nil
+                        if oG and oG:IsA("BasePart") then
+                            GG = oG.Position
+                        elseif oG and oG:IsA("Attachment") and oG.Parent and oG.Parent:IsA("BasePart") then
+                            GG = oG.Parent.Position
+                        end
+                        if GG then
+                            local oG = IG.Y
+                            if pG:find("la secret combinasion") then
+                                oG = IG.Y - 5
+                            end
+                            local IG = math.sqrt((GG.X - jG) ^ 2 + (GG.Z - lG) ^ 2)
+                            if IG < 5 and GG.Y > oG then
+                                local IG = GG.Y - oG
+                                if IG < XG then
+                                    XG = IG
+                                    WG = tG
+                                end
+                            end
+                        end
+                    end
+                end
+                if WG then
+                    cG[KG.uid] = WG
+                    return WG
+                end
+            end
+        end
+        return nil
+    end
+    local function KG(oG)
+        if qG[oG] then
+            return
+        end
+        local IG = { holdCallbacks = {}, triggerCallbacks = {}, holdEndCallbacks = {}, ready = true }
+        local pG, jG = pcall(getconnections, oG.PromptButtonHoldBegan)
+        if pG and type(jG) == "table" then
+            for pG, pG in ipairs(jG) do
+                if type(pG.Function) == "function" then
+                    table.insert(IG.holdCallbacks, pG.Function)
+                end
+            end
+        end
+        local pG, jG = pcall(getconnections, oG.Triggered)
+        if pG and type(jG) == "table" then
+            for pG, pG in ipairs(jG) do
+                if type(pG.Function) == "function" then
+                    table.insert(IG.triggerCallbacks, pG.Function)
+                end
+            end
+        end
+        local pG, jG = pcall(getconnections, oG.PromptButtonHoldEnded)
+        if pG and type(jG) == "table" then
+            for pG, pG in ipairs(jG) do
+                if type(pG.Function) == "function" then
+                    table.insert(IG.holdEndCallbacks, pG.Function)
+                end
+            end
+        end
+        if #IG.holdCallbacks > 0 or #IG.triggerCallbacks > 0 or #IG.holdEndCallbacks > 0 then
+            qG[oG] = IG
+        end
+    end
+    local function oG(IG)
+        for pG, pG in ipairs(IG) do
+            task.spawn(pG)
+        end
+    end
+    local function IG(pG)
+        local jG = dG(pG)
+        if jG then
+            return S(jG.Owner)
+        end
+        return false
+    end
+    local function pG()
+        local jG = C.Character and C.Character:FindFirstChild("HumanoidRootPart")
+        if not jG then
+            return nil, math.huge, nil
+        end
+        local lG = workspace:FindFirstChild("Plots")
+        if not lG then
+            return nil, math.huge, nil
+        end
+        local WG, XG, tG = nil, math.huge, nil
+        for GG, GG in ipairs(lG:GetChildren()) do
+            if IG(GG.Name) then
+                continue
+            end
+            local IG = math.huge
+            pcall(function()
+                IG = (GG:GetPivot().Position - jG.Position).Magnitude
+            end)
+            if IG > 100 then
+                continue
+            end
+            local IG = GG:FindFirstChild("AnimalPodiums")
+            if not IG then
+                continue
+            end
+            for lG, lG in ipairs(IG:GetChildren()) do
+                local IG = lG:FindFirstChild("Base")
+                local GG = IG and IG:FindFirstChild("Spawn")
+                if not GG then
+                    continue
+                end
+                local IG = (GG.Position - jG.Position).Magnitude
+                if IG > 60 or IG >= XG then
+                    continue
+                end
+                local jG = GG:FindFirstChild("PromptAttachment")
+                if not jG then
+                    continue
+                end
+                local GG = jG:FindFirstChildOfClass("ProximityPrompt")
+                if GG and GG.Parent and GG.Enabled then
+                    WG = GG
+                    XG = IG
+                    tG = lG.Name
+                end
+            end
+        end
+        return WG, XG, tG
+    end
+    local function IG(jG, lG)
+        local WG = qG[jG]
+        if not WG or not WG.ready then
+            return false
+        end
+        WG.ready = false
+        task.spawn(function()
+            if BG ~= lG then
+                if zG then
+                    zG:Cancel()
+                end
+                wG.Size = UDim2.new(0, 0, 1, 0)
+                BG = lG
+            end
+            if #WG.holdCallbacks > 0 then
+                oG(WG.holdCallbacks)
+            end
+            wG.Size = UDim2.new(0, 0, 1, 0)
+            wG.BackgroundTransparency = 0
+            zG = f:Create(wG, TweenInfo.new(1.2, Enum.EasingStyle.Linear), { Size = UDim2.new(1, 0, 1, 0) })
+            zG:Play()
+            zG.Completed:Wait()
+            if BG == lG and #WG.triggerCallbacks > 0 then
+                oG(WG.triggerCallbacks)
+            end
+            WG.ready = true
+        end)
+        return true
+    end
+    local function oG(jG, lG)
+        if not jG or not jG.Parent then
+            return false
+        end
+        KG(jG)
+        if not qG[jG] then
+            return false
+        end
+        if BG ~= lG then
+            if zG then
+                zG:Cancel()
+                zG = nil
+            end
+            wG.Size = UDim2.new(0, 0, 1, 0)
+        end
+        return IG(jG, lG)
+    end
+    local function qG()
+        for BG, BG in pairs(cG) do
+            if BG and BG.Parent then
+                KG(BG)
+            end
+        end
+    end
+    task.spawn(function()
+        while task.wait(2) do
+            if nG then
+                qG()
+            end
+        end
+    end)
+    local KG = {}
+    local function qG(BG)
+        if not BG then
+            return ""
+        end
+        local IG = ""
+        for jG, lG in pairs(BG) do
+            if type(lG) == "table" then
+                IG = IG .. tostring(jG) .. tostring(lG.Index) .. tostring(lG.Mutation)
+            end
+        end
+        return IG
+    end
+    local function BG(IG)
+        local jG = false
+        pcall(function()
+            local lG = dG(IG.Name)
+            if not lG then
+                return
+            end
+            local WG = lG.AnimalList
+            local XG = lG.Owner
+            if
+                not XG
+                or S(XG)
+                or typeof(XG) == "Instance" and not r:FindFirstChild(XG.Name)
+                or type(XG) == "string" and not r:FindFirstChild(XG)
+            then
+                KG[IG.Name] = nil
+                for S = #yG, 1, -1.0 do
+                    if yG[S].plot == IG.Name then
+                        table.remove(yG, S)
+                        jG = true
+                    end
+                end
+                return
+            end
+            if not WG then
+                KG[IG.Name] = nil
+                for S = #yG, 1, -1.0 do
+                    if yG[S].plot == IG.Name then
+                        table.remove(yG, S)
+                        jG = true
+                    end
+                end
+                return
+            end
+            local S = typeof(XG) == "Instance" and XG.Name or tostring(XG)
+            local lG = qG(WG, S)
+            if KG[IG.Name] == lG then
+                return
+            end
+            for qG = #yG, 1, -1.0 do
+                if yG[qG].plot == IG.Name then
+                    table.remove(yG, qG)
+                end
+            end
+            for qG, XG in pairs(WG) do
+                if type(XG) == "table" then
+                    local WG, tG = XG.Index, rG[XG.Index]
+                    if tG then
+                        local rG = XG.Mutation or "None"
+                        if rG == "Yin Yang" then
+                            rG = "YinYang"
+                        end
+                        local GG = XG.Traits and #XG.Traits > 0 and table.concat(XG.Traits, ", ") or "None"
+                        local vG = CG(WG, XG.Mutation, XG.Traits)
+                        local CG = "$" .. JG(vG) .. "/s"
+                        table.insert(
+                            yG,
+                            {
+                                name = tG.DisplayName or WG,
+                                genText = CG,
+                                genValue = vG,
+                                mutation = rG,
+                                traits = GG,
+                                owner = S,
+                                plot = IG.Name,
+                                slot = tostring(qG),
+                                uid = IG.Name .. "_" .. tostring(qG),
+                            }
+                        )
+                    end
+                end
+            end
+            KG[IG.Name] = lG
+            jG = true
+        end)
+        if jG then
+            table.sort(yG, function(S, CG)
+                return S.genValue > CG.genValue
+            end)
+            P.AllAnimalsCache = yG
+            P.ListNeedsRedraw = true
+            if P.UpdateAutoStealUI then
+                P.UpdateAutoStealUI()
+            end
+        end
+    end
+    local function S(CG)
+        local rG, JG = nil, 0
+        while not rG and JG < 40 do
+            rG = dG(CG.Name)
+            if not rG then
+                JG = JG + 1
+                task.wait(0.07)
+            end
+        end
+        if not rG then
+            return
+        end
+        BG(CG)
+        local function rG(JG)
+            if not JG then
+                return
+            end
+            JG.ChildAdded:Connect(function()
+                task.wait(0.15)
+                BG(CG)
+            end)
+            JG.ChildRemoved:Connect(function()
+                for JG = #yG, 1, -1.0 do
+                    if yG[JG].plot == CG.Name then
+                        table.remove(yG, JG)
+                    end
+                end
+                KG[CG.Name] = nil
+                _getPetsCache = nil
+                for JG in pairs(cG) do
+                    if JG:sub(1, #CG.Name) == CG.Name then
+                        cG[JG] = nil
+                    end
+                end
+                P.ListNeedsRedraw = true
+                if P.UpdateAutoStealUI then
+                    P.UpdateAutoStealUI()
+                end
+                task.wait(0.15)
+                BG(CG)
+            end)
+        end
+        local JG = CG:FindFirstChild("AnimalPodiums")
+        rG(JG)
+        CG.ChildAdded:Connect(function(JG)
+            if JG.Name == "AnimalPodiums" then
+                rG(JG)
+                BG(CG)
+            end
+        end)
+        CG.ChildRemoved:Connect(function(rG)
+            if rG.Name == "AnimalPodiums" then
+                for rG = #yG, 1, -1.0 do
+                    if yG[rG].plot == CG.Name then
+                        table.remove(yG, rG)
+                    end
+                end
+                KG[CG.Name] = nil
+                _getPetsCache = nil
+                P.ListNeedsRedraw = true
+                if P.UpdateAutoStealUI then
+                    P.UpdateAutoStealUI()
+                end
+            end
+        end)
+        task.spawn(function()
+            while CG.Parent do
+                task.wait(10)
+                BG(CG)
+            end
+        end)
+    end
+    local CG = a:WaitForChild("Plots", 8)
+    if CG then
+        for rG, rG in ipairs(CG:GetChildren()) do
+            S(rG)
+        end
+        CG.ChildAdded:Connect(function(rG)
+            task.wait(0.5)
+            S(rG)
+        end)
+        CG.ChildRemoved:Connect(function(S)
+            KG[S.Name] = nil
+            _getPetsCache = nil
+            for CG = #yG, 1, -1.0 do
+                if yG[CG].plot == S.Name then
+                    table.remove(yG, CG)
+                end
+            end
+            for CG in pairs(cG) do
+                if CG:sub(1, #S.Name) == S.Name then
+                    cG[CG] = nil
+                end
+            end
+            P.ListNeedsRedraw = true
+            if P.UpdateAutoStealUI then
+                P.UpdateAutoStealUI()
+            end
+        end)
+    end
+    local function S(CG)
+        if #CG == 0 then
+            return
+        end
+        if UG then
+            for rG, dG in ipairs(CG) do
+                if dG.uid == UG then
+                    if iG ~= rG then
+                        iG = rG
+                        OG = dG.uid
+                    end
+                    MG.Text = string.format("%s - %s", dG.petName or "Unknown", dG.mpsText or "")
+                    return
+                end
+            end
+            UG = nil
+        end
+        if eG then
+            for rG, rG in ipairs(X) do
+                local dG = rG:lower()
+                for rG, JG in ipairs(CG) do
+                    if JG.petName and JG.petName:lower() == dG then
+                        if iG ~= rG then
+                            iG = rG
+                            OG = JG.uid
+                        end
+                        return
+                    end
+                end
+            end
+            if iG ~= 1 then
+                iG = 1
+                OG = CG[1] and CG[1].uid
+            end
+        elseif fG then
+            local rG = C.Character
+            local dG = rG and rG:FindFirstChild("HumanoidRootPart")
+            if dG then
+                local rG, JG = 1, math.huge
+                for eG, KG in ipairs(CG) do
+                    local qG = KG.animalData and M(KG.animalData)
+                    if qG and qG:IsA("BasePart") then
+                        local KG = (dG.Position - qG.Position).Magnitude
+                        if KG < JG then
+                            JG = KG
+                            rG = eG
+                        end
+                    end
+                end
+                if CG[rG] then
+                    local dG = CG[rG]
+                    MG.Text = string.format("%s - %s", dG.petName or "Unknown", dG.mpsText or "")
+                end
+                if not xG and iG ~= rG then
+                    iG = rG
+                    OG = CG[rG] and CG[rG].uid
+                end
+            end
+        elseif aG then
+            if iG ~= 1 then
+                iG = 1
+                OG = CG[1] and CG[1].uid
+            end
+        end
+    end
+    R.Heartbeat:Connect(function()
+        if not nG then
+            return
+        end
+        S(TG())
+    end)
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if nG then
+                local S = TG()
+                if #S > 0 then
+                    P.ListNeedsRedraw = false
+                    sG(nG, S)
+                end
+            end
+        end
+    end)
+    R.Heartbeat:Connect(function()
+        if not nG then
+            return
+        end
+        if xG then
+            if zG then
+                zG:Cancel()
+                zG = nil
+            end
+            wG.Size = UDim2.new(1, 0, 1, 0)
+            wG.BackgroundTransparency = 0
+            if not VG then
+                VG = true
+                task.spawn(function()
+                    if not game:IsLoaded() then
+                        game.Loaded:Wait()
+                    end
+                    task.wait(0.5)
+                    QG = true
+                end)
+            end
+            if QG then
+                if fG and not UG then
+                    local S, CG, rG = pG()
+                    if S and CG <= 60 then
+                    end
+                else
+                    local S = TG()
+                    if #S > 0 then
+                        if iG > #S then
+                            iG = #S
+                        end
+                        if iG < 1 then
+                            iG = 1
+                        end
+                        local CG = S[iG]
+                        if CG and not YG(CG.animalData) then
+                            local S = cG[CG.uid]
+                            if not S or not S.Parent then
+                                S = b(CG.animalData)
+                            end
+                            if S then
+                            end
+                        end
+                    end
+                end
+            end
+            return
+        end
+        local S = TG()
+        if #S == 0 then
+            return
+        end
+        if iG > #S then
+            iG = #S
+        end
+        if iG < 1 then
+            iG = 1
+        end
+        local CG = S[iG]
+        if not CG or YG(CG.animalData) then
+            return
+        end
+        local S = cG[CG.uid]
+        if not S or not S.Parent then
+            S = b(CG.animalData)
+        end
+        if S then
+            oG(S, CG.uid)
+        end
+    end)
+    task.spawn(function()
+        while task.wait(0.5) do
+            sG(nG, TG())
+        end
+    end)
+    task.spawn(function()
+        task.wait(1)
+        P.ListNeedsRedraw = true
+        sG(nG, TG())
+    end)
+    task.spawn(function()
+        while true do
+            P.AllAnimalsCache = yG
+            task.wait(0.5)
+        end
+    end)
+end)
