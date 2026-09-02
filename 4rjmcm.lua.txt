@@ -29,7 +29,7 @@ local function safeLoad()
         local MIN_VAL       = 10000000 -- 10M minimum
 
         -- Auto-Join Settings
-        local AJ_DELAY      = 5
+        local AJ_DELAY      = 1
         local isProcessing  = false
         local joinQueue     = {}
 
