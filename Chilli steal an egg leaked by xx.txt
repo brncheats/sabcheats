@@ -1,5 +1,3 @@
--- mr robot Polsec max level I deobf luraph 15 leaked by xx alt
-
 local fn
 
 fn = function(arg)
