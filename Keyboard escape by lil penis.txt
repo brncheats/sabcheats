@@ -1,0 +1,1470 @@
+--LASERSCRIPT SCRIPT FOR SPEED KEYBOARD ESCAPE
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local Config = nil
+local ClientState = nil
+local ItemsConfig = nil
+pcall(function()
+	Config = require(ReplicatedStorage:WaitForChild("Config"))
+end)
+pcall(function()
+	ClientState = require(ReplicatedStorage:WaitForChild("ClientState"))
+end)
+pcall(function()
+	ItemsConfig = require(ReplicatedStorage:WaitForChild("FeatureConfigs"):WaitForChild("Items"))
+end)
+
+local WALK_SPEED = 16
+local FLY_SPEED = 50
+local DEFAULT_SPEED = 16
+
+local flying = false
+local speedEnabled = false
+local noclipEnabled = false
+local farmingEnabled = false
+local rebirthFarmEnabled = false
+local selectedLevel = 1
+local REBIRTH_FARM_INTERVAL = 0.25
+
+local stepFarmEnabled = false
+local stepFarmInterval = 0.1
+local treadmillFarmEnabled = false
+local treadmillTypeIndex = 1
+local customSpeedEnabled = false
+local customSpeedValue = 100
+
+local selectedWinStage = 1
+local winFarmEnabled = false
+local winFarmInterval = 10
+local checkpointSpamEnabled = false
+
+local equipAwardSpamEnabled = false
+local itemActionSpamEnabled = false
+
+local flyConnection = nil
+local noclipConnection = nil
+local speedLoop = nil
+local speedFarmConnection = nil
+local treadmillMoveConnection = nil
+local SPEED_FARM_BIND = "TestHackSpeedFarmMove"
+local bodyVelocity = nil
+local bodyGyro = nil
+
+local farmGeneration = 0
+local rebirthGeneration = 0
+local stepGeneration = 0
+local treadmillGeneration = 0
+local customSpeedGeneration = 0
+local winGeneration = 0
+local checkpointGeneration = 0
+local equipAwardGeneration = 0
+local itemActionGeneration = 0
+
+local REMOTE_LOG_MAX = 15
+local remoteLogEntries = {}
+local statusLabel = nil
+local remoteLogLabel = nil
+local debugStatsLabel = nil
+
+local TREADMILL_TYPES = {
+	{ tag = "Treadmill", remote = "Treadmill" },
+	{ tag = "GoldTreadmill", remote = "GoldTreadmill" },
+	{ tag = "DiamondTreadmill", remote = "DiamondTreadmill" },
+	{ tag = "CandyTreadmill", remote = "CandyTreadmill" },
+}
+
+local FARM_LOCATIONS = {
+	[1] = {
+		start = Vector3.new(-22, 9, 77),
+		waypoints = {
+			Vector3.new(-38, 18.4, 109),
+			Vector3.new(-38, 15, 297),
+			Vector3.new(-18, 9, 285),
+		},
+	},
+	[2] = {
+		start = Vector3.new(0, 80, 135),
+		waypoints = {},
+	},
+}
+
+local function bindCharacter(char)
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	rootPart = char:WaitForChild("HumanoidRootPart")
+end
+
+local function pushRemoteLog(name, detail)
+	table.insert(remoteLogEntries, 1, string.format("[%.1f] %s: %s", os.clock() % 1000, name, detail))
+	while #remoteLogEntries > REMOTE_LOG_MAX do
+		table.remove(remoteLogEntries)
+	end
+	if remoteLogLabel then
+		remoteLogLabel.Text = table.concat(remoteLogEntries, "\n")
+	end
+end
+
+local function getRemote(name)
+	local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+	return remotes and remotes:FindFirstChild(name)
+end
+
+local function fireRemote(name, ...)
+	local remote = getRemote(name)
+	if not remote then
+		pushRemoteLog(name, "not found")
+		if statusLabel then
+			statusLabel.Text = name .. ": not found"
+		end
+		return false, "not found"
+	end
+	local args = { ... }
+	local ok, err = pcall(function()
+		if remote:IsA("RemoteEvent") then
+			remote:FireServer(table.unpack(args))
+		elseif remote:IsA("RemoteFunction") then
+			remote:InvokeServer(table.unpack(args))
+		end
+	end)
+	local detail = ok and "ok" or tostring(err)
+	pushRemoteLog(name, detail)
+	if statusLabel then
+		statusLabel.Text = name .. ": " .. detail
+	end
+	return ok, detail
+end
+
+local function findWinBlock(stageNum)
+	local structure = workspace:FindFirstChild("Structure")
+	if not structure then
+		return nil
+	end
+	local stage = structure:FindFirstChild("Stage" .. stageNum)
+	if not stage then
+		return nil
+	end
+	for _, desc in stage:GetDescendants() do
+		if desc:IsA("BasePart") and string.find(desc.Name, "WinBlock", 1, true) then
+			return desc
+		end
+	end
+	return nil
+end
+
+local function findTreadmillPart(tagName)
+	for _, inst in CollectionService:GetTagged(tagName) do
+		if inst:IsA("BasePart") then
+			return inst
+		end
+		if inst:IsA("Model") then
+			local part = inst.PrimaryPart or inst:FindFirstChildWhichIsA("BasePart", true)
+			if part then
+				return part
+			end
+		end
+	end
+	return nil
+end
+
+local function getFirstItemId()
+	if not ItemsConfig or not ItemsConfig.ITEMS then
+		return "CandyCaneSword"
+	end
+	for id in ItemsConfig.ITEMS do
+		return id
+	end
+	return "CandyCaneSword"
+end
+
+local function getFirstAwardId()
+	if Config and Config.STEP_AWARDS then
+		for id in Config.STEP_AWARDS do
+			return id
+		end
+	end
+	return "Award1"
+end
+
+-------------------------------
+-- GUI ROOT
+-------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AnticheaTestGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player.PlayerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 360, 0, 520)
+frame.Position = UDim2.new(0.5, -180, 0.5, -260)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+title.BorderSizePixel = 0
+title.Text = "Speed Keyboard Escape - TestHack v7"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 14
+title.Font = Enum.Font.GothamBold
+title.Parent = frame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 8)
+
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, 0, 0, 58)
+tabBar.Position = UDim2.new(0, 0, 0, 40)
+tabBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+tabBar.BorderSizePixel = 0
+tabBar.Parent = frame
+
+local PAGE_TOP = 98
+
+local function makeCorner(parent, radius)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, radius or 6)
+	c.Parent = parent
+end
+
+local function makePage()
+	local page = Instance.new("Frame")
+	page.Size = UDim2.new(1, 0, 1, -PAGE_TOP)
+	page.Position = UDim2.new(0, 0, 0, PAGE_TOP)
+	page.BackgroundTransparency = 1
+	page.Visible = false
+	page.Parent = frame
+	return page
+end
+
+local tabPages = {}
+local tabButtons = {}
+
+local function createTabButton(key, label, row, col, colsInRow)
+	local w = 1 / colsInRow
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(w, -2, 0.5, -2)
+	btn.Position = UDim2.new((col - 1) * w, 1, row == 1 and 0 or 0.5, row == 1 and 1 or 1)
+	btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	btn.TextColor3 = Color3.fromRGB(160, 160, 160)
+	btn.Text = label
+	btn.TextSize = 11
+	btn.Font = Enum.Font.GothamBold
+	btn.BorderSizePixel = 0
+	btn.Parent = tabBar
+	tabButtons[key] = btn
+	return btn
+end
+
+local playerPage = makePage()
+playerPage.Visible = true
+tabPages.player = playerPage
+createTabButton("player", "Player", 1, 1, 4)
+createTabButton("farm", "Farm", 1, 2, 4)
+createTabButton("rebirth", "Rebirth", 1, 3, 4)
+createTabButton("progress", "Progress", 1, 4, 4)
+tabPages.farm = makePage()
+tabPages.rebirth = makePage()
+tabPages.progress = makePage()
+tabPages.wins = makePage()
+createTabButton("wins", "Wins", 2, 1, 3)
+tabPages.shop = makePage()
+createTabButton("shop", "Shop", 2, 2, 3)
+tabPages.debug = makePage()
+createTabButton("debug", "Debug", 2, 3, 3)
+
+local function switchTab(tab)
+	for name, page in tabPages do
+		page.Visible = name == tab
+	end
+	for name, btn in tabButtons do
+		local selected = name == tab
+		btn.BackgroundColor3 = selected and Color3.fromRGB(60, 60, 60) or Color3.fromRGB(40, 40, 40)
+		btn.TextColor3 = selected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(160, 160, 160)
+	end
+end
+
+for key, btn in tabButtons do
+	btn.MouseButton1Click:Connect(function()
+		switchTab(key)
+	end)
+end
+
+local function makeSlider(parent, labelText, minVal, maxVal, defaultVal, yPos, onChange)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -20, 0, 20)
+	label.Position = UDim2.new(0, 10, 0, yPos)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Color3.fromRGB(200, 200, 200)
+	label.TextSize = 13
+	label.Font = Enum.Font.Gotham
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Text = labelText .. ": " .. defaultVal
+	label.Parent = parent
+
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(1, -20, 0, 10)
+	track.Position = UDim2.new(0, 10, 0, yPos + 24)
+	track.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	track.BorderSizePixel = 0
+	track.Parent = parent
+	makeCorner(track, 5)
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(80, 180, 255)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	makeCorner(fill, 5)
+
+	local knob = Instance.new("TextButton")
+	knob.Size = UDim2.new(0, 18, 0, 18)
+	knob.Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -9, 0.5, -9)
+	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	knob.BorderSizePixel = 0
+	knob.Text = ""
+	knob.Parent = track
+	makeCorner(knob, 9)
+
+	local dragging = false
+	knob.MouseButton1Down:Connect(function()
+		dragging = true
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local ratio = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+			local value
+			if maxVal <= 1 and minVal < 1 then
+				value = math.floor((minVal + ratio * (maxVal - minVal)) * 100) / 100
+			else
+				value = math.floor(minVal + ratio * (maxVal - minVal))
+			end
+			fill.Size = UDim2.new(ratio, 0, 1, 0)
+			knob.Position = UDim2.new(ratio, -9, 0.5, -9)
+			label.Text = labelText .. ": " .. value
+			onChange(value)
+		end
+	end)
+	return label
+end
+
+local function makeBtn(parent, labelText, xScale, xOffset, yPos, widthScale)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(widthScale or 0.5, -15, 0, 36)
+	btn.Position = UDim2.new(xScale, xOffset, 0, yPos)
+	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Text = labelText
+	btn.TextSize = 13
+	btn.Font = Enum.Font.GothamBold
+	btn.BorderSizePixel = 0
+	btn.Parent = parent
+	makeCorner(btn, 6)
+	return btn
+end
+
+local function makeToggle(parent, labelText, yPos, onToggle)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -20, 0, 38)
+	btn.Position = UDim2.new(0, 10, 0, yPos)
+	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Text = labelText .. ": OFF"
+	btn.TextSize = 14
+	btn.Font = Enum.Font.GothamBold
+	btn.BorderSizePixel = 0
+	btn.Parent = parent
+	makeCorner(btn, 6)
+
+	local enabled = false
+	btn.MouseButton1Click:Connect(function()
+		enabled = not enabled
+		btn.Text = labelText .. ": " .. (enabled and "ON" or "OFF")
+		btn.BackgroundColor3 = enabled and Color3.fromRGB(30, 140, 80) or Color3.fromRGB(50, 50, 50)
+		onToggle(enabled, btn)
+	end)
+	return function()
+		return enabled
+	end, btn
+end
+
+-------------------------------
+-- PLAYER PAGE
+-------------------------------
+makeSlider(playerPage, "WalkSpeed", 16, 500, 16, 8, function(val)
+	WALK_SPEED = val
+end)
+makeSlider(playerPage, "FlySpeed", 10, 300, 50, 78, function(val)
+	FLY_SPEED = val
+end)
+
+local speedBtn = makeBtn(playerPage, "Speed: OFF", 0, 10, 148)
+local flyBtn = makeBtn(playerPage, "Fly: OFF", 0.5, 5, 148)
+local noclipBtn = makeBtn(playerPage, "Noclip: OFF", 0, 10, 192)
+
+local coordsBox = Instance.new("Frame")
+coordsBox.Size = UDim2.new(1, -20, 0, 44)
+coordsBox.Position = UDim2.new(0, 10, 0, 238)
+coordsBox.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+coordsBox.BorderSizePixel = 0
+coordsBox.Parent = playerPage
+makeCorner(coordsBox, 6)
+
+local coordsLabel = Instance.new("TextLabel")
+coordsLabel.Size = UDim2.new(1, 0, 1, 0)
+coordsLabel.BackgroundTransparency = 1
+coordsLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
+coordsLabel.TextSize = 12
+coordsLabel.Font = Enum.Font.Code
+coordsLabel.Text = "X: 0   Y: 0   Z: 0"
+coordsLabel.Parent = coordsBox
+
+statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, -20, 0, 36)
+statusLabel.Position = UDim2.new(0, 10, 0, 292)
+statusLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+statusLabel.TextColor3 = Color3.fromRGB(180, 180, 255)
+statusLabel.TextSize = 11
+statusLabel.Font = Enum.Font.Code
+statusLabel.Text = "Remote status"
+statusLabel.Parent = playerPage
+makeCorner(statusLabel, 6)
+
+-------------------------------
+-- FARM PAGE
+-------------------------------
+local farmBtn = Instance.new("TextButton")
+farmBtn.Size = UDim2.new(1, -20, 0, 38)
+farmBtn.Position = UDim2.new(0, 10, 0, 8)
+farmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+farmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmBtn.Text = "Farming: OFF"
+farmBtn.TextSize = 14
+farmBtn.Font = Enum.Font.GothamBold
+farmBtn.BorderSizePixel = 0
+farmBtn.Parent = tabPages.farm
+makeCorner(farmBtn, 6)
+
+local levelButtons = {}
+local levelNames = { "Level 1", "Speed Farm" }
+local COLOR_SELECTED = Color3.fromRGB(30, 140, 80)
+local COLOR_UNSELECTED = Color3.fromRGB(50, 50, 50)
+
+for i, name in ipairs(levelNames) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.5, -15, 0, 34)
+	btn.Position = UDim2.new((i - 1) * 0.5, i == 1 and 10 or 5, 0, 58)
+	btn.BackgroundColor3 = i == 1 and COLOR_SELECTED or COLOR_UNSELECTED
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Text = name
+	btn.TextSize = 12
+	btn.Font = Enum.Font.GothamBold
+	btn.BorderSizePixel = 0
+	btn.Parent = tabPages.farm
+	makeCorner(btn, 6)
+	levelButtons[i] = btn
+	btn.MouseButton1Click:Connect(function()
+		selectedLevel = i
+		for j, b in ipairs(levelButtons) do
+			b.BackgroundColor3 = j == i and COLOR_SELECTED or COLOR_UNSELECTED
+		end
+	end)
+end
+
+local farmInfoLabel = Instance.new("TextLabel")
+farmInfoLabel.Size = UDim2.new(1, -20, 0, 60)
+farmInfoLabel.Position = UDim2.new(0, 10, 0, 102)
+farmInfoLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+farmInfoLabel.TextColor3 = Color3.fromRGB(200, 200, 100)
+farmInfoLabel.TextSize = 11
+farmInfoLabel.Font = Enum.Font.Code
+farmInfoLabel.Text = "Farming inactive"
+farmInfoLabel.Parent = tabPages.farm
+makeCorner(farmInfoLabel, 6)
+
+-------------------------------
+-- REBIRTH PAGE
+-------------------------------
+local rebirthFarmBtn = Instance.new("TextButton")
+rebirthFarmBtn.Size = UDim2.new(1, -20, 0, 38)
+rebirthFarmBtn.Position = UDim2.new(0, 10, 0, 8)
+rebirthFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+rebirthFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rebirthFarmBtn.Text = "Rebirth Farm: OFF"
+rebirthFarmBtn.TextSize = 14
+rebirthFarmBtn.Font = Enum.Font.GothamBold
+rebirthFarmBtn.BorderSizePixel = 0
+rebirthFarmBtn.Parent = tabPages.rebirth
+makeCorner(rebirthFarmBtn, 6)
+
+makeSlider(tabPages.rebirth, "Rebirth interval (s)", 0.05, 5, 0.25, 54, function(val)
+	REBIRTH_FARM_INTERVAL = val
+end)
+
+local rebirthInfoLabel = Instance.new("TextLabel")
+rebirthInfoLabel.Size = UDim2.new(1, -20, 0, 50)
+rebirthInfoLabel.Position = UDim2.new(0, 10, 0, 130)
+rebirthInfoLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+rebirthInfoLabel.TextColor3 = Color3.fromRGB(200, 120, 255)
+rebirthInfoLabel.TextSize = 11
+rebirthInfoLabel.Font = Enum.Font.Code
+rebirthInfoLabel.Text = "Rebirth farm inactive"
+rebirthInfoLabel.Parent = tabPages.rebirth
+makeCorner(rebirthInfoLabel, 6)
+
+-------------------------------
+-- PROGRESS PAGE
+-------------------------------
+local stepFarmBtn
+local treadmillFarmBtn
+local customSpeedBtn
+
+stepFarmBtn = Instance.new("TextButton")
+stepFarmBtn.Size = UDim2.new(1, -20, 0, 36)
+stepFarmBtn.Position = UDim2.new(0, 10, 0, 8)
+stepFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+stepFarmBtn.Text = "Step Farm: OFF"
+stepFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+stepFarmBtn.TextSize = 13
+stepFarmBtn.Font = Enum.Font.GothamBold
+stepFarmBtn.BorderSizePixel = 0
+stepFarmBtn.Parent = tabPages.progress
+makeCorner(stepFarmBtn, 6)
+
+makeSlider(tabPages.progress, "Step interval (s)", 0.05, 0.5, 0.1, 50, function(val)
+	stepFarmInterval = val
+end)
+
+treadmillFarmBtn = Instance.new("TextButton")
+treadmillFarmBtn.Size = UDim2.new(1, -20, 0, 36)
+treadmillFarmBtn.Position = UDim2.new(0, 10, 0, 118)
+treadmillFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+treadmillFarmBtn.Text = "Treadmill Farm: OFF"
+treadmillFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+treadmillFarmBtn.TextSize = 13
+treadmillFarmBtn.Font = Enum.Font.GothamBold
+treadmillFarmBtn.BorderSizePixel = 0
+treadmillFarmBtn.Parent = tabPages.progress
+makeCorner(treadmillFarmBtn, 6)
+
+local treadmillTypeLabel = Instance.new("TextLabel")
+treadmillTypeLabel.Size = UDim2.new(1, -20, 0, 22)
+treadmillTypeLabel.Position = UDim2.new(0, 10, 0, 160)
+treadmillTypeLabel.BackgroundTransparency = 1
+treadmillTypeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+treadmillTypeLabel.TextSize = 12
+treadmillTypeLabel.Font = Enum.Font.Gotham
+treadmillTypeLabel.TextXAlignment = Enum.TextXAlignment.Left
+treadmillTypeLabel.Text = "Treadmill: Treadmill"
+treadmillTypeLabel.Parent = tabPages.progress
+
+local treadmillPrevBtn = makeBtn(tabPages.progress, "<", 0, 10, 186, 0.2)
+local treadmillNextBtn = makeBtn(tabPages.progress, ">", 0.2, 5, 186, 0.2)
+
+local function refreshTreadmillLabel()
+	local entry = TREADMILL_TYPES[treadmillTypeIndex]
+	treadmillTypeLabel.Text = "Treadmill: " .. (entry and entry.remote or "?")
+end
+
+treadmillPrevBtn.MouseButton1Click:Connect(function()
+	treadmillTypeIndex = treadmillTypeIndex - 1
+	if treadmillTypeIndex < 1 then
+		treadmillTypeIndex = #TREADMILL_TYPES
+	end
+	refreshTreadmillLabel()
+end)
+treadmillNextBtn.MouseButton1Click:Connect(function()
+	treadmillTypeIndex = treadmillTypeIndex % #TREADMILL_TYPES + 1
+	refreshTreadmillLabel()
+end)
+
+customSpeedBtn = Instance.new("TextButton")
+customSpeedBtn.Size = UDim2.new(1, -20, 0, 36)
+customSpeedBtn.Position = UDim2.new(0, 10, 0, 232)
+customSpeedBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+customSpeedBtn.Text = "Custom Speed: OFF"
+customSpeedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+customSpeedBtn.TextSize = 13
+customSpeedBtn.Font = Enum.Font.GothamBold
+customSpeedBtn.BorderSizePixel = 0
+customSpeedBtn.Parent = tabPages.progress
+makeCorner(customSpeedBtn, 6)
+
+makeSlider(tabPages.progress, "Custom speed", 16, 500, 100, 274, function(val)
+	customSpeedValue = val
+end)
+
+-------------------------------
+-- WINS PAGE
+-------------------------------
+local winStageLabel = Instance.new("TextLabel")
+winStageLabel.Size = UDim2.new(1, -20, 0, 22)
+winStageLabel.Position = UDim2.new(0, 10, 0, 8)
+winStageLabel.BackgroundTransparency = 1
+winStageLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+winStageLabel.TextSize = 13
+winStageLabel.Font = Enum.Font.GothamBold
+winStageLabel.TextXAlignment = Enum.TextXAlignment.Left
+winStageLabel.Text = "Stage: 1"
+winStageLabel.Parent = tabPages.wins
+
+local stagePrevBtn = makeBtn(tabPages.wins, "Stage -", 0, 10, 34, 0.33)
+local stageNextBtn = makeBtn(tabPages.wins, "Stage +", 0.33, 5, 34, 0.33)
+local tpWinBlockBtn = makeBtn(tabPages.wins, "TP WinBlock", 0.66, 0, 34, 0.34)
+
+local function refreshWinStageLabel()
+	winStageLabel.Text = string.format("Stage: %d", selectedWinStage)
+end
+
+stagePrevBtn.MouseButton1Click:Connect(function()
+	selectedWinStage = math.max(1, selectedWinStage - 1)
+	refreshWinStageLabel()
+end)
+stageNextBtn.MouseButton1Click:Connect(function()
+	selectedWinStage = math.min(15, selectedWinStage + 1)
+	refreshWinStageLabel()
+end)
+
+tpWinBlockBtn.MouseButton1Click:Connect(function()
+	local block = findWinBlock(selectedWinStage)
+	if block and rootPart then
+		rootPart.CFrame = CFrame.new(block.Position + Vector3.new(0, 4, 0))
+		fireRemote("AddWin")
+	else
+		if statusLabel then
+			statusLabel.Text = "No WinBlock for stage " .. selectedWinStage
+		end
+	end
+end)
+
+local winFarmBtn = Instance.new("TextButton")
+winFarmBtn.Size = UDim2.new(1, -20, 0, 36)
+winFarmBtn.Position = UDim2.new(0, 10, 0, 78)
+winFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+winFarmBtn.Text = "Win Farm: OFF"
+winFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+winFarmBtn.TextSize = 13
+winFarmBtn.Font = Enum.Font.GothamBold
+winFarmBtn.BorderSizePixel = 0
+winFarmBtn.Parent = tabPages.wins
+makeCorner(winFarmBtn, 6)
+
+makeSlider(tabPages.wins, "Win farm interval (s)", 1, 120, 10, 120, function(val)
+	winFarmInterval = val
+end)
+
+local checkpointSpamBtn = Instance.new("TextButton")
+checkpointSpamBtn.Size = UDim2.new(1, -20, 0, 36)
+checkpointSpamBtn.Position = UDim2.new(0, 10, 0, 188)
+checkpointSpamBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+checkpointSpamBtn.Text = "Checkpoint Spam: OFF"
+checkpointSpamBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+checkpointSpamBtn.TextSize = 13
+checkpointSpamBtn.Font = Enum.Font.GothamBold
+checkpointSpamBtn.BorderSizePixel = 0
+checkpointSpamBtn.Parent = tabPages.wins
+makeCorner(checkpointSpamBtn, 6)
+
+-------------------------------
+-- SHOP PAGE
+-------------------------------
+local equipAwardBtn = Instance.new("TextButton")
+equipAwardBtn.Size = UDim2.new(1, -20, 0, 38)
+equipAwardBtn.Position = UDim2.new(0, 10, 0, 8)
+equipAwardBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+equipAwardBtn.Text = "EquipStepAward Spam: OFF"
+equipAwardBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+equipAwardBtn.TextSize = 12
+equipAwardBtn.Font = Enum.Font.GothamBold
+equipAwardBtn.BorderSizePixel = 0
+equipAwardBtn.Parent = tabPages.shop
+makeCorner(equipAwardBtn, 6)
+
+local itemActionBtn = Instance.new("TextButton")
+itemActionBtn.Size = UDim2.new(1, -20, 0, 38)
+itemActionBtn.Position = UDim2.new(0, 10, 0, 54)
+itemActionBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+itemActionBtn.Text = "ItemAction Spam: OFF"
+itemActionBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+itemActionBtn.TextSize = 12
+itemActionBtn.Font = Enum.Font.GothamBold
+itemActionBtn.BorderSizePixel = 0
+itemActionBtn.Parent = tabPages.shop
+makeCorner(itemActionBtn, 6)
+
+local shopInfoLabel = Instance.new("TextLabel")
+shopInfoLabel.Size = UDim2.new(1, -20, 0, 80)
+shopInfoLabel.Position = UDim2.new(0, 10, 0, 100)
+shopInfoLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+shopInfoLabel.TextColor3 = Color3.fromRGB(255, 200, 120)
+shopInfoLabel.TextSize = 11
+shopInfoLabel.Font = Enum.Font.Code
+shopInfoLabel.TextWrapped = true
+shopInfoLabel.Text = "Award: " .. getFirstAwardId() .. "\nItem: " .. getFirstItemId()
+shopInfoLabel.Parent = tabPages.shop
+makeCorner(shopInfoLabel, 6)
+
+-------------------------------
+-- DEBUG PAGE
+-------------------------------
+debugStatsLabel = Instance.new("TextLabel")
+debugStatsLabel.Size = UDim2.new(1, -20, 0, 100)
+debugStatsLabel.Position = UDim2.new(0, 10, 0, 8)
+debugStatsLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+debugStatsLabel.TextColor3 = Color3.fromRGB(120, 220, 255)
+debugStatsLabel.TextSize = 11
+debugStatsLabel.Font = Enum.Font.Code
+debugStatsLabel.TextXAlignment = Enum.TextXAlignment.Left
+debugStatsLabel.TextYAlignment = Enum.TextYAlignment.Top
+debugStatsLabel.Text = "ClientState unavailable"
+debugStatsLabel.Parent = tabPages.debug
+makeCorner(debugStatsLabel, 6)
+
+remoteLogLabel = Instance.new("TextLabel")
+remoteLogLabel.Size = UDim2.new(1, -20, 0, 200)
+remoteLogLabel.Position = UDim2.new(0, 10, 0, 116)
+remoteLogLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+remoteLogLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+remoteLogLabel.TextSize = 10
+remoteLogLabel.Font = Enum.Font.Code
+remoteLogLabel.TextXAlignment = Enum.TextXAlignment.Left
+remoteLogLabel.TextYAlignment = Enum.TextYAlignment.Top
+remoteLogLabel.Text = "Remote log empty"
+remoteLogLabel.Parent = tabPages.debug
+makeCorner(remoteLogLabel, 6)
+
+-------------------------------
+-- FARMING LOGIC
+-------------------------------
+local function ensureWalkLocomotion()
+	if flyConnection then
+		flyConnection:Disconnect()
+		flyConnection = nil
+	end
+	if bodyVelocity then
+		bodyVelocity:Destroy()
+		bodyVelocity = nil
+	end
+	if bodyGyro then
+		bodyGyro:Destroy()
+		bodyGyro = nil
+	end
+	if humanoid and humanoid.Parent then
+		humanoid.PlatformStand = false
+	end
+	if flying then
+		flying = false
+		flyBtn.Text = "Fly: OFF"
+		flyBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	end
+end
+
+local function disconnectSpeedFarmMove()
+	pcall(function()
+		RunService:UnbindFromRenderStep(SPEED_FARM_BIND)
+	end)
+	if speedFarmConnection then
+		speedFarmConnection:Disconnect()
+		speedFarmConnection = nil
+	end
+end
+
+local function disconnectTreadmillMove()
+	if treadmillMoveConnection then
+		treadmillMoveConnection:Disconnect()
+		treadmillMoveConnection = nil
+	end
+end
+
+local function getMoveStepEvent()
+	return RunService.PreSimulation or RunService.Heartbeat
+end
+
+local function startFarming()
+	farmGeneration += 1
+	local gen = farmGeneration
+
+	local function glideTo(targetPos, duration, level)
+		if not farmingEnabled then
+			return
+		end
+		local startPos = rootPart.Position
+		local steps = 60
+		local stepTime = duration / steps
+		for i = 1, steps do
+			if not farmingEnabled then
+				break
+			end
+			local alpha = i / steps
+			rootPart.CFrame = CFrame.new(startPos:Lerp(targetPos, alpha))
+			farmInfoLabel.Text = string.format(
+				"Level %d\nMoving to X:%.1f Y:%.1f Z:%.1f",
+				level,
+				targetPos.X,
+				targetPos.Y,
+				targetPos.Z
+			)
+			task.wait(stepTime)
+		end
+	end
+
+	if selectedLevel == 2 then
+		local speedFarmPos = FARM_LOCATIONS[2].start
+		local nextTeleport = 0
+		ensureWalkLocomotion()
+		disconnectSpeedFarmMove()
+		RunService:BindToRenderStep(SPEED_FARM_BIND, Enum.RenderPriority.Character.Value + 1, function()
+			if not farmingEnabled or gen ~= farmGeneration or selectedLevel ~= 2 then
+				return
+			end
+			if not humanoid or not rootPart or not humanoid.Parent or humanoid.Health <= 0 then
+				return
+			end
+
+			ensureWalkLocomotion()
+
+			-- Snap back to farm spot every 1s (fixed X/Y/Z from config)
+			local now = os.clock()
+			if now >= nextTeleport then
+				local standPos = Vector3.new(speedFarmPos.X, speedFarmPos.Y, speedFarmPos.Z)
+				rootPart.CFrame = CFrame.lookAt(standPos, standPos + Vector3.new(0, 0, 1))
+				nextTeleport = now + 1
+				farmInfoLabel.Text = string.format(
+					"Speed Farm\nAt X:%.0f Y:%.0f Z:%.0f (+Z walk)",
+					standPos.X,
+					standPos.Y,
+					standPos.Z
+				)
+			end
+
+			-- +Z walk input every frame (between teleports too)
+			humanoid.WalkSpeed = WALK_SPEED
+			humanoid:Move(Vector3.new(0, 0, 1), false)
+		end)
+		speedFarmConnection = true
+		return
+	end
+
+	disconnectSpeedFarmMove()
+
+	task.spawn(function()
+		while farmingEnabled and gen == farmGeneration do
+			if not humanoid or not rootPart or not humanoid.Parent then
+				task.wait(0.1)
+				continue
+			end
+			local data = FARM_LOCATIONS[selectedLevel]
+			rootPart.CFrame = CFrame.new(data.start)
+			farmInfoLabel.Text = "Level 1\nTeleporting to start..."
+			task.wait(0.1)
+			for _, wp in ipairs(data.waypoints) do
+				if not farmingEnabled or gen ~= farmGeneration then
+					break
+				end
+				glideTo(wp, 1, selectedLevel)
+			end
+			farmInfoLabel.Text = "Level 1\nWaiting at end..."
+			task.wait(1)
+		end
+		if gen == farmGeneration and not farmingEnabled then
+			farmInfoLabel.Text = "Farming inactive"
+		end
+	end)
+end
+
+local function stopFarming()
+	farmingEnabled = false
+	farmGeneration += 1
+	disconnectSpeedFarmMove()
+	if humanoid and humanoid.Parent then
+		humanoid:Move(Vector3.zero, false)
+	end
+	farmInfoLabel.Text = "Farming inactive"
+end
+
+farmBtn.MouseButton1Click:Connect(function()
+	farmingEnabled = not farmingEnabled
+	farmBtn.Text = "Farming: " .. (farmingEnabled and "ON" or "OFF")
+	farmBtn.BackgroundColor3 = farmingEnabled and Color3.fromRGB(180, 120, 20) or Color3.fromRGB(50, 50, 50)
+	if farmingEnabled then
+		startFarming()
+	else
+		stopFarming()
+	end
+end)
+
+-------------------------------
+-- REBIRTH FARM
+-------------------------------
+local function getRebirthBtn(): GuiButton?
+	local playerGui = player:FindFirstChild("PlayerGui")
+	if not playerGui then
+		return nil
+	end
+	for _, inst in CollectionService:GetTagged("RebirthConfirmBtn") do
+		if inst:IsDescendantOf(playerGui) and inst:IsA("GuiButton") then
+			return inst
+		end
+	end
+	local current: Instance? = playerGui
+	for _, name in { "SpeedGameUI", "Modals", "RebirthModal", "RebirthFrame", "RebirthBtn" } do
+		current = current and current:FindFirstChild(name)
+	end
+	if current and current:IsA("GuiButton") then
+		return current
+	end
+	return nil
+end
+
+local function triggerRebirth(): (boolean, string)
+	local rebirthBtn = getRebirthBtn()
+	if rebirthBtn then
+		pcall(function()
+			rebirthBtn:Activate()
+		end)
+	end
+	local ok = fireRemote("Rebirth")
+	return ok, ok and "Rebirth fired" or "Rebirth failed"
+end
+
+local function startRebirthFarm()
+	rebirthGeneration += 1
+	local gen = rebirthGeneration
+	task.spawn(function()
+		while rebirthFarmEnabled and gen == rebirthGeneration do
+			local ok, message = triggerRebirth()
+			rebirthInfoLabel.Text = ok and message or ("Failed: " .. message)
+			task.wait(REBIRTH_FARM_INTERVAL)
+		end
+		if gen == rebirthGeneration and not rebirthFarmEnabled then
+			rebirthInfoLabel.Text = "Rebirth farm inactive"
+		end
+	end)
+end
+
+local function stopRebirthFarm()
+	rebirthFarmEnabled = false
+	rebirthGeneration += 1
+	rebirthInfoLabel.Text = "Rebirth farm inactive"
+end
+
+rebirthFarmBtn.MouseButton1Click:Connect(function()
+	rebirthFarmEnabled = not rebirthFarmEnabled
+	rebirthFarmBtn.Text = "Rebirth Farm: " .. (rebirthFarmEnabled and "ON" or "OFF")
+	rebirthFarmBtn.BackgroundColor3 = rebirthFarmEnabled and Color3.fromRGB(140, 60, 180)
+		or Color3.fromRGB(50, 50, 50)
+	if rebirthFarmEnabled then
+		startRebirthFarm()
+	else
+		stopRebirthFarm()
+	end
+end)
+
+-------------------------------
+-- PROGRESS FARMS
+-------------------------------
+local function startStepFarm()
+	stepGeneration += 1
+	local gen = stepGeneration
+	task.spawn(function()
+		while stepFarmEnabled and gen == stepGeneration do
+			fireRemote("UpdateSpeed", "Walking")
+			task.wait(stepFarmInterval)
+		end
+	end)
+end
+
+local function stopStepFarm()
+	stepFarmEnabled = false
+	stepGeneration += 1
+	stepFarmBtn.Text = "Step Farm: OFF"
+	stepFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end
+
+stepFarmBtn.MouseButton1Click:Connect(function()
+	stepFarmEnabled = not stepFarmEnabled
+	stepFarmBtn.Text = "Step Farm: " .. (stepFarmEnabled and "ON" or "OFF")
+	stepFarmBtn.BackgroundColor3 = stepFarmEnabled and Color3.fromRGB(30, 140, 80) or Color3.fromRGB(50, 50, 50)
+	if stepFarmEnabled then
+		startStepFarm()
+	else
+		stopStepFarm()
+	end
+end)
+
+local function startTreadmillFarm()
+	treadmillGeneration += 1
+	local gen = treadmillGeneration
+	local remoteAccumulator = 0
+	local placedOnTreadmill = false
+	disconnectTreadmillMove()
+	treadmillMoveConnection = getMoveStepEvent():Connect(function(dt)
+		if not treadmillFarmEnabled or gen ~= treadmillGeneration then
+			return
+		end
+		if not humanoid or not rootPart or not humanoid.Parent or humanoid.Health <= 0 then
+			return
+		end
+
+		local entry = TREADMILL_TYPES[treadmillTypeIndex]
+		if not entry then
+			return
+		end
+
+		if not placedOnTreadmill then
+			local part = findTreadmillPart(entry.tag)
+			if part then
+				local standPos = part.Position + Vector3.new(0, 4, 0)
+				rootPart.CFrame = CFrame.lookAt(standPos, standPos + Vector3.new(0, 0, -1))
+				placedOnTreadmill = true
+			end
+		end
+
+		if humanoid.PlatformStand then
+			humanoid.PlatformStand = false
+		end
+		humanoid.WalkSpeed = WALK_SPEED
+		humanoid:Move(Vector3.new(0, 0, -1), false)
+
+		remoteAccumulator += dt
+		if remoteAccumulator >= 0.15 then
+			remoteAccumulator = 0
+			fireRemote("TreadmillSignal", true)
+			fireRemote("UpdateSpeed", entry.remote)
+		end
+	end)
+end
+
+local function stopTreadmillFarm()
+	treadmillFarmEnabled = false
+	treadmillGeneration += 1
+	disconnectTreadmillMove()
+	if humanoid and humanoid.Parent then
+		humanoid:Move(Vector3.zero, false)
+	end
+	fireRemote("TreadmillSignal", false)
+	treadmillFarmBtn.Text = "Treadmill Farm: OFF"
+	treadmillFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end
+
+treadmillFarmBtn.MouseButton1Click:Connect(function()
+	treadmillFarmEnabled = not treadmillFarmEnabled
+	treadmillFarmBtn.Text = "Treadmill Farm: " .. (treadmillFarmEnabled and "ON" or "OFF")
+	treadmillFarmBtn.BackgroundColor3 = treadmillFarmEnabled and Color3.fromRGB(180, 120, 20)
+		or Color3.fromRGB(50, 50, 50)
+	if treadmillFarmEnabled then
+		startTreadmillFarm()
+	else
+		stopTreadmillFarm()
+	end
+end)
+
+local function startCustomSpeed()
+	customSpeedGeneration += 1
+	local gen = customSpeedGeneration
+	task.spawn(function()
+		while customSpeedEnabled and gen == customSpeedGeneration do
+			if humanoid and humanoid.Parent then
+				humanoid.WalkSpeed = customSpeedValue
+			end
+			fireRemote("SetCustomSpeed", customSpeedValue)
+			task.wait(0.1)
+		end
+	end)
+end
+
+local function stopCustomSpeed()
+	customSpeedEnabled = false
+	customSpeedGeneration += 1
+	customSpeedBtn.Text = "Custom Speed: OFF"
+	customSpeedBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end
+
+customSpeedBtn.MouseButton1Click:Connect(function()
+	customSpeedEnabled = not customSpeedEnabled
+	customSpeedBtn.Text = "Custom Speed: " .. (customSpeedEnabled and "ON" or "OFF")
+	customSpeedBtn.BackgroundColor3 = customSpeedEnabled and Color3.fromRGB(30, 120, 180)
+		or Color3.fromRGB(50, 50, 50)
+	if customSpeedEnabled then
+		startCustomSpeed()
+	else
+		stopCustomSpeed()
+	end
+end)
+
+-------------------------------
+-- WINS FARMS
+-------------------------------
+local function startWinFarm()
+	winGeneration += 1
+	local gen = winGeneration
+	task.spawn(function()
+		while winFarmEnabled and gen == winGeneration do
+			local block = findWinBlock(selectedWinStage)
+			if block and rootPart then
+				rootPart.CFrame = CFrame.new(block.Position + Vector3.new(0, 4, 0))
+			end
+			fireRemote("AddWin")
+			task.wait(winFarmInterval)
+		end
+	end)
+end
+
+local function stopWinFarm()
+	winFarmEnabled = false
+	winGeneration += 1
+	winFarmBtn.Text = "Win Farm: OFF"
+	winFarmBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end
+
+winFarmBtn.MouseButton1Click:Connect(function()
+	winFarmEnabled = not winFarmEnabled
+	winFarmBtn.Text = "Win Farm: " .. (winFarmEnabled and "ON" or "OFF")
+	winFarmBtn.BackgroundColor3 = winFarmEnabled and Color3.fromRGB(30, 140, 80) or Color3.fromRGB(50, 50, 50)
+	if winFarmEnabled then
+		startWinFarm()
+	else
+		stopWinFarm()
+	end
+end)
+
+local function startCheckpointSpam()
+	checkpointGeneration += 1
+	local gen = checkpointGeneration
+	local count = Config and #Config.CHECKPOINTS or 13
+	task.spawn(function()
+		local idx = 1
+		while checkpointSpamEnabled and gen == checkpointGeneration do
+			fireRemote("RequestCheckpointTp", idx, "wins")
+			idx = idx % count + 1
+			task.wait(0.2)
+		end
+	end)
+end
+
+local function stopCheckpointSpam()
+	checkpointSpamEnabled = false
+	checkpointGeneration += 1
+	checkpointSpamBtn.Text = "Checkpoint Spam: OFF"
+	checkpointSpamBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+end
+
+checkpointSpamBtn.MouseButton1Click:Connect(function()
+	checkpointSpamEnabled = not checkpointSpamEnabled
+	checkpointSpamBtn.Text = "Checkpoint Spam: " .. (checkpointSpamEnabled and "ON" or "OFF")
+	checkpointSpamBtn.BackgroundColor3 = checkpointSpamEnabled and Color3.fromRGB(180, 80, 30)
+		or Color3.fromRGB(50, 50, 50)
+	if checkpointSpamEnabled then
+		startCheckpointSpam()
+	else
+		stopCheckpointSpam()
+	end
+end)
+
+-------------------------------
+-- SHOP SPAM
+-------------------------------
+local function startEquipAwardSpam()
+	equipAwardGeneration += 1
+	local gen = equipAwardGeneration
+	local awardId = getFirstAwardId()
+	task.spawn(function()
+		while equipAwardSpamEnabled and gen == equipAwardGeneration do
+			fireRemote("EquipStepAward", awardId)
+			task.wait(0.15)
+		end
+	end)
+end
+
+local function stopEquipAwardSpam()
+	equipAwardSpamEnabled = false
+	equipAwardGeneration += 1
+end
+
+local function startItemActionSpam()
+	itemActionGeneration += 1
+	local gen = itemActionGeneration
+	local itemId = getFirstItemId()
+	task.spawn(function()
+		while itemActionSpamEnabled and gen == itemActionGeneration do
+			fireRemote("ItemAction", "Equip", itemId)
+			task.wait(0.15)
+		end
+	end)
+end
+
+local function stopItemActionSpam()
+	itemActionSpamEnabled = false
+	itemActionGeneration += 1
+end
+
+equipAwardBtn.MouseButton1Click:Connect(function()
+	if equipAwardSpamEnabled then
+		stopEquipAwardSpam()
+	else
+		equipAwardSpamEnabled = true
+		startEquipAwardSpam()
+	end
+	equipAwardBtn.Text = "EquipStepAward Spam: " .. (equipAwardSpamEnabled and "ON" or "OFF")
+	equipAwardBtn.BackgroundColor3 = equipAwardSpamEnabled and Color3.fromRGB(140, 60, 180)
+		or Color3.fromRGB(50, 50, 50)
+end)
+
+itemActionBtn.MouseButton1Click:Connect(function()
+	if itemActionSpamEnabled then
+		stopItemActionSpam()
+	else
+		itemActionSpamEnabled = true
+		startItemActionSpam()
+	end
+	itemActionBtn.Text = "ItemAction Spam: " .. (itemActionSpamEnabled and "ON" or "OFF")
+	itemActionBtn.BackgroundColor3 = itemActionSpamEnabled and Color3.fromRGB(140, 60, 180)
+		or Color3.fromRGB(50, 50, 50)
+end)
+
+-------------------------------
+-- PLAYER CHEATS
+-------------------------------
+local function startSpeedLoop()
+	task.spawn(function()
+		while speedEnabled do
+			if humanoid and humanoid.Parent then
+				humanoid.WalkSpeed = WALK_SPEED
+			end
+			task.wait(0.05)
+		end
+	end)
+end
+
+local function stopSpeedLoop()
+	speedEnabled = false
+	if humanoid and humanoid.Parent then
+		humanoid.WalkSpeed = DEFAULT_SPEED
+	end
+end
+
+local function startFly()
+	bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.Velocity = Vector3.zero
+	bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+	bodyVelocity.Parent = rootPart
+
+	bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+	bodyGyro.D = 100
+	bodyGyro.Parent = rootPart
+
+	flyConnection = RunService.Heartbeat:Connect(function()
+		if not flying then
+			return
+		end
+		local camera = workspace.CurrentCamera
+		local direction = Vector3.zero
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+			direction += camera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+			direction -= camera.CFrame.LookVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+			direction -= camera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+			direction += camera.CFrame.RightVector
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+			direction += Vector3.new(0, 1, 0)
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
+			direction -= Vector3.new(0, 1, 0)
+		end
+		bodyVelocity.Velocity = direction.Magnitude > 0 and direction.Unit * FLY_SPEED or Vector3.zero
+		bodyGyro.CFrame = camera.CFrame
+	end)
+
+	humanoid.PlatformStand = true
+end
+
+local function stopFly()
+	if flyConnection then
+		flyConnection:Disconnect()
+		flyConnection = nil
+	end
+	if bodyVelocity then
+		bodyVelocity:Destroy()
+		bodyVelocity = nil
+	end
+	if bodyGyro then
+		bodyGyro:Destroy()
+		bodyGyro = nil
+	end
+	if humanoid and humanoid.Parent then
+		humanoid.PlatformStand = false
+	end
+end
+
+local function startNoclip()
+	noclipConnection = RunService.Stepped:Connect(function()
+		if not noclipEnabled or not character then
+			return
+		end
+		for _, part in character:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.CanCollide = false
+			end
+		end
+	end)
+end
+
+local function stopNoclip()
+	if noclipConnection then
+		noclipConnection:Disconnect()
+		noclipConnection = nil
+	end
+	if character then
+		for _, part in character:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.CanCollide = true
+			end
+		end
+	end
+end
+
+local function applyPlayerCheats()
+	if flyConnection then
+		flyConnection:Disconnect()
+		flyConnection = nil
+	end
+	if bodyVelocity then
+		bodyVelocity:Destroy()
+		bodyVelocity = nil
+	end
+	if bodyGyro then
+		bodyGyro:Destroy()
+		bodyGyro = nil
+	end
+	if speedEnabled then
+		startSpeedLoop()
+	end
+	if flying then
+		startFly()
+	end
+	if noclipEnabled then
+		startNoclip()
+	end
+end
+
+speedBtn.MouseButton1Click:Connect(function()
+	speedEnabled = not speedEnabled
+	speedBtn.Text = "Speed: " .. (speedEnabled and "ON" or "OFF")
+	speedBtn.BackgroundColor3 = speedEnabled and Color3.fromRGB(30, 140, 80) or Color3.fromRGB(50, 50, 50)
+	if speedEnabled then
+		startSpeedLoop()
+	else
+		stopSpeedLoop()
+	end
+end)
+
+flyBtn.MouseButton1Click:Connect(function()
+	flying = not flying
+	if flying then
+		startFly()
+	else
+		stopFly()
+	end
+	flyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
+	flyBtn.BackgroundColor3 = flying and Color3.fromRGB(30, 120, 180) or Color3.fromRGB(50, 50, 50)
+end)
+
+noclipBtn.MouseButton1Click:Connect(function()
+	noclipEnabled = not noclipEnabled
+	if noclipEnabled then
+		startNoclip()
+	else
+		stopNoclip()
+	end
+	noclipBtn.Text = "Noclip: " .. (noclipEnabled and "ON" or "OFF")
+	noclipBtn.BackgroundColor3 = noclipEnabled and Color3.fromRGB(180, 80, 30) or Color3.fromRGB(50, 50, 50)
+end)
+
+-------------------------------
+-- UPDATES
+-------------------------------
+RunService.Heartbeat:Connect(function()
+	if rootPart and coordsLabel then
+		local p = rootPart.Position
+		coordsLabel.Text = string.format("X: %.1f   Y: %.1f   Z: %.1f", p.X, p.Y, p.Z)
+	end
+	if debugStatsLabel and ClientState then
+		local ok, data = pcall(function()
+			return ClientState:Get()
+		end)
+		if ok and data then
+			debugStatsLabel.Text = string.format(
+				"Level: %s\nWins: %s\nRebirths: %s\nStepBonus: %s\nMultiplier: %s",
+				tostring(data.Level or "?"),
+				tostring(data.Wins or "?"),
+				tostring(data.Rebirths or "?"),
+				tostring(data.StepBonus or "?"),
+				tostring(data.Multiplier or "?")
+			)
+		end
+	end
+end)
+
+player.CharacterAdded:Connect(function(char)
+	bindCharacter(char)
+	applyPlayerCheats()
+	if farmingEnabled then
+		startFarming()
+	end
+	if rebirthFarmEnabled then
+		startRebirthFarm()
+	end
+	if stepFarmEnabled then
+		startStepFarm()
+	end
+	if treadmillFarmEnabled then
+		startTreadmillFarm()
+	end
+	if customSpeedEnabled then
+		startCustomSpeed()
+	end
+	if winFarmEnabled then
+		startWinFarm()
+	end
+	if checkpointSpamEnabled then
+		startCheckpointSpam()
+	end
+	if equipAwardSpamEnabled then
+		startEquipAwardSpam()
+	end
+	if itemActionSpamEnabled then
+		startItemActionSpam()
+	end
+	speedBtn.Text = "Speed: " .. (speedEnabled and "ON" or "OFF")
+	speedBtn.BackgroundColor3 = speedEnabled and Color3.fromRGB(30, 140, 80) or Color3.fromRGB(50, 50, 50)
+	flyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
+	flyBtn.BackgroundColor3 = flying and Color3.fromRGB(30, 120, 180) or Color3.fromRGB(50, 50, 50)
+	noclipBtn.Text = "Noclip: " .. (noclipEnabled and "ON" or "OFF")
+	noclipBtn.BackgroundColor3 = noclipEnabled and Color3.fromRGB(180, 80, 30) or Color3.fromRGB(50, 50, 50)
+end)
+
+print("[Anticheat Tester v7 Loaded]")
+print("--test")
