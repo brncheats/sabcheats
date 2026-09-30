@@ -1,0 +1,6189 @@
+do
+	local HttpService = game:GetService("HttpService")
+
+
+local function fn()
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Workspace = game:GetService("Workspace")
+	local brainrotScanner = { Version = "SynchronizerPlotsV3" }
+	local module = nil
+	local module2 = nil
+	local module3 = nil
+	local module4 = nil
+	local n = 0
+
+	local function fn2()
+		local ok_, result = pcall(function()
+			return getgenv()
+		end)
+
+		return ok_ and result or _G
+	end
+
+	local v = fn2()
+	if type(v.BrainrotScanner) == "table" and v.BrainrotScanner.Version == brainrotScanner.Version then
+		return v.BrainrotScanner
+	end
+
+	local function fn3(arg)
+		if arg == nil then
+			return nil
+		end
+
+		if typeof(arg) == "EnumItem" then
+			return arg.Name
+		end
+
+		if type(arg) == "table" then
+			return arg.DisplayName or arg.Name or arg.Value
+		end
+		return tostring(arg)
+	end
+
+	local function fn4()
+		if module and module2 and module3 and module4 then
+			return true
+		end
+		local datas = ReplicatedStorage:FindFirstChild("Datas")
+		local packages = ReplicatedStorage:FindFirstChild("Packages")
+		if not datas then
+			return false, "ReplicatedStorage.Datas is not loaded"
+		end
+
+		if not packages then
+			return false, "ReplicatedStorage.Packages is not loaded"
+		end
+		local animals = datas:FindFirstChild("Animals")
+		local mutations = datas:FindFirstChild("Mutations")
+		local traits = datas:FindFirstChild("Traits")
+		local synchronizer = packages:FindFirstChild("Synchronizer")
+		if not animals or not mutations or not traits or not synchronizer then
+			return false, "Animals, Mutations, Traits, or Synchronizer data is not loaded"
+		end
+
+		local ok_, result = pcall(function()
+			module = require(animals)
+			module2 = require(mutations)
+			module3 = require(traits)
+			module4 = require(synchronizer)
+		end)
+
+		if not ok_ then
+			return false, "Could not load brainrot data: " .. tostring(result)
+		end
+		return true
+	end
+
+	local function fn5(arg)
+		local tbl = {}
+
+		if type(arg) == "table" then
+			for _, v2 in pairs(arg) do
+				tbl[#tbl + 1] = tostring(v2)
+			end
+		elseif arg ~= nil then
+			for match in tostring(arg):gsub("[%[%]{}]", ""):gsub("\"", ""):gmatch("[^,;|]+") do
+				local str = match:gsub("^%s+", ""):gsub("%s+$", "")
+
+				if str ~= "" and str:lower() ~= "none" then
+					tbl[#tbl + 1] = str
+				end
+			end
+		end
+
+		table.sort(tbl)
+		return tbl
+	end
+
+	local function fn6(arg, arg2, arg3)
+		local v2 = module[arg]
+		if type(v2) ~= "table" then
+			return 0
+		end
+		local flag = arg2 and arg2 ~= "" and arg2 ~= "None"
+		local n2 = 1
+
+		if flag then
+			local v3 = module2[arg2]
+
+			if type(v3) == "table" then
+				n2 = 1 + (tonumber(v3.Modifier) or 0)
+			end
+		end
+
+		local flag2 = false
+
+		for _, v3 in ipairs(arg3) do
+			if v3 == "Sleepy" then
+				flag2 = true
+			else
+				local v4 = module3[v3]
+
+				if type(v4) == "table" then
+					n2 += tonumber(v4.MultiplierModifier) or 0
+				end
+			end
+		end
+
+		local num = tonumber(v2.Generation)
+
+		if not num then
+			num = (tonumber(v2.Price) or 0) * 0.1
+		end
+
+		local v3 = math.round(num * n2)
+
+		if flag2 then
+			v3 = math.round(v3 * 0.5)
+		end
+
+		return v3
+	end
+
+	local function fn7(arg)
+		local result = nil
+
+		if typeof(getthreadidentity) == "function" then
+			local ok_
+			ok_, result = pcall(getthreadidentity)
+			local v2 = nil
+
+			if not ok_ then
+				result = v2
+			end
+		end
+
+		if typeof(setthreadidentity) == "function" then
+			pcall(setthreadidentity, 8)
+		end
+
+		local ok_, result2 = pcall(function()
+			return module4:GetTableFromChannel(arg)
+		end)
+
+		if result ~= nil and typeof(setthreadidentity) == "function" then
+			pcall(setthreadidentity, result)
+		end
+
+		if ok_ and type(result2) == "table" then
+			return result2
+		end
+		return nil
+	end
+
+	local function updateStatusBar(arg)
+		if typeof(arg) == "Instance" then
+			return tostring(arg.Name or arg)
+		end
+
+		if type(arg) == "table" then
+			return tostring(arg.Name or arg.Username or arg.DisplayName or "")
+		end
+		return arg ~= nil and tostring(arg) or ""
+	end
+
+	brainrotScanner.Reset = function()
+		module = nil
+		module2 = nil
+		module3 = nil
+		module4 = nil
+	end
+
+	brainrotScanner.Scan = function()
+		local v2, v3 = fn4()
+		if not v2 then
+			return nil, v3
+		end
+		local plots = Workspace:FindFirstChild("Plots")
+		if not plots then
+			return nil, "Workspace.Plots was not found"
+		end
+		local tbl = {}
+		local n2 = 0
+
+		for _, child in ipairs(plots:GetChildren()) do
+			local v4 = fn7(child.Name)
+
+			if v4 then
+				n2 += 1
+				local v5 = updateStatusBar(v4.Owner)
+				local animalList = type(v4.AnimalList) == "table" and v4.AnimalList or {}
+
+				for k, v6 in pairs(animalList) do
+					if type(v6) == "table" and v6.Index ~= nil then
+						local index = v6.Index
+						local v7 = module[index]
+
+						if type(v7) == "table" then
+							local str = fn3(v6.Mutation) or "None"
+							local v8 = fn5(v6.Traits)
+
+							tbl[#tbl + 1] = {
+								Name = fn3(v7.DisplayName) or tostring(index),
+								Index = tostring(index),
+								Rarity = fn3(v7.Rarity or v7.RarityName or v7.Tier or v7.Category) or "Unknown",
+								Mutation = str,
+								Traits = v8,
+								TraitsText = #v8 > 0 and table.concat(v8, ", ") or "None",
+								Generation = fn6(index, str, v8),
+								Owner = v5,
+								Plot = tostring(child.Name),
+								Slot = tostring(k),
+							}
+						end
+					end
+				end
+			end
+		end
+
+		if n2 == 0 then
+			return nil, "Synchronizer plot data is not available yet"
+		end
+
+		table.sort(tbl, function(arg, arg2)
+			if arg.Generation == arg2.Generation then
+				return arg.Name < arg2.Name
+			end
+			return arg.Generation > arg2.Generation
+		end)
+
+		return tbl
+	end
+
+	brainrotScanner.Start = function(arg, arg2)
+		assert(type(arg2) == "function", "Scanner.Start requires a callback")
+		local n2 = math.max(tonumber(arg) or 0.5, 0.1)
+		n += 1
+		local v2 = n
+
+		task.spawn(function()
+			while n == v2 do
+				local v3 = brainrotScanner.Scan()
+
+				if v3 then
+					task.spawn(arg2, v3)
+				end
+
+				task.wait(n2)
+			end
+		end)
+
+		return function()
+			if n == v2 then
+				n += 1
+			end
+		end
+	end
+
+	brainrotScanner.Stop = function()
+		n += 1
+	end
+
+	v.BrainrotScanner = brainrotScanner
+	return brainrotScanner
+end
+
+BrainrotScanner = fn()
+
+load = function()
+	local Players = game:GetService("Players")
+	local TweenService = game:GetService("TweenService")
+	local ReplicatedFirst = game:GetService("ReplicatedFirst")
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local SoundService = game:GetService("SoundService")
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local color = Color3.fromRGB(255, 255, 255)
+
+	local function fn2(arg, arg2, arg3, arg4, arg5)
+		if not arg or not arg.Parent then
+			return nil
+		end
+		local tween = TweenService:Create(arg, TweenInfo.new(arg2 or 0.5, arg4 or Enum.EasingStyle.Quint, arg5 or Enum.EasingDirection.Out), arg3)
+		tween:Play()
+		return tween
+	end
+
+	local function fn3(arg, arg2)
+		task.spawn(function()
+			local ok_, result = pcall(function()
+				local controllers = ReplicatedStorage:WaitForChild("Controllers", 10)
+				if not controllers then
+					return
+				end
+				local notificationController = controllers:WaitForChild("NotificationController", 10)
+				if not notificationController then
+					return
+				end
+				require(notificationController):Notify(arg, 1231683126832612, nil, arg2)
+			end)
+
+			if not ok_ then
+				warn("Notification error:", result)
+			end
+		end)
+	end
+
+	local luckeyLoadingScreen = playerGui:FindFirstChild("LuckeyLoadingScreen")
+
+	if luckeyLoadingScreen then
+		luckeyLoadingScreen:Destroy()
+	end
+
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "LuckeyLoadingScreen"
+	screenGui.IgnoreGuiInset = true
+	screenGui.ResetOnSpawn = false
+	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+	screenGui.DisplayOrder = 999999
+	screenGui.Parent = playerGui
+	local frame = Instance.new("Frame")
+	frame.Name = "Background"
+	frame.Size = UDim2.fromScale(1, 1)
+	frame.Position = UDim2.fromScale(0, 0)
+	frame.BackgroundColor3 = Color3.new(0, 0, 0)
+	frame.BackgroundTransparency = 0
+	frame.BorderSizePixel = 0
+	frame.ZIndex = 1
+	frame.Parent = screenGui
+	local imageLabel = Instance.new("ImageLabel")
+	imageLabel.Name = "Icon"
+	imageLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	imageLabel.Position = UDim2.fromScale(0.5, 0.5)
+	imageLabel.Size = UDim2.fromOffset(750, 750)
+	imageLabel.BackgroundTransparency = 1
+	imageLabel.Image = "rbxassetid://" .. tostring(15602019048)
+	imageLabel.ImageTransparency = 1
+	imageLabel.ScaleType = Enum.ScaleType.Fit
+	imageLabel.ZIndex = 10
+	imageLabel.Parent = frame
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Name = "CreatorLabel"
+	textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	textLabel.Position = UDim2.new(0.5, 0, 0.5, 130)
+	textLabel.Size = UDim2.fromOffset(420, 30)
+	textLabel.BackgroundTransparency = 1
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel.TextTransparency = 1
+	textLabel.Font = Enum.Font.GothamMedium
+	textLabel.TextSize = 14
+	textLabel.Text = "leaked by sticky"
+	textLabel.ZIndex = 11
+	textLabel.Parent = frame
+	local imageLabel2 = Instance.new("ImageLabel")
+	imageLabel2.Name = "Vignette"
+	imageLabel2.AnchorPoint = Vector2.new(0.5, 0.5)
+	imageLabel2.Position = UDim2.fromScale(0.5, 0.5)
+	imageLabel2.Size = UDim2.fromScale(1, 1)
+	imageLabel2.BackgroundTransparency = 1
+	imageLabel2.Image = "rbxassetid://18720640102"
+	imageLabel2.ImageColor3 = color
+	imageLabel2.ImageTransparency = 1
+	imageLabel2.ScaleType = Enum.ScaleType.Stretch
+	imageLabel2.ZIndex = 5
+	imageLabel2.Parent = frame
+	local sound = Instance.new("Sound")
+	sound.Name = "LuckeyStartupSound"
+	sound.SoundId = "rbxassetid://6963676402"
+	sound.Volume = 0.3
+	sound.Parent = SoundService
+	task.wait()
+	fn2(frame, 0.35, { BackgroundTransparency = 0.5 })
+
+	task.delay(0.35, function()
+		pcall(function()
+			sound.TimePosition = 1
+			sound:Play()
+		end)
+
+		fn2(imageLabel, 0.45, { ImageTransparency = 0.01, Size = UDim2.fromOffset(200, 200) })
+		fn2(textLabel, 0.45, { TextTransparency = 0.3 })
+
+		task.delay(0.2, function()
+			fn2(imageLabel2, 2, { ImageTransparency = 0.2 })
+		end)
+	end)
+
+	task.spawn(function()
+		while not game:IsLoaded() and not ReplicatedFirst:GetAttribute("ClientLoaded") do
+			task.wait(0.1)
+		end
+
+		fn3(string.format("<%s>%s</%s>", "phantom", "Luckey's Hub", "phantom"), "Top")
+	end)
+
+	task.wait(4)
+	fn2(imageLabel2, 0.8, { ImageTransparency = 1, Size = UDim2.fromScale(2, 2) })
+	fn2(imageLabel, 0.6, { ImageTransparency = 1 })
+	fn2(textLabel, 0.4, { TextTransparency = 1 })
+	local v = fn2(frame, 0.8, { BackgroundTransparency = 1 })
+
+	if v then
+		v.Completed:Wait()
+	else
+		task.wait(0.8)
+	end
+
+	if screenGui.Parent then
+		screenGui:Destroy()
+	end
+
+	if sound.Parent then
+		sound:Destroy()
+	end
+end
+
+load()
+local HttpService, TweenService, UserInputService, NotificationController, CornerNotificationController, localPlayer
+
+do
+	local Players = game:GetService("Players")
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	HttpService = game:GetService("HttpService")
+	TweenService = game:GetService("TweenService")
+	UserInputService = game:GetService("UserInputService")
+	NotificationController = require(ReplicatedStorage.Controllers.NotificationController)
+	CornerNotificationController = nil
+
+	pcall(function()
+		CornerNotificationController = require(ReplicatedStorage.Controllers.CornerNotificationController)
+	end)
+
+	localPlayer = Players.LocalPlayer
+end
+
+local playerGui
+playerGui = localPlayer:WaitForChild("PlayerGui")
+local topNotification
+topNotification = playerGui:WaitForChild("TopNotification"):WaitForChild("TopNotification")
+local prompt
+local tradePrompts = playerGui:FindFirstChild("TradePrompts")
+prompt = tradePrompts and tradePrompts:FindFirstChild("Prompt")
+local tbl
+tbl = { [4422933919] = true, [11331728761] = true }
+local visible
+visible = tbl[localPlayer.UserId] == true
+local ReplicatedStorage
+ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players
+Players = game:GetService("Players")
+
+if not (request or http_request) then
+	if syn then
+	end
+end
+
+local remoteHandler
+
+local function fn2()
+	local tbl2 = {}
+	local str = "Remote"
+	local str2 = "Capture"
+	local v2 = nil
+	local str3 = "BESTBRAINROTEVER"
+	local flag = false
+	local tbl3 = { version = 2, jobId = tostring(game.JobId), found = nil, rejected = {} }
+	local tbl4 = { "invalid code", "please wait", "already been redeemed", "does not exist" }
+	local tbl5 = { "requestlist", "buy", "purchase", "fetch", "delivery", "trade", "delete", "equip" }
+
+	local function fn3()
+		if flag then
+			return
+		end
+		flag = true
+		if typeof(isfile) ~= "function" or typeof(readfile) ~= "function" then
+			return
+		end
+		local ok_, result = pcall(isfile, "LuckeyHub_RedeemRemoteCache.json")
+		if not ok_ or not result then
+			return
+		end
+		local ok_2, result2 = pcall(readfile, "LuckeyHub_RedeemRemoteCache.json")
+		if not ok_2 or type(result2) ~= "string" then
+			return
+		end
+		local ok_3, result3 = pcall(HttpService.JSONDecode, HttpService, result2)
+		ok_3 = ok_3 and type(result3) == "table"
+
+		if ok_3 then
+			ok_3 = tostring(result3.jobId or "") == tostring(game.JobId)
+		end
+
+		if ok_3 then
+			tbl3.version = 2
+			tbl3.jobId = tostring(game.JobId)
+			tbl3.found = type(result3.found) == "string" and result3.found or nil
+			tbl3.rejected = type(result3.rejected) == "table" and result3.rejected or {}
+		else
+			tbl3 = { version = 2, jobId = tostring(game.JobId), found = nil, rejected = {} }
+		end
+	end
+
+	local function fn4()
+		tbl3.version = 2
+		tbl3.jobId = tostring(game.JobId)
+		if typeof(writefile) ~= "function" then
+			return
+		end
+		local ok_, result = pcall(HttpService.JSONEncode, HttpService, tbl3)
+
+		if ok_ then
+			pcall(writefile, "LuckeyHub_RedeemRemoteCache.json", result)
+		end
+	end
+
+	local function fn5(arg, ...)
+		local v3 = pcall
+		local invokeServer = arg.InvokeServer
+		local v4 = table.pack(...)
+		v4.n = 3 + v4.n - 1
+		table.move(v4, 1, v4.n, 3, v4)
+		v4[1] = invokeServer
+		v4[2] = arg
+		return v3(table.unpack(v4, 1, v4.n))
+	end
+
+	local function fn6(arg)
+		local str4 = arg:GetFullName():lower()
+
+		for _, v3 in ipairs(tbl5) do
+			if str4:find(v3, 1, true) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	local function fn7(arg, arg2)
+		if arg ~= false or type(arg2) ~= "string" then
+			return false
+		end
+		local str4 = arg2:lower()
+
+		for _, v3 in ipairs(tbl4) do
+			if str4:find(v3, 1, true) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	tbl2.GetSkippedCount = function()
+		fn3()
+		local n = 0
+
+		for _, v3 in pairs(tbl3.rejected) do
+			if v3 == true then
+				n += 1
+			end
+		end
+
+		return n
+	end
+
+	tbl2.Find = function(arg, arg2)
+		fn3()
+
+		local function updateStatusBar(arg3)
+			if type(arg2) == "function" then
+				task.defer(arg2, arg3)
+			end
+		end
+
+		local flag2 = not arg
+		if flag2 and v2 and v2.Parent then
+			updateStatusBar("Using cached remote: " .. v2.Name)
+			return v2
+		end
+		v2 = nil
+		local packages = ReplicatedStorage:FindFirstChild("Packages")
+		packages = packages and packages:FindFirstChild("Net")
+		if not packages then
+			return nil, "ReplicatedStorage.Packages.Net not found"
+		end
+		local tbl6 = {}
+		local v3 = nil
+
+		for _, descendant in ipairs(packages:GetDescendants()) do
+			if descendant:IsA("RemoteFunction") and not fn6(descendant) then
+				local fullName = descendant:GetFullName()
+
+				if fullName == tbl3.found then
+					v3 = descendant
+				end
+
+				if tbl3.rejected[fullName] ~= true or fullName == tbl3.found then
+					table.insert(tbl6, descendant)
+				end
+			end
+		end
+
+		if flag2 and v3 then
+			v2 = v3
+			updateStatusBar("Using saved remote: " .. v3.Name)
+			return v2
+		end
+
+		table.sort(tbl6, function(arg3, arg4)
+			local found = tbl3.found
+			local flag3 = arg3:GetFullName() == found
+			local found2 = tbl3.found
+			if flag3 ~= arg4:GetFullName() == found2 then
+				return flag3
+			end
+			return #arg3.Name < #arg4.Name
+		end)
+
+		local n = #tbl6
+		updateStatusBar("Ready to test " .. n .. " remote(s)")
+
+		for i, v4 in ipairs(tbl6) do
+			local fullName = v4:GetFullName()
+			local str4 = i .. "/" .. n
+			updateStatusBar("Testing " .. str4 .. ": " .. v4.Name)
+			print("[Redeem Finder] Testing", str4, fullName)
+			local bestbrainrotever, v5, v6 = fn5(v4, "BESTBRAINROTEVER")
+
+			if bestbrainrotever and fn7(v5, v6) then
+				v2 = v4
+				tbl3.found = fullName
+				tbl3.rejected[fullName] = nil
+				fn4()
+				updateStatusBar("Found " .. str4 .. ": " .. v4.Name)
+				print("[Redeem Finder] Found", fullName, v6)
+				return v2
+			end
+
+			tbl3.rejected[fullName] = true
+
+			if tbl3.found == fullName then
+				tbl3.found = nil
+			end
+
+			fn4()
+			updateStatusBar("Rejected + saved " .. str4 .. ": " .. v4.Name)
+			task.wait(0.1)
+		end
+
+		return nil, "No redeem RemoteFunction matched"
+	end
+
+	local function updateStatusBar()
+		local codes = playerGui:FindFirstChild("Codes")
+		return codes and codes:FindFirstChild("Codes")
+	end
+
+	local function getUsernameById(arg)
+		if not arg or typeof(getconnections) ~= "function" then
+			return false
+		end
+
+		local function handleBotControl(arg2)
+			local ok_, result = pcall(getconnections, arg2)
+			if not ok_ or #result == 0 then
+				return false
+			end
+
+			if typeof(firesignal) == "function" then
+				if pcall(firesignal, arg2) then
+					return true
+				end
+			end
+
+			local v3, v4, v5 = ipairs(result)
+			local flag2 = false
+
+			for _, v6 in v3, v4, v5 do
+				flag2 = pcall(function()
+					v6:Fire()
+				end) or flag2
+			end
+
+			return flag2
+		end
+
+		return handleBotControl(arg.Activated) or handleBotControl(arg.MouseButton1Click)
+	end
+
+	local function handleBotControl(arg)
+		local v3 = updateStatusBar()
+		local codeRedeem = v3 and v3:FindFirstChild("CodeRedeem")
+		codeRedeem = codeRedeem and codeRedeem:FindFirstChild("TextBox")
+
+		if codeRedeem then
+			codeRedeem.ClearTextOnFocus = false
+			codeRedeem.Text = tostring(arg or "")
+		end
+
+		return getUsernameById(v3 and v3:FindFirstChild("Confirm"))
+	end
+
+	tbl2.GetCachedRemote = function()
+		fn3()
+		if v2 and v2.Parent then
+			return v2
+		end
+
+		if not tbl3.found then
+			return nil
+		end
+
+		for _, descendant in ipairs(ReplicatedStorage:GetDescendants()) do
+			local isRemoteFunction = descendant:IsA("RemoteFunction")
+
+			if isRemoteFunction then
+				local found = tbl3.found
+				isRemoteFunction = descendant:GetFullName() == found
+			end
+
+			if isRemoteFunction then
+				v2 = descendant
+				return v2
+			end
+		end
+
+		return nil
+	end
+
+	tbl2.Capture = function(arg)
+		fn3()
+
+		local function fn11(arg2)
+			if type(arg) == "function" then
+				task.defer(arg, arg2)
+			end
+		end
+
+		if typeof(hookmetamethod) ~= "function" or typeof(getnamecallmethod) ~= "function" or typeof(newcclosure) ~= "function" then
+			return nil, "Capture scanner is unsupported by this executor"
+		end
+		local packages = ReplicatedStorage:FindFirstChild("Packages")
+		local net = packages and packages:FindFirstChild("Net")
+		if not net then
+			return nil, "ReplicatedStorage.Packages.Net not found"
+		end
+
+		if tbl2.CaptureInProgress then
+			fn11("Waiting for the current Capture scan...")
+			local n = os.clock() + 9
+
+			while tbl2.CaptureInProgress and os.clock() < n do
+				task.wait(0.05)
+			end
+
+			local v3 = tbl2.GetCachedRemote()
+			return v3, v3 and "Current Capture completed" or "Current Capture did not find a remote"
+		end
+
+		tbl2.CaptureInProgress = true
+		local v3 = nil
+		local flag2 = false
+		local flag3 = false
+		local v4 = nil
+
+		local function fn12()
+			if flag3 then
+				return
+			end
+			flag3 = true
+
+			pcall(function()
+				hookmetamethod(game, "__namecall", v4)
+			end)
+		end
+
+		local ok_, result = pcall(function()
+			v4 = hookmetamethod(game, "__namecall", newcclosure(function(arg2, ...)
+				local v5 = table.pack(...)
+				local v6 = getnamecallmethod()
+				local tbl6 = { ... }
+
+				if not v3 and v6 == "InvokeServer" and typeof(arg2) == "Instance" and arg2:IsA("RemoteFunction") and arg2:IsDescendantOf(net) and tbl6[1] == str3 then
+					v3 = arg2
+					v2 = arg2
+					tbl3.found = arg2:GetFullName()
+					tbl3.rejected[tbl3.found] = nil
+					flag2 = true
+					fn11("Captured and saved: " .. arg2.Name)
+				end
+
+				return v4(arg2, table.unpack(v5, 1, v5.n))
+			end))
+		end)
+
+		if not ok_ then
+			tbl2.CaptureInProgress = false
+			return nil, "Could not install capture hook: " .. tostring(result)
+		end
+		fn11("Typing test code and firing Redeem...")
+		LUCKEY_REDEEM_UTILITY_IGNORE_UNTIL = tick() + 10
+
+		if not handleBotControl("BESTBRAINROTEVER") then
+			fn12()
+			tbl2.CaptureInProgress = false
+			return nil, "Codes TextBox or Redeem button not found"
+		end
+
+		local n = os.clock() + 8
+
+		while not v3 and os.clock() < n do
+			task.wait()
+		end
+
+		fn12()
+		tbl2.CaptureInProgress = false
+
+		if v3 then
+			if flag2 then
+				task.defer(fn4)
+			end
+
+			return v3, "Captured for JobId " .. tostring(game.JobId)
+		end
+
+		return nil, "No matching InvokeServer call was captured"
+	end
+
+	tbl2.SetMode = function(arg)
+		str = arg == "Click" and "Click" or "Remote"
+	end
+
+	tbl2.GetMode = function()
+		return str
+	end
+
+	tbl2.SetScanMethod = function(arg)
+		str2 = arg == "Capture" and "Capture" or "Probe"
+	end
+
+	tbl2.GetScanMethod = function()
+		return str2
+	end
+
+	tbl2.AcceptSharedRemote = function(arg, arg2)
+		local str4 = tostring(arg or "")
+		if tostring(arg2 or "") ~= tostring(game.JobId) then
+			return nil, "Controller is not in this Roblox server"
+		end
+
+		if not str4:match("^ReplicatedStorage%.") then
+			return nil, "Invalid remote path"
+		end
+		local v3 = nil
+
+		for _, descendant in ipairs(ReplicatedStorage:GetDescendants()) do
+			if descendant:IsA("RemoteFunction") and descendant:GetFullName() == str4 then
+				v3 = descendant
+				break
+			else
+				v3 = nil
+			end
+		end
+
+		if not v3 or fn6(v3) then
+			return nil, "Shared RemoteFunction was not found or is unsafe"
+		end
+		local bestbrainrotever, v4, v5 = fn5(v3, "BESTBRAINROTEVER")
+		if not bestbrainrotever or not fn7(v4, v5) then
+			return nil, "Shared remote failed the redeem-response test"
+		end
+		v2 = v3
+		tbl3.found = v3:GetFullName()
+		tbl3.rejected[tbl3.found] = nil
+		fn4()
+		return v3, "Shared remote tested and saved"
+	end
+
+	tbl2.Redeem = function(arg)
+		local str4 = tostring(arg or "")
+		if str4 == "" then
+			return false, false, "Empty code", "None"
+		end
+
+		if str == "Remote" then
+			local v3, v4
+
+			if str2 == "Capture" then
+				v3 = tbl2.GetCachedRemote()
+				v4 = nil
+
+				if not v3 then
+					v3, v4 = tbl2.Capture()
+				end
+			else
+				v3, v4 = tbl2.Find(false)
+			end
+
+			if not v3 then
+				return false, false, tostring(v4 or "Redeem remote not found"), "Remote"
+			end
+			local now = os.clock()
+			local v5, v6, v7 = fn5(v3, str4)
+			local n = math.max(0, math.floor((os.clock() - now) * 1000 + 0.5))
+			if not v5 then
+				return false, false, tostring(v6), "Remote", n
+			end
+			return true, v6, v7, "Remote", n
+		end
+
+		if handleBotControl(str4) then
+			return true, nil, nil, "Click"
+		end
+		return false, false, "Redeem button has no callable listeners", "Click"
+	end
+
+	return tbl2
+end
+
+remoteHandler = fn2()
+local fn3
+
+fn3 = function(arg)
+	if not arg then
+		return ""
+	end
+	return arg:gsub("<.->", "")
+end
+
+local n, tbl2, tbl3, request_, fn4
+local str = "https://luckeyai-il7v.onrender.com/solve"
+n = 0
+tbl2 = { sniper = {}, riddle = {} }
+tbl3 = {}
+request_ = nil
+
+if syn and syn.request then
+	request_ = syn.request
+elseif http and http.request then
+	request_ = http.request
+elseif request then
+	request_ = request
+else
+	error("No HTTP request function found.")
+end
+
+fn4 = function(arg)
+	if not arg or arg == "" then
+		return nil, "No question provided."
+	end
+
+	local ok_, result = pcall(function()
+		return request_({
+			Url = str,
+			Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode({ question = arg }),
+		})
+	end)
+
+	if not ok_ then
+		return nil, "HTTP request failed: " .. tostring(result)
+	end
+
+	if type(result) ~= "table" then
+		return nil, "Invalid HTTP response: " .. tostring(result)
+	end
+	local statusCode = result.StatusCode or result.Status or result.status or result.status_code
+	local body = result.Body or result.body or result.ResponseBody or result.responseBody
+	if not statusCode then
+		return nil, "Missing status code. Response: " .. HttpService:JSONEncode(result)
+	end
+
+	if statusCode ~= 200 then
+		local str2 = tostring(body or result.StatusMessage or result.statusMessage or "No response body")
+		local ok_2, result2 = pcall(HttpService.JSONDecode, HttpService, str2)
+
+		if ok_2 and type(result2) == "table" then
+			str2 = tostring(result2.error or result2.message or result2.detail or str2)
+		end
+
+		return nil, "API error " .. tostring(statusCode) .. ": " .. str2:sub(1, 240)
+	end
+
+	if not body or body == "" then
+		return nil, "API returned an empty body."
+	end
+
+	local ok_2, result2 = pcall(function()
+		return HttpService:JSONDecode(body)
+	end)
+
+	if not ok_2 or type(result2) ~= "table" then
+		return nil, "Invalid JSON: " .. tostring(body)
+	end
+
+	if result2.error then
+		return nil, "Server error: " .. tostring(result2.error)
+	end
+	local answer = result2.answer
+	if not answer or answer == "" then
+		return nil, "Missing answer: " .. tostring(body)
+	end
+	local str2 = tostring(answer):upper():gsub("%s+", "")
+	if str2 == "UNKNOWN" then
+		return nil, "The server could not find the answer."
+	end
+	return str2, nil, false
+end
+
+local str2, fn5, fn6
+
+do
+	local tbl4 = { "my_secret_xor_key_2026", "fallback_key_if_needed" }
+	str2 = "supersecret123"
+
+	local function fn7(arg)
+		local ok_, result = pcall(function()
+			return crypt and crypt.base64 and crypt.base64.decode(arg)
+		end)
+
+		if ok_ and result then
+			return result
+		end
+		return HttpService:Base64Decode(arg)
+	end
+
+	local function base64Encode(arg)
+		if crypt and crypt.base64 and crypt.base64.encode then
+			return crypt.base64.encode(arg)
+		end
+		error("No Base64 encoder available")
+	end
+
+	local function xorByte(arg, arg2)
+		if bit and bit.bxor then
+			return bit.bxor(arg, arg2)
+		end
+
+		if bit32 and bit32.bxor then
+			return bit32.bxor(arg, arg2)
+		end
+		error("No bitwise XOR available")
+	end
+
+	local function xorDecrypt(arg, arg2)
+		local v2 = tbl4[arg2]
+		if not v2 then
+			warn("Unknown XOR version:", arg2)
+			return nil
+		end
+		local v3 = nil
+
+		if not pcall(function()
+			v3 = fn7(arg)
+		end) or not v3 then
+			warn("Base64 decode failed")
+			return nil
+		end
+
+		local tbl5 = {}
+
+		for i = 1, #v3 do
+			local v4 = string.byte(v3, i)
+			local v5 = string.byte(v2, (i - 1) % #v2 + 1)
+			tbl5[i] = string.char(xorByte(v4, v5))
+		end
+
+		return table.concat(tbl5)
+	end
+
+	local function fn11(arg, arg2)
+		local v2 = tbl4[arg2]
+		assert(v2, "Unknown XOR version")
+		local tbl5 = {}
+
+		for i = 1, #arg do
+			local v3 = string.byte(arg, i)
+			local v4 = string.byte(v2, (i - 1) % #v2 + 1)
+			tbl5[i] = string.char(xorByte(v3, v4))
+		end
+
+		return table.concat(tbl5)
+	end
+
+	fn5 = function(arg, arg2)
+		local v2 = fn11(HttpService:JSONEncode(arg), arg2)
+		return { version = arg2, payload = updateStatusBar(v2) }
+	end
+
+	fn6 = function(arg)
+		local ok_, result = pcall(HttpService.JSONDecode, HttpService, arg)
+		if not ok_ then
+			warn("JSON decode failed")
+			return nil
+		end
+
+		if not result.version or not result.payload then
+			warn("Missing version or payload")
+			return nil
+		end
+		local v2 = handleBotControl(result.payload, result.version)
+		if not v2 then
+			return nil
+		end
+		return HttpService:JSONDecode(v2)
+	end
+end
+
+local str3
+str3 = nil
+local flag
+flag = false
+local connection
+connection = nil
+local thread
+thread = nil
+local solved
+solved = nil
+local v2
+v2 = nil
+lastRiddleSolveMs = nil
+local flag2
+flag2 = false
+local str4
+str4 = ""
+local n2
+n2 = 0
+local v3
+v3 = nil
+local tbl4
+tbl4 = {}
+local n3
+n3 = 10
+announcementHideFromPrevious = true
+LUCKEY_IGNORED_TOP_NOTIFICATION_OBJECTS = setmetatable({}, { __mode = "k" })
+LUCKEY_PENDING_ANNOUNCEMENT_TEXTS = {}
+LUCKEY_ANNOUNCEMENT_IGNORE_SECONDS = 5
+local tbl5
+tbl5 = {}
+local tbl6
+tbl6 = {}
+local botRequestCache
+botRequestCache = {}
+local botRedeemCache
+botRedeemCache = {}
+local botProfileUI
+botProfileUI = {}
+local botProfileData
+botProfileData = {}
+local botOnlineStatus
+botOnlineStatus = {}
+local botStatusLabels
+botStatusLabels = {}
+local botAvailLabels
+botAvailLabels = {}
+local botIndicatorDots
+botIndicatorDots = {}
+local botAvatarImages
+botAvatarImages = {}
+local v4
+v4 = nil
+local name_
+name_ = nil
+local v5
+v5 = nil
+connectedWebSocketUsers = {}
+selectedFanumTaxUser = nil
+pendingFanumTaxRequests = {}
+pendingBrainrotScanRequests = {}
+refreshFanumTaxUsers = nil
+showFanumBrainrotPopup = nil
+targetedAnnouncementAllowed = visible
+targetedAnnouncementUsers = {}
+selectedTargetedAnnouncementUser = nil
+refreshTargetedAnnouncementUsersUI = nil
+setTargetedAnnouncementAccess = nil
+local fn7
+fn7 = nil
+tbl5[tostring(localPlayer.UserId)] = true
+local settings
+
+settings = {
+	redeemThreshold = 1,
+	autoRedeemEnabled = true,
+	retryCodeEnabled = false,
+	retryStopPromptOpen = false,
+	retryStopConfirmUntil = 0,
+	retrySessionId = 0,
+	retryTimerToken = 0,
+	retryAttemptCount = 0,
+	autoModeEnabled = false,
+	botModeEnabled = false,
+	ownerPriorityRedeemEnabled = false,
+	pingBoostFFlagsEnabled = false,
+}
+
+pingBoostFFlags = {
+	{ "DFFlagBrowserTrackerIdTelemetryEnabled", "False" },
+	{ "DFFlagPreloadAsyncSupportTexturePack", "True" },
+	{ "DFFlagTextureQualityOverrideEnabled", "True" },
+	{ "DFFlagVideoCaptureServiceEnabled", "False" },
+	{ "DFFlagSampleAndRefreshRakPing", "True" },
+	{ "DFFlagRakNetUseSlidingWindow4", "True" },
+	{ "DFFlagCoreScriptTelemetry2", "False" },
+	{ "DFFlagEnableSoundPreloading", "True" },
+	{ "DFFlagOptimizePartsInPart", "True" },
+	{ "DFFlagDisableDPIScale", "True" },
+	{ "DFFlagDebugPerfMode", "True" },
+	{ "DFIntRaknetBandwidthInfluxHundredthsPercentageV2", "10000" },
+	{ "DFIntRakNetClockDriftAdjustmentPerPingMillisecond", "100" },
+	{ "DFIntPerformanceControlTextureQualityBestUtility", "-1" },
+	{ "DFIntSignalRHubConnectionHeartbeatTimerRateMs", "1000" },
+	{ "DFIntMaxReceiveToDeserializeLatencyMilliseconds", "15" },
+	{ "DFIntMegaReplicatorNetworkQualityProcessorUnit", "10" },
+	{ "DFIntNetworkInDeserializeLimitGameplayMsClient", "6" },
+	{ "DFIntSignalRHubConnectionBaseRetryTimeMs", "100" },
+	{ "DFIntClientPacketHealthyAllocationPercent", "20" },
+	{ "DFIntTelemetryProfilerHundredthsPercentage", "0" },
+	{ "DFIntMaxWaitTimeBeforeForcePacketProcessMS", "1" },
+	{ "DFIntNetworkInProcessLimitGameplayMsClient", "6" },
+	{ "DFIntAnimationLodFacsVisibilityDenominator", "0" },
+	{ "DFIntRaknetBandwidthPingSendEveryXSeconds", "1" },
+	{ "DFIntSignalRCoreKeepAlivePingPeriodMs", "250" },
+	{ "DFIntClientPacketMaxFrameMicroseconds", "200" },
+	{ "DFIntSoundServiceCacheCleanupMaxAgeDays", "2" },
+	{ "DFIntMaxProcessPacketsStepsPerCyclic", "5000" },
+	{ "DFIntClientPacketExcessMicroseconds", "1000" },
+	{ "DFIntMaxProcessPacketsStepsAccumulated", "0" },
+	{ "DFIntWaitOnUpdateNetworkLoopEndedMS", "100" },
+	{ "DFIntLargePacketQueueSizeCutoffMB", "1000" },
+	{ "DFIntMaxProcessPacketsJobScaling", "10000" },
+	{ "DFIntRakNetNakResendDelayRttPercent", "50" },
+	{ "DFIntSignalRCoreServerTimeoutMs", "11100" },
+	{ "DFIntDebugFRMQualityLevelOverride", "1" },
+	{ "DFIntClientPacketMinMicroseconds", "1" },
+	{ "DFIntAnimationLodFacsDistanceMin", "0" },
+	{ "DFIntAnimationLodFacsDistanceMax", "0" },
+	{ "DFIntWaitOnRecvFromLoopEndedMS", "100" },
+	{ "DFIntRakNetNakResendDelayMsMax", "100" },
+	{ "DFIntCodecMaxOutgoingFrames", "10000" },
+	{ "DFIntSignalRCoreRpcQueueSize", "256" },
+	{ "DFIntRakNetMinAckGrowthPercent", "0" },
+	{ "DFIntTaskSchedulerTargetFps", "9999" },
+	{ "DFIntCodecMaxIncomingPackets", "100" },
+	{ "DFIntRakNetMtuValue3InBytes", "1200" },
+	{ "DFIntRakNetMtuValue1InBytes", "1280" },
+	{ "DFIntRakNetMtuValue2InBytes", "1240" },
+	{ "DFIntRakNetNakResendDelayMs", "10" },
+	{ "DFIntRakNetResendRttMultiple", "1" },
+	{ "DFIntMemCacheMaxCapacityMB", "48" },
+	{ "DFIntClientPacketMaxDelayMs", "11" },
+	{ "DFIntTextureQualityOverride", "0" },
+	{ "DFIntRakNetSelectTimeoutMs", "1" },
+	{ "DFIntSignalRCoreTimerMs", "750" },
+	{ "DFIntConnectionMTUSize", "1260" },
+	{ "DFIntMaxFrameBufferSize", "4" },
+	{ "DFIntRakNetLoopMs", "1" },
+	{ "DFIntDebugRestrictGCDistance", "1" },
+	{ "FIntTaskSchedulerAsyncTasksMinimumThreadCount", "2" },
+	{ "FIntRenderMaxShadowAtlasUsageBeforeDownscale", "80" },
+	{ "FIntPerformanceTelemetryQueueProcessLimit", "0" },
+	{ "FIntRenderShadowMapDepthCacheMemLimit", "192" },
+	{ "FIntUITextureMaxRenderTextureSize", "1024" },
+	{ "FIntRakNetResendBufferArrayLength", "128" },
+	{ "FIntTaskSchedulerAutoThreadLimit", "6" },
+	{ "FIntTerrainOTAMaxTextureSize", "1024" },
+	{ "FIntOcclusionWorkerThreadCount", "5" },
+	{ "FIntTaskSchedulerMaxNumOfJobs", "86" },
+	{ "FIntTelemetryProfilerFrequency", "0" },
+	{ "FIntRenderLocalLightFadeInMs", "0" },
+	{ "FIntDefaultMeshCacheSizeMB", "256" },
+	{ "FIntReportDeviceInfoRollout", "0" },
+	{ "FIntTaskSchedulerThreadMin", "1" },
+	{ "FIntRobloxGuiBlurIntensity", "0" },
+	{ "FIntTerrainArraySliceSize", "0" },
+	{ "FIntDebugForceMSAASamples", "1" },
+	{ "FIntRenderShadowmapBias", "0" },
+	{ "FIntFRMMaxGrassDistance", "0" },
+	{ "FIntFRMMinGrassDistance", "0" },
+	{ "FIntGrassMovementReducedMotionFactor", "0" },
+	{ "FIntDebugTextureManagerSkipMips", "7" },
+	{ "RenderUseTextureManager224", "False" },
+	{ "TextureQualityOverride", "1" },
+	{ "TextureQualityOverrideEnabled", "True" },
+	{ "PerformanceControlTextureQualityBestUtility", "1" },
+	{ "FFlagRenderAllocateShadowMapResourcesOnDemand", "True" },
+	{ "FFlagSpecifyNetworkReplicatorScopeForItems", "True" },
+	{ "FFlagTaskSchedulerLimitTargetFpsTo2402", "False" },
+	{ "FFlagHandleAltEnterFullscreenManually", "False" },
+	{ "FFlagGameBasicSettingsFramerateCap5", "False" },
+	{ "FFlagSpecifyNetworkReplicatorScope", "True" },
+	{ "FFlagSendRenderFidelityTelemetry2", "False" },
+	{ "FFlagRenderGpuTextureCompressor", "True" },
+	{ "FFlagBaseThreadPoolUseRuntime2", "True" },
+	{ "FFlagCacheTextBoundsInGuiText", "True" },
+	{ "FFlagEnableTelemetryService1", "False" },
+	{ "FFlagDebugGraphicsPreferD3D11", "True" },
+	{ "FFlagPerfDataOnTelemetryV2", "False" },
+	{ "FFlagOpenTelemetryEnabled2", "False" },
+	{ "FFlagRbxStorageUseMemCache", "True" },
+	{ "FFlagDebugForceGenerateHSR", "True" },
+	{ "FFlagRenderInitShadowmaps", "True" },
+	{ "FFlagFastGPULightCulling3", "True" },
+	{ "FFlagDebugSkyGray", "True" },
+	{ "FFlagDebugRenderingSetDeterministic", "True" },
+	{ "FLogNetwork", "7" },
+}
+
+pingBoostOriginalValues = {}
+pingBoostAppliedFlags = {}
+local screenGui
+screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MacStyleFloatingApp"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = (typeof(gethui) == "function" and gethui()) or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+local frame
+frame = Instance.new("Frame")
+frame.Name = "MainPanel"
+frame.AnchorPoint = Vector2.new(0.5, 0.5)
+frame.Position = UDim2.fromScale(0.5, 0.5)
+frame.Size = UDim2.fromOffset(420, 720)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+frame.BorderSizePixel = 0
+frame.ClipsDescendants = true
+frame.Active = true
+frame.Parent = screenGui
+
+do
+	local imageLabel = Instance.new("ImageLabel")
+	imageLabel.Name = "LuckeyBackground"
+	imageLabel.Size = UDim2.fromScale(1, 1)
+	imageLabel.Position = UDim2.fromScale(0, 0)
+	imageLabel.BackgroundTransparency = 1
+	imageLabel.Image = "rbxassetid://131277439519181"
+	imageLabel.ImageColor3 = Color3.fromRGB(255, 255, 255)
+	imageLabel.ImageTransparency = 0.55
+	imageLabel.ScaleType = Enum.ScaleType.Stretch
+	imageLabel.ZIndex = 0
+	imageLabel.Parent = frame
+	local uiCorner = Instance.new("UICorner")
+	uiCorner.CornerRadius = UDim.new(0, 14)
+	uiCorner.Parent = imageLabel
+	TweenService:Create(imageLabel, TweenInfo.new(7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { ImageTransparency = 0.47 }):Play()
+end
+
+do
+	local uiScale = Instance.new("UIScale")
+	uiScale.Parent = frame
+
+	local function updateStatusBar()
+		local currentCamera = workspace.CurrentCamera
+		currentCamera = currentCamera and currentCamera.ViewportSize or Vector2.new(1280, 720)
+		local n4 = math.min(1, currentCamera.X / 460, currentCamera.Y / 700)
+		uiScale.Scale = math.max(0.68, n4)
+	end
+
+	updateStatusBar()
+
+	if workspace.CurrentCamera then
+		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateStatusBar)
+	end
+end
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 14)
+uiCorner.Parent = frame
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Color = Color3.fromRGB(70, 70, 70)
+uiStroke.Thickness = 1
+uiStroke.Transparency = 0.3
+uiStroke.Parent = frame
+local frame2
+frame2 = Instance.new("Frame")
+frame2.Name = "TitleBar"
+frame2.Size = UDim2.new(1, 0, 0, 44)
+frame2.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame2.BorderSizePixel = 0
+frame2.Parent = frame
+local uiCorner2 = Instance.new("UICorner")
+uiCorner2.CornerRadius = UDim.new(0, 14)
+uiCorner2.Parent = frame2
+local frame3 = Instance.new("Frame")
+frame3.Size = UDim2.new(1, 0, 0, 14)
+frame3.Position = UDim2.new(0, 0, 1, -14)
+frame3.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame3.BorderSizePixel = 0
+frame3.ZIndex = frame2.ZIndex
+frame3.Parent = frame2
+local frame4 = Instance.new("Frame")
+frame4.Size = UDim2.new(1, 0, 0, 1)
+frame4.Position = UDim2.new(0, 0, 1, -1)
+frame4.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+frame4.BorderSizePixel = 0
+frame4.ZIndex = 3
+frame4.Parent = frame2
+local textLabel
+textLabel = Instance.new("TextLabel")
+textLabel.BackgroundTransparency = 1
+textLabel.Size = UDim2.new(1, -160, 1, 0)
+textLabel.Position = UDim2.fromOffset(80, 0)
+textLabel.Font = Enum.Font.GothamMedium
+textLabel.TextSize = 14
+textLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+textLabel.Text = "@luataun"
+textLabel.TextXAlignment = Enum.TextXAlignment.Center
+textLabel.ZIndex = 3
+textLabel.Parent = frame2
+local v6, v7, v8
+
+do
+	local frame5 = Instance.new("Frame")
+	frame5.Name = "TrafficLights"
+	frame5.BackgroundTransparency = 1
+	frame5.Size = UDim2.fromOffset(70, 20)
+	frame5.Position = UDim2.fromOffset(16, 12)
+	frame5.ZIndex = 3
+	frame5.Parent = frame2
+	local uiListLayout = Instance.new("UIListLayout")
+	uiListLayout.FillDirection = Enum.FillDirection.Horizontal
+	uiListLayout.Padding = UDim.new(0, 8)
+	uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	uiListLayout.Parent = frame5
+
+	local function createTextButton(backgroundColor3, text)
+		local textButton = Instance.new("TextButton")
+		textButton.Size = UDim2.fromOffset(14, 14)
+		textButton.BackgroundColor3 = backgroundColor3
+		textButton.AutoButtonColor = false
+		textButton.BorderSizePixel = 0
+		textButton.Text = ""
+		textButton.Font = Enum.Font.GothamBold
+		textButton.TextSize = 10
+		textButton.TextColor3 = Color3.fromRGB(60, 30, 0)
+		textButton.ZIndex = 4
+		textButton.Parent = frame5
+		local uiCorner3 = Instance.new("UICorner")
+		uiCorner3.CornerRadius = UDim.new(1, 0)
+		uiCorner3.Parent = textButton
+
+		textButton.MouseEnter:Connect(function()
+			textButton.Text = text
+		end)
+
+		textButton.MouseLeave:Connect(function()
+			textButton.Text = ""
+		end)
+
+		return textButton
+	end
+
+	v6 = createTextButton(Color3.fromRGB(255, 95, 86), "Ãƒâ€”")
+	v7 = createTextButton(Color3.fromRGB(255, 189, 46), "Ã¢Ë†â€™")
+	v8 = createTextButton(Color3.fromRGB(39, 201, 63), "+")
+end
+
+do
+	local Stats = game:GetService("Stats")
+	local RunService = game:GetService("RunService")
+	local frame5 = Instance.new("Frame")
+	frame5.Name = "MinimizedStats"
+	frame5.Size = UDim2.new(1, -20, 0, 32)
+	frame5.Position = UDim2.new(0, 10, 1, -42)
+	frame5.BackgroundColor3 = Color3.fromRGB(48, 48, 52)
+	frame5.BackgroundTransparency = 0.08
+	frame5.BorderSizePixel = 0
+	frame5.Visible = true
+	frame5.ZIndex = 20
+	frame5.Parent = frame
+	local uiCorner3 = Instance.new("UICorner")
+	uiCorner3.CornerRadius = UDim.new(0, 12)
+	uiCorner3.Parent = frame5
+	local uiStroke2 = Instance.new("UIStroke")
+	uiStroke2.Color = Color3.fromRGB(112, 112, 118)
+	uiStroke2.Transparency = 0.35
+	uiStroke2.Thickness = 1
+	uiStroke2.Parent = frame5
+	local uiPadding = Instance.new("UIPadding")
+	uiPadding.PaddingLeft = UDim.new(0, 8)
+	uiPadding.PaddingRight = UDim.new(0, 8)
+	uiPadding.Parent = frame5
+	local uiListLayout = Instance.new("UIListLayout")
+	uiListLayout.FillDirection = Enum.FillDirection.Horizontal
+	uiListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	uiListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	uiListLayout.Padding = UDim.new(0, 8)
+	uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	uiListLayout.Parent = frame5
+
+	local function createTextLabel(name_2, arg, layoutOrder)
+		local textLabel2 = Instance.new("TextLabel")
+		textLabel2.Name = name_2
+		textLabel2.Size = UDim2.fromOffset(arg, 24)
+		textLabel2.BackgroundColor3 = Color3.fromRGB(65, 65, 70)
+		textLabel2.BackgroundTransparency = 0.15
+		textLabel2.BorderSizePixel = 0
+		textLabel2.Font = Enum.Font.GothamBold
+		textLabel2.TextSize = 11
+		textLabel2.TextColor3 = Color3.fromRGB(224, 224, 228)
+		textLabel2.Text = name_2 .. " 0"
+		textLabel2.LayoutOrder = layoutOrder
+		textLabel2.ZIndex = 21
+		textLabel2.Parent = frame5
+		local uiCorner4 = Instance.new("UICorner")
+		uiCorner4.CornerRadius = UDim.new(0, 8)
+		uiCorner4.Parent = textLabel2
+		return textLabel2
+	end
+
+	local Players2 = createTextLabel("Players", 96, 1)
+	local fps = createTextLabel("FPS", 72, 2)
+	local Ping = createTextLabel("Ping", 90, 3)
+
+	task.spawn(function()
+		local now = os.clock()
+		local n4 = 0
+
+		while screenGui.Parent do
+			RunService.RenderStepped:Wait()
+			n4 += 1
+			local now2 = os.clock()
+			local n5 = now2 - now
+
+			if n5 >= 1 then
+				local n6 = math.max(0, math.floor(n4 / n5 + 0.5))
+				Players2.Text = "Players " .. tostring(#Players:GetPlayers())
+				fps.Text = "FPS " .. tostring(n6)
+				local n7 = 0
+
+				pcall(function()
+					local valueString = Stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
+					n7 = tonumber(tostring(valueString):match("%d+")) or 0
+				end)
+
+				Ping.Text = "Ping " .. tostring(math.floor(n7 + 0.5)) .. "ms"
+				n4 = 0
+				now = now2
+			end
+		end
+	end)
+end
+
+local frame5
+frame5 = Instance.new("Frame")
+frame5.Name = "Content"
+frame5.Size = UDim2.new(1, 0, 1, -44)
+frame5.Position = UDim2.fromOffset(0, 44)
+frame5.BackgroundColor3 = Color3.fromRGB(14, 14, 14)
+frame5.BackgroundTransparency = 0.44
+frame5.BorderSizePixel = 0
+frame5.ClipsDescendants = true
+frame5.Parent = frame
+local uiCorner3 = Instance.new("UICorner")
+uiCorner3.CornerRadius = UDim.new(0, 14)
+uiCorner3.Parent = frame5
+local frame6 = Instance.new("Frame")
+frame6.Size = UDim2.new(1, 0, 0, 14)
+frame6.Position = UDim2.fromOffset(0, 0)
+frame6.BackgroundColor3 = frame5.BackgroundColor3
+frame6.BackgroundTransparency = frame5.BackgroundTransparency
+frame6.BorderSizePixel = 0
+frame6.ZIndex = 2
+frame6.Parent = frame5
+local frame7
+frame7 = Instance.new("Frame")
+frame7.Name = "HomePage"
+frame7.Size = UDim2.fromScale(1, 1)
+frame7.Position = UDim2.fromScale(0, 0)
+frame7.BackgroundTransparency = 1
+frame7.Parent = frame5
+local textLabel2 = Instance.new("TextLabel")
+textLabel2.BackgroundTransparency = 1
+textLabel2.Size = UDim2.new(1, -230, 0, 40)
+textLabel2.Position = UDim2.fromOffset(20, 16)
+textLabel2.Font = Enum.Font.GothamMedium
+textLabel2.TextSize = 22
+textLabel2.TextColor3 = Color3.fromRGB(255, 255, 255)
+textLabel2.TextXAlignment = Enum.TextXAlignment.Left
+textLabel2.Text = "Luckey's Code Sniper"
+textLabel2.Parent = frame7
+local textLabel3, updateStatusBar
+
+do
+	local frame8 = Instance.new("Frame")
+	frame8.Size = UDim2.new(1, -40, 0, 44)
+	frame8.Position = UDim2.fromOffset(20, 64)
+	frame8.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+	frame8.BorderSizePixel = 0
+	frame8.Parent = frame7
+	local uiCorner4 = Instance.new("UICorner")
+	uiCorner4.CornerRadius = UDim.new(0, 10)
+	uiCorner4.Parent = frame8
+	local uiStroke2 = Instance.new("UIStroke")
+	uiStroke2.Color = Color3.fromRGB(50, 50, 50)
+	uiStroke2.Thickness = 1
+	uiStroke2.Parent = frame8
+	local frame9 = Instance.new("Frame")
+	frame9.Size = UDim2.fromOffset(10, 10)
+	frame9.Position = UDim2.new(0, 14, 0.5, -5)
+	frame9.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+	frame9.BorderSizePixel = 0
+	frame9.Parent = frame8
+	local uiCorner5 = Instance.new("UICorner")
+	uiCorner5.CornerRadius = UDim.new(1, 0)
+	uiCorner5.Parent = frame9
+	textLabel3 = Instance.new("TextLabel")
+	textLabel3.Size = UDim2.new(1, -40, 1, 0)
+	textLabel3.Position = UDim2.fromOffset(32, 0)
+	textLabel3.BackgroundTransparency = 1
+	textLabel3.Font = Enum.Font.Gotham
+	textLabel3.TextSize = 13
+	textLabel3.TextColor3 = Color3.fromRGB(180, 180, 180)
+	textLabel3.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel3.TextTruncate = Enum.TextTruncate.AtEnd
+	textLabel3.Text = "Idle"
+	textLabel3.Parent = frame8
+	retryStopButton = Instance.new("TextButton")
+	retryStopButton.Size = UDim2.fromOffset(92, 28)
+	retryStopButton.Position = UDim2.new(1, -102, 0.5, -14)
+	retryStopButton.BackgroundColor3 = Color3.fromRGB(205, 75, 75)
+	retryStopButton.BorderSizePixel = 0
+	retryStopButton.AutoButtonColor = false
+	retryStopButton.Font = Enum.Font.GothamBold
+	retryStopButton.TextSize = 11
+	retryStopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	retryStopButton.Text = "Stop Retry"
+	retryStopButton.Visible = false
+	retryStopButton.ZIndex = 8
+	retryStopButton.Parent = frame8
+	Instance.new("UICorner", retryStopButton).CornerRadius = UDim.new(0, 8)
+	local uiStroke3 = Instance.new("UIStroke")
+	uiStroke3.Color = Color3.fromRGB(255, 175, 175)
+	uiStroke3.Thickness = 1
+	uiStroke3.Transparency = 0.15
+	uiStroke3.Parent = retryStopButton
+	TweenService:Create(uiStroke3, TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Transparency = 0.8, Thickness = 2 }):Play()
+
+	retryStopButton.MouseEnter:Connect(function()
+		TweenService:Create(retryStopButton, TweenInfo.new(0.14, Enum.EasingStyle.Back), { BackgroundColor3 = Color3.fromRGB(235, 90, 90), Size = UDim2.fromOffset(96, 30) }):Play()
+	end)
+
+	retryStopButton.MouseLeave:Connect(function()
+		TweenService:Create(retryStopButton, TweenInfo.new(0.14, Enum.EasingStyle.Quad), { BackgroundColor3 = Color3.fromRGB(205, 75, 75), Size = UDim2.fromOffset(92, 28) }):Play()
+	end)
+
+	retryStopButton.Activated:Connect(function()
+		if requestRetryStopConfirmation then
+			requestRetryStopConfirmation()
+		end
+	end)
+
+	setRetryStopVisible = function(arg)
+		local visible2 = arg == true
+
+		if retryStopButton then
+			retryStopButton.Visible = visible2
+		end
+
+		textLabel3.Size = visible2 and UDim2.new(1, -144, 1, 0) or UDim2.new(1, -40, 1, 0)
+	end
+
+	updateStatusBar = function(text, arg)
+		task.spawn(function()
+			textLabel3.Text = text
+			local color = arg and Color3.fromRGB(120, 220, 150) or Color3.fromRGB(100, 100, 100)
+			local textColor = arg and Color3.fromRGB(200, 235, 210) or Color3.fromRGB(180, 180, 180)
+			TweenService:Create(frame9, TweenInfo.new(0.2), { BackgroundColor3 = color }):Play()
+			TweenService:Create(textLabel3, TweenInfo.new(0.2), { TextColor3 = textColor }):Play()
+		end)
+	end
+end
+
+local textLabel4
+
+do
+	local frame8 = Instance.new("Frame")
+	frame8.Size = UDim2.new(1, -40, 0, 52)
+	frame8.Position = UDim2.fromOffset(20, 118)
+	frame8.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+	frame8.BorderSizePixel = 0
+	frame8.Parent = frame7
+	Instance.new("UICorner", frame8).CornerRadius = UDim.new(0, 10)
+	local uiStroke2 = Instance.new("UIStroke")
+	uiStroke2.Color = Color3.fromRGB(50, 50, 50)
+	uiStroke2.Thickness = 1
+	uiStroke2.Parent = frame8
+	local textLabel5 = Instance.new("TextLabel")
+	textLabel5.BackgroundTransparency = 1
+	textLabel5.Size = UDim2.new(1, -24, 0, 14)
+	textLabel5.Position = UDim2.fromOffset(12, 6)
+	textLabel5.Font = Enum.Font.GothamBold
+	textLabel5.TextSize = 9
+	textLabel5.TextColor3 = Color3.fromRGB(150, 150, 150)
+	textLabel5.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel5.Text = "PREVIEW"
+	textLabel5.Parent = frame8
+	textLabel4 = Instance.new("TextLabel")
+	textLabel4.Size = UDim2.new(1, -24, 0, 24)
+	textLabel4.Position = UDim2.fromOffset(12, 22)
+	textLabel4.BackgroundTransparency = 1
+	textLabel4.Font = Enum.Font.Code
+	textLabel4.TextSize = 14
+	textLabel4.TextColor3 = Color3.fromRGB(235, 235, 235)
+	textLabel4.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel4.TextTruncate = Enum.TextTruncate.AtEnd
+	textLabel4.Text = "-"
+	textLabel4.Parent = frame8
+end
+
+local createTextButton
+
+createTextButton = function(parent, text, size, position)
+	local textButton = Instance.new("TextButton")
+	textButton.Name = text .. "Button"
+	textButton.Size = size
+	textButton.Position = position
+	textButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	textButton.AutoButtonColor = false
+	textButton.Font = Enum.Font.GothamMedium
+	textButton.TextSize = 15
+	textButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+	textButton.Text = text
+	textButton.BorderSizePixel = 0
+	textButton.Parent = parent
+	local uiCorner4 = Instance.new("UICorner")
+	uiCorner4.CornerRadius = UDim.new(1, 0)
+	uiCorner4.Parent = textButton
+
+	textButton.MouseEnter:Connect(function()
+		TweenService:Create(textButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { BackgroundColor3 = Color3.fromRGB(220, 220, 220), Size = size + UDim2.fromOffset(4, 2) }):Play()
+	end)
+
+	textButton.MouseLeave:Connect(function()
+		TweenService:Create(textButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { BackgroundColor3 = Color3.fromRGB(255, 255, 255), Size = size }):Play()
+	end)
+
+	textButton.MouseButton1Down:Connect(function()
+		TweenService:Create(textButton, TweenInfo.new(0.08, Enum.EasingStyle.Quad), { Size = size - UDim2.fromOffset(6, 4) }):Play()
+	end)
+
+	textButton.MouseButton1Up:Connect(function()
+		TweenService:Create(textButton, TweenInfo.new(0.12, Enum.EasingStyle.Quad), { Size = size + UDim2.fromOffset(4, 2) }):Play()
+	end)
+
+	return textButton
+end
+
+local codeSniper
+local udim2 = UDim2.fromOffset
+codeSniper = createTextButton(frame7, "Code Sniper", UDim2.fromOffset(170, 44), udim2(20, 184))
+local riddleSolver
+riddleSolver = createTextButton(frame7, "Riddle Solver", UDim2.fromOffset(170, 44), UDim2.fromOffset(210, 184))
+local textLabel5 = Instance.new("TextLabel")
+textLabel5.BackgroundTransparency = 1
+textLabel5.Size = UDim2.new(1, -40, 0, 16)
+textLabel5.Position = UDim2.fromOffset(20, 240)
+textLabel5.Font = Enum.Font.GothamBold
+textLabel5.TextSize = 10
+textLabel5.TextColor3 = Color3.fromRGB(150, 150, 150)
+textLabel5.TextXAlignment = Enum.TextXAlignment.Left
+textLabel5.Text = "CAPTURED PARTS"
+textLabel5.Parent = frame7
+local scrollingFrame
+
+do
+	local frame8 = Instance.new("Frame")
+	frame8.Size = UDim2.new(1, -40, 0, 72)
+	frame8.Position = UDim2.fromOffset(20, 260)
+	frame8.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+	frame8.BorderSizePixel = 0
+	frame8.Parent = frame7
+	Instance.new("UICorner", frame8).CornerRadius = UDim.new(0, 10)
+	local uiStroke2 = Instance.new("UIStroke")
+	uiStroke2.Color = Color3.fromRGB(50, 50, 50)
+	uiStroke2.Thickness = 1
+	uiStroke2.Parent = frame8
+	scrollingFrame = Instance.new("ScrollingFrame")
+	scrollingFrame.Size = UDim2.new(1, 0, 1, 0)
+	scrollingFrame.BackgroundTransparency = 1
+	scrollingFrame.BorderSizePixel = 0
+	scrollingFrame.ScrollBarThickness = 2
+	scrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(130, 130, 130)
+	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scrollingFrame.Parent = frame8
+end
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Padding = UDim.new(0, 3)
+uiListLayout.Parent = scrollingFrame
+local uiPadding = Instance.new("UIPadding")
+uiPadding.PaddingTop = UDim.new(0, 8)
+uiPadding.PaddingBottom = UDim.new(0, 8)
+uiPadding.PaddingLeft = UDim.new(0, 8)
+uiPadding.PaddingRight = UDim.new(0, 8)
+uiPadding.Parent = scrollingFrame
+local textLabel6
+textLabel6 = Instance.new("TextLabel")
+textLabel6.Size = UDim2.new(1, 0, 0, 22)
+textLabel6.BackgroundTransparency = 1
+textLabel6.Text = "Nothing yet."
+textLabel6.TextColor3 = Color3.fromRGB(120, 120, 120)
+textLabel6.TextSize = 12
+textLabel6.Font = Enum.Font.Gotham
+textLabel6.TextXAlignment = Enum.TextXAlignment.Left
+textLabel6.Parent = scrollingFrame
+local textLabel7 = Instance.new("TextLabel")
+textLabel7.BackgroundTransparency = 1
+textLabel7.Size = UDim2.new(1, -40, 0, 16)
+textLabel7.Position = UDim2.fromOffset(20, 344)
+textLabel7.Font = Enum.Font.GothamBold
+textLabel7.TextSize = 10
+textLabel7.TextColor3 = Color3.fromRGB(150, 150, 150)
+textLabel7.TextXAlignment = Enum.TextXAlignment.Left
+textLabel7.Text = "PREVIOUS NOTIFICATIONS"
+textLabel7.Parent = frame7
+local scrollingFrame2
+
+do
+	local frame8 = Instance.new("Frame")
+	frame8.Size = UDim2.new(1, -40, 0, 100)
+	frame8.Position = UDim2.fromOffset(20, 364)
+	frame8.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+	frame8.BorderSizePixel = 0
+	frame8.Parent = frame7
+	Instance.new("UICorner", frame8).CornerRadius = UDim.new(0, 10)
+	local uiStroke2 = Instance.new("UIStroke")
+	uiStroke2.Color = Color3.fromRGB(50, 50, 50)
+	uiStroke2.Thickness = 1
+	uiStroke2.Parent = frame8
+	scrollingFrame2 = Instance.new("ScrollingFrame")
+	scrollingFrame2.Size = UDim2.new(1, 0, 1, 0)
+	scrollingFrame2.BackgroundTransparency = 1
+	scrollingFrame2.BorderSizePixel = 0
+	scrollingFrame2.ScrollBarThickness = 2
+	scrollingFrame2.ScrollBarImageColor3 = Color3.fromRGB(130, 130, 130)
+	scrollingFrame2.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scrollingFrame2.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scrollingFrame2.Parent = frame8
+end
+
+local uiListLayout2 = Instance.new("UIListLayout")
+uiListLayout2.Padding = UDim.new(0, 3)
+uiListLayout2.Parent = scrollingFrame2
+local uiPadding2 = Instance.new("UIPadding")
+uiPadding2.PaddingTop = UDim.new(0, 8)
+uiPadding2.PaddingBottom = UDim.new(0, 8)
+uiPadding2.PaddingLeft = UDim.new(0, 8)
+uiPadding2.PaddingRight = UDim.new(0, 8)
+uiPadding2.Parent = scrollingFrame2
+local textLabel8
+textLabel8 = Instance.new("TextLabel")
+textLabel8.Size = UDim2.new(1, 0, 0, 22)
+textLabel8.BackgroundTransparency = 1
+textLabel8.Text = "Waiting for messages..."
+textLabel8.TextColor3 = Color3.fromRGB(120, 120, 120)
+textLabel8.TextSize = 12
+textLabel8.Font = Enum.Font.Gotham
+textLabel8.TextXAlignment = Enum.TextXAlignment.Left
+textLabel8.Parent = scrollingFrame2
+local textLabel9 = Instance.new("TextLabel")
+textLabel9.BackgroundTransparency = 1
+textLabel9.Size = UDim2.new(1, -40, 0, 16)
+textLabel9.Position = UDim2.fromOffset(20, 484)
+textLabel9.Font = Enum.Font.GothamBold
+textLabel9.TextSize = 10
+textLabel9.TextColor3 = Color3.fromRGB(150, 150, 150)
+textLabel9.TextXAlignment = Enum.TextXAlignment.Left
+textLabel9.Text = "QUICK TOOLS"
+textLabel9.Parent = frame7
+
+do
+	local frame8 = Instance.new("Frame")
+	frame8.Size = UDim2.new(1, -40, 0, 310)
+	frame8.Position = UDim2.fromOffset(20, 240)
+	frame8.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	frame8.BorderSizePixel = 0
+	frame8.Visible = false
+	frame8.ZIndex = 60
+	frame8.Parent = frame7
+	Instance.new("UICorner", frame8).CornerRadius = UDim.new(0, 14)
+	local uiStroke2 = Instance.new("UIStroke")
+	uiStroke2.Color = Color3.fromRGB(65, 65, 65)
+	uiStroke2.Thickness = 1
+	uiStroke2.Parent = frame8
+	local udim22 = UDim2.fromOffset
+	local controls = createTextButton(frame7, "Controls", UDim2.fromOffset(122, 32), udim22(20, 512))
+	controls.TextSize = 12
+	local udim23 = UDim2.new
+	local close = createTextButton(frame8, "Close", UDim2.fromOffset(58, 28), udim23(1, -70, 0, 9))
+	close.TextSize = 11
+	close.ZIndex = 62
+
+	controls.Activated:Connect(function()
+		frame8.Visible = true
+	end)
+
+	close.Activated:Connect(function()
+		frame8.Visible = false
+	end)
+
+	local textLabel10 = Instance.new("TextLabel")
+	textLabel10.BackgroundTransparency = 1
+	textLabel10.Size = UDim2.new(1, -40, 0, 16)
+	textLabel10.Position = UDim2.fromOffset(16, 12)
+	textLabel10.Font = Enum.Font.GothamBold
+	textLabel10.TextSize = 10
+	textLabel10.TextColor3 = Color3.fromRGB(150, 150, 150)
+	textLabel10.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel10.Text = "ADVANCED CONTROLS"
+	textLabel10.ZIndex = 61
+	textLabel10.Parent = frame8
+	local frame9 = Instance.new("Frame")
+	frame9.Size = UDim2.new(1, -32, 0, 1)
+	frame9.Position = UDim2.fromOffset(16, 44)
+	frame9.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	frame9.BorderSizePixel = 0
+	frame9.ZIndex = 61
+	frame9.Parent = frame8
+
+	local function createTextButton2(text, arg, arg2, arg3)
+		local textButton = Instance.new("TextButton")
+		textButton.Size = UDim2.fromOffset(arg3, 32)
+		textButton.Position = UDim2.fromOffset(arg, arg2)
+		textButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		textButton.AutoButtonColor = false
+		textButton.Font = Enum.Font.GothamMedium
+		textButton.TextSize = 12
+		textButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+		textButton.Text = text
+		textButton.BorderSizePixel = 0
+		textButton.ZIndex = 62
+		textButton.Parent = frame8
+		local uiCorner4 = Instance.new("UICorner")
+		uiCorner4.CornerRadius = UDim.new(1, 0)
+		uiCorner4.Parent = textButton
+
+		textButton.MouseEnter:Connect(function()
+			TweenService:Create(textButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { BackgroundColor3 = Color3.fromRGB(220, 220, 220) }):Play()
+		end)
+
+		textButton.MouseLeave:Connect(function()
+			TweenService:Create(textButton, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+		end)
+
+		textButton.MouseButton1Down:Connect(function()
+			TweenService:Create(textButton, TweenInfo.new(0.08), { Size = textButton.Size - UDim2.fromOffset(4, 2) }):Play()
+		end)
+
+		textButton.MouseButton1Up:Connect(function()
+			TweenService:Create(textButton, TweenInfo.new(0.12), { Size = UDim2.fromOffset(arg3, 32) }):Play()
+		end)
+
+		return textButton
+	end
+
+	sniperSwitchBtn = createTextButton2("Redeem", 16, 64, 78)
+	riddleSwitchBtn = createTextButton2("Riddle", 102, 64, 78)
+	clearSniperBtn = createTextButton2("Clear All", 188, 64, 78)
+	popSniperBtn = createTextButton2("Pop Last", 274, 64, 90)
+	announcementBox = Instance.new("TextBox")
+	announcementBox.Size = UDim2.fromOffset(230, 36)
+	announcementBox.Position = UDim2.fromOffset(16, 114)
+	announcementBox.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+	announcementBox.BorderSizePixel = 0
+	announcementBox.ClearTextOnFocus = false
+	announcementBox.PlaceholderText = "Announcement text"
+	announcementBox.Font = Enum.Font.Gotham
+	announcementBox.TextSize = 12
+	announcementBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+	announcementBox.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+	announcementBox.Text = ""
+	announcementBox.Visible = visible
+	announcementBox.ZIndex = 62
+	announcementBox.Parent = frame8
+	Instance.new("UICorner", announcementBox).CornerRadius = UDim.new(0, 8)
+	announcementUserIdBox = Instance.new("TextBox")
+	announcementUserIdBox.Size = UDim2.fromOffset(110, 36)
+	announcementUserIdBox.Position = UDim2.fromOffset(254, 114)
+	announcementUserIdBox.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+	announcementUserIdBox.BorderSizePixel = 0
+	announcementUserIdBox.ClearTextOnFocus = false
+	announcementUserIdBox.PlaceholderText = "UserId"
+	announcementUserIdBox.Font = Enum.Font.Gotham
+	announcementUserIdBox.TextSize = 12
+	announcementUserIdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+	announcementUserIdBox.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+	announcementUserIdBox.Text = ""
+	announcementUserIdBox.Visible = visible
+	announcementUserIdBox.ZIndex = 62
+	announcementUserIdBox.Parent = frame8
+	Instance.new("UICorner", announcementUserIdBox).CornerRadius = UDim.new(0, 8)
+	announcementHistoryToggle = createTextButton2("Hide: ON", 16, 164, 108)
+	announcementHistoryToggle.Visible = visible
+	announcementSendBtn = createTextButton2("Send Announcement", 132, 164, 144)
+	announcementSendBtn.Visible = visible
+	priorityToggle = createTextButton2("Owner First: OFF", 16, 214, 160)
+	priorityToggle.Visible = visible
+	pingBoostToggle = createTextButton2("FFlag Boost: OFF", 184, 214, 180)
+end
+
+local textButton
+textButton = Instance.new("TextButton")
+textButton.Size = UDim2.fromOffset(96, 36)
+textButton.Position = UDim2.new(1, -116, 0, 16)
+textButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+textButton.AutoButtonColor = false
+textButton.Text = "Settings"
+textButton.Font = Enum.Font.GothamBold
+textButton.TextSize = 14
+textButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+textButton.BorderSizePixel = 0
+textButton.Parent = frame7
+local uiCorner4 = Instance.new("UICorner")
+uiCorner4.CornerRadius = UDim.new(0, 18)
+uiCorner4.Parent = textButton
+
+do
+	local textButton2 = Instance.new("TextButton")
+	textButton2.Name = "LocalTestAnnouncement"
+	textButton2.Size = UDim2.fromOffset(76, 34)
+	textButton2.BackgroundColor3 = Color3.fromRGB(72, 72, 78)
+	textButton2.AutoButtonColor = false
+	textButton2.BorderSizePixel = 0
+	textButton2.Font = Enum.Font.GothamBold
+	textButton2.TextSize = 11
+	textButton2.TextColor3 = Color3.fromRGB(235, 235, 238)
+	textButton2.Text = "Test Alert"
+	textButton2.ZIndex = 8
+	textButton2.Position = UDim2.new(1, -196, 0, 16)
+	textButton2.Parent = frame7
+	local uiCorner5 = Instance.new("UICorner")
+	uiCorner5.CornerRadius = UDim.new(0, 10)
+	uiCorner5.Parent = textButton2
+	local frame8 = Instance.new("Frame")
+	frame8.Name = "LocalTestAnnouncementDialog"
+	frame8.Size = UDim2.fromScale(1, 1)
+	frame8.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	frame8.BackgroundTransparency = 0.3
+	frame8.BorderSizePixel = 0
+	frame8.Visible = false
+	frame8.ZIndex = 140
+	frame8.Parent = frame
+	local frame9 = Instance.new("Frame")
+	frame9.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame9.Position = UDim2.fromScale(0.5, 0.5)
+	frame9.Size = UDim2.fromOffset(360, 190)
+	frame9.BackgroundColor3 = Color3.fromRGB(42, 42, 47)
+	frame9.BorderSizePixel = 0
+	frame9.ZIndex = 141
+	frame9.Parent = frame8
+	local uiCorner6 = Instance.new("UICorner")
+	uiCorner6.CornerRadius = UDim.new(0, 14)
+	uiCorner6.Parent = frame9
+	local uiStroke2 = Instance.new("UIStroke")
+	uiStroke2.Color = Color3.fromRGB(105, 105, 112)
+	uiStroke2.Thickness = 1
+	uiStroke2.Transparency = 0.25
+	uiStroke2.Parent = frame9
+	local textLabel10 = Instance.new("TextLabel")
+	textLabel10.Size = UDim2.new(1, -24, 0, 26)
+	textLabel10.Position = UDim2.fromOffset(12, 10)
+	textLabel10.BackgroundTransparency = 1
+	textLabel10.Font = Enum.Font.GothamBold
+	textLabel10.TextSize = 14
+	textLabel10.TextColor3 = Color3.fromRGB(240, 240, 242)
+	textLabel10.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel10.Text = "Local Sniper Test (not global)"
+	textLabel10.ZIndex = 142
+	textLabel10.Parent = frame9
+
+	local function createTextBox(placeholderText, arg)
+		local textBox = Instance.new("TextBox")
+		textBox.Size = UDim2.new(1, -24, 0, 38)
+		textBox.Position = UDim2.fromOffset(12, arg)
+		textBox.BackgroundColor3 = Color3.fromRGB(60, 60, 66)
+		textBox.BorderSizePixel = 0
+		textBox.ClearTextOnFocus = false
+		textBox.Font = Enum.Font.Gotham
+		textBox.TextSize = 12
+		textBox.TextColor3 = Color3.fromRGB(245, 245, 245)
+		textBox.PlaceholderColor3 = Color3.fromRGB(165, 165, 170)
+		textBox.PlaceholderText = placeholderText
+		textBox.Text = ""
+		textBox.ZIndex = 142
+		textBox.Parent = frame9
+		local uiCorner7 = Instance.new("UICorner")
+		uiCorner7.CornerRadius = UDim.new(0, 9)
+		uiCorner7.Parent = textBox
+		return textBox
+	end
+
+	local v9 = createTextBox("Announcement/code text", 44)
+	local v10 = createTextBox("Username, @username, or UserId", 88)
+	local textButton3 = Instance.new("TextButton")
+	textButton3.Size = UDim2.fromOffset(92, 36)
+	textButton3.Position = UDim2.new(1, -202, 1, -48)
+	textButton3.BackgroundColor3 = Color3.fromRGB(72, 72, 78)
+	textButton3.BorderSizePixel = 0
+	textButton3.Font = Enum.Font.GothamBold
+	textButton3.TextSize = 12
+	textButton3.TextColor3 = Color3.fromRGB(235, 235, 238)
+	textButton3.Text = "Cancel"
+	textButton3.ZIndex = 142
+	textButton3.Parent = frame9
+	Instance.new("UICorner", textButton3).CornerRadius = UDim.new(0, 9)
+	local textButton4 = Instance.new("TextButton")
+	textButton4.Size = UDim2.fromOffset(98, 36)
+	textButton4.Position = UDim2.new(1, -104, 1, -48)
+	textButton4.BackgroundColor3 = Color3.fromRGB(220, 220, 224)
+	textButton4.BorderSizePixel = 0
+	textButton4.Font = Enum.Font.GothamBold
+	textButton4.TextSize = 12
+	textButton4.TextColor3 = Color3.fromRGB(30, 30, 33)
+	textButton4.Text = "Show Local"
+	textButton4.ZIndex = 142
+	textButton4.Parent = frame9
+	Instance.new("UICorner", textButton4).CornerRadius = UDim.new(0, 9)
+
+	textButton2.Activated:Connect(function()
+		frame8.Visible = true
+		textButton4.Text = "Show Local"
+	end)
+
+	textButton3.Activated:Connect(function()
+		frame8.Visible = false
+	end)
+
+	textButton4.Activated:Connect(function()
+		local str5 = tostring(v9.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+		local str6 = tostring(v10.Text or ""):gsub("^%s+", ""):gsub("%s+$", ""):gsub("^@", "")
+		if str5 == "" then
+			textButton4.Text = "Enter text"
+			return
+		end
+		textButton4.Text = "Resolving..."
+
+		task.spawn(function()
+			local num = tonumber(str6)
+
+			if not num then
+				if str6 == "" then
+					num = localPlayer.UserId
+				else
+					local ok_, result = pcall(Players.GetUserIdFromNameAsync, Players, str6)
+
+					if ok_ then
+						num = tonumber(result)
+					end
+				end
+			end
+
+			if not num then
+				textButton4.Text = "User not found"
+				task.wait(1.2)
+
+				if textButton4.Parent then
+					textButton4.Text = "Show Local"
+				end
+
+				return
+			end
+
+			local ok_, result = pcall(function()
+				return require(game:GetService("ReplicatedStorage").Controllers.NotificationController)
+			end)
+
+			if not ok_ or not result then
+				textButton4.Text = "Notify unavailable"
+				return
+			end
+
+			if pcall(function()
+				result:Notify(str5, 5, "Sounds.Sfx.Blop", "Top", num)
+			end) then
+				v10.Text = tostring(num)
+				textButton4.Text = "Shown locally"
+				task.wait(0.5)
+				frame8.Visible = false
+				textButton4.Text = "Show Local"
+			else
+				textButton4.Text = "Notify failed"
+			end
+		end)
+	end)
+end
+
+textButton.MouseEnter:Connect(function()
+	TweenService:Create(textButton, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(220, 220, 220) }):Play()
+end)
+
+textButton.MouseLeave:Connect(function()
+	TweenService:Create(textButton, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+end)
+
+local flag3, getUsernameById, handleBotControl, autoRedeem, botMode, textBox, save, v9
+
+do
+	local frame8 = Instance.new("Frame")
+	frame8.Name = "SettingsPage"
+	frame8.Size = UDim2.fromScale(1, 1)
+	frame8.Position = UDim2.fromScale(1, 0)
+	frame8.BackgroundTransparency = 1
+	frame8.Parent = frame5
+	local textLabel10 = Instance.new("TextLabel")
+	textLabel10.BackgroundTransparency = 1
+	textLabel10.Size = UDim2.new(1, -110, 0, 40)
+	textLabel10.Position = UDim2.fromOffset(70, 14)
+	textLabel10.Font = Enum.Font.GothamMedium
+	textLabel10.TextSize = 22
+	textLabel10.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel10.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel10.Text = "Settings"
+	textLabel10.Parent = frame8
+	local textButton2 = Instance.new("TextButton")
+	textButton2.Size = UDim2.fromOffset(52, 36)
+	textButton2.Position = UDim2.fromOffset(20, 12)
+	textButton2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	textButton2.AutoButtonColor = false
+	textButton2.Text = "Back"
+	textButton2.Font = Enum.Font.GothamBold
+	textButton2.TextSize = 18
+	textButton2.TextColor3 = Color3.fromRGB(0, 0, 0)
+	textButton2.BorderSizePixel = 0
+	textButton2.Parent = frame8
+	local uiCorner5 = Instance.new("UICorner")
+	uiCorner5.CornerRadius = UDim.new(0, 18)
+	uiCorner5.Parent = textButton2
+
+	textButton2.MouseEnter:Connect(function()
+		TweenService:Create(textButton2, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(220, 220, 220) }):Play()
+	end)
+
+	textButton2.MouseLeave:Connect(function()
+		TweenService:Create(textButton2, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+	end)
+
+	flag3 = false
+
+	local function fn11()
+		if flag3 then
+			return
+		end
+		flag3 = true
+		frame8.Position = UDim2.fromScale(1, 0)
+		TweenService:Create(frame7, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromScale(-1, 0) }):Play()
+		local tween = TweenService:Create(frame8, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromScale(0, 0) })
+		tween:Play()
+
+		tween.Completed:Connect(function()
+			flag3 = false
+		end)
+	end
+
+	local function fn12()
+		if flag3 then
+			return
+		end
+		flag3 = true
+		local tweenInfo_ = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(frame7, tweenInfo_, { Position = UDim2.fromScale(0, 0) })
+		TweenService:Create(frame8, tweenInfo_, { Position = UDim2.fromScale(1, 0) }):Play()
+		tween:Play()
+
+		tween.Completed:Connect(function()
+			flag3 = false
+		end)
+	end
+
+	textButton.Activated:Connect(fn11)
+	textButton2.Activated:Connect(fn12)
+	local flag4 = false
+	local flag5 = false
+	local size = frame.Size
+	local position = frame.Position
+
+	v6.Activated:Connect(function()
+		local tween = TweenService:Create(frame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = UDim2.fromOffset(0, 0) })
+		tween:Play()
+
+		tween.Completed:Connect(function()
+			screenGui:Destroy()
+		end)
+	end)
+
+	v7.Activated:Connect(function()
+		if flag4 then
+			local tbl17 = { Size = size, Position = position }
+			TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), tbl17):Play()
+			frame5.Visible = true
+			local minimizedStats = frame2:FindFirstChild("MinimizedStats") or frame:FindFirstChild("MinimizedStats")
+
+			if minimizedStats then
+				minimizedStats.Parent = frame
+				minimizedStats.Size = UDim2.new(1, -20, 0, 32)
+				minimizedStats.Position = UDim2.new(0, 10, 1, -42)
+				minimizedStats.Visible = true
+			end
+
+			textLabel.Visible = true
+			flag4 = false
+		else
+			size = frame.Size
+			position = frame.Position
+			frame5.Visible = false
+			textLabel.Visible = false
+			local minimizedStats = frame:FindFirstChild("MinimizedStats") or frame2:FindFirstChild("MinimizedStats")
+
+			if minimizedStats then
+				minimizedStats.Parent = frame2
+				minimizedStats.Size = UDim2.new(1, -102, 0, 32)
+				minimizedStats.Position = UDim2.fromOffset(92, 6)
+				minimizedStats.Visible = true
+			end
+
+			TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+				Size = UDim2.new(frame.Size.X.Scale, frame.Size.X.Offset, 0, 44),
+				Position = UDim2.new(0, 20, 1, -60),
+			}):Play()
+
+			flag4 = true
+		end
+	end)
+
+	v8.Activated:Connect(function()
+		if flag5 then
+			local tbl17 = { Size = size, Position = position }
+			TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), tbl17):Play()
+			flag5 = false
+		else
+			size = frame.Size
+			position = frame.Position
+			TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Size = UDim2.fromScale(0.9, 0.85), Position = UDim2.fromScale(0.5, 0.5) }):Play()
+			flag5 = true
+		end
+	end)
+
+	local flag6 = false
+	local v10 = nil
+	local position2 = nil
+	local position3 = nil
+
+	frame2.InputBegan:Connect(function(input)
+		if flag5 then
+			return
+		end
+
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			flag6 = true
+			position2 = input.Position
+			position3 = frame.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					flag6 = false
+				end
+			end)
+		end
+	end)
+
+	frame2.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			v10 = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == v10 and flag6 then
+			local n4 = input.Position - position2
+			local udim22 = UDim2.new(position3.X.Scale, position3.X.Offset + n4.X, position3.Y.Scale, position3.Y.Offset + n4.Y)
+			TweenService:Create(frame, TweenInfo.new(0.08, Enum.EasingStyle.Linear), { Position = udim22 }):Play()
+		end
+	end)
+
+	local size2 = frame.Size
+	frame.Size = UDim2.fromOffset(0, 0)
+	TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = size2 }):Play()
+
+	getUsernameById = function(arg, arg2)
+		local str5 = tostring(arg2 or arg or "Unknown")
+
+		local ok_, result = pcall(function()
+			return Players:GetNameFromUserIdAsync(tonumber(arg))
+		end)
+
+		return ok_ and result or str5
+	end
+
+	local function fn13(arg, arg2)
+		if not sendWebSocketMessage then
+			return false
+		end
+
+		local v11 = fn5({
+			key = str2,
+			type = "controlResponse",
+			senderId = localPlayer.UserId,
+			senderName = localPlayer.Name,
+			senderDisplayName = localPlayer.DisplayName,
+			targetId = tonumber(arg),
+			accepted = arg2 == true,
+			settings = {
+				autoRedeem = settings.autoRedeemEnabled,
+				autoMode = settings.autoModeEnabled,
+				botMode = settings.botModeEnabled,
+				redeemThreshold = settings.redeemThreshold,
+				retryCode = settings.retryCodeEnabled,
+				redeemMethod = remoteHandler.GetMode(),
+				scanMethod = remoteHandler.GetScanMethod(),
+			},
+		}, 1)
+
+		return sendWebSocketMessage(HttpService:JSONEncode(v11))
+	end
+
+	handleBotControl = function(arg, arg2)
+		local str5 = tostring(arg or "")
+		if str5 == "" or str5 == tostring(localPlayer.UserId) then
+			return
+		end
+
+		if tbl5[str5] or tbl6[str5] then
+			return
+		end
+		tbl6[str5] = true
+		local str6 = tostring(arg2 or getUsernameById(str5, str5))
+
+		local function fn14(arg3)
+			tbl6[str5] = nil
+			tbl5[str5] = arg3 == true or nil
+
+			if arg3 then
+				settings.botModeEnabled = true
+				updateSettingsUI()
+			end
+
+			fn13(str5, arg3 == true)
+
+			if arg3 then
+				pcall(function()
+					NotificationController:Success("Accepted bot control from @" .. str6 .. " (Bot Mode ON)")
+				end)
+			else
+				pcall(function()
+					NotificationController:Error("Declined bot control from @" .. str6)
+				end)
+			end
+		end
+
+		if prompt and CornerNotificationController then
+			local clone = prompt:Clone()
+			clone.Name = "BotModeControlPrompt"
+			clone.Username.Text = "Would you like @" .. str6 .. " to control you in bot mode?"
+			clone.Label.Text = "Bot Mode Request"
+			clone.Label.TextColor3 = Color3.fromRGB(0, 147, 223)
+			clone.Visible = true
+			local v11 = CornerNotificationController:Add(clone)
+			local flag7 = false
+
+			local function fn15()
+				if flag7 then
+					return
+				end
+				flag7 = true
+				v11()
+			end
+
+			clone.Yes.Activated:Connect(function()
+				if flag7 then
+					return
+				end
+				fn14(true)
+				fn15()
+			end)
+
+			clone.No.Activated:Connect(function()
+				if flag7 then
+					return
+				end
+				fn14(false)
+				fn15()
+			end)
+
+			task.delay(15, function()
+				if not flag7 then
+					fn14(false)
+					fn15()
+				end
+			end)
+		else
+			local luckeyBotControlPrompt = playerGui:FindFirstChild("LuckeyBotControlPrompt")
+
+			if luckeyBotControlPrompt then
+				luckeyBotControlPrompt:Destroy()
+			end
+
+			local screenGui2 = Instance.new("ScreenGui")
+			screenGui2.Name = "LuckeyBotControlPrompt"
+			screenGui2.ResetOnSpawn = false
+			screenGui2.IgnoreGuiInset = true
+			screenGui2.DisplayOrder = 1000000
+			screenGui2.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+			screenGui2.Parent = playerGui
+			local frame9 = Instance.new("Frame")
+			frame9.Size = UDim2.fromScale(1, 1)
+			frame9.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+			frame9.BackgroundTransparency = 0.45
+			frame9.BorderSizePixel = 0
+			frame9.Parent = screenGui2
+			local frame10 = Instance.new("Frame")
+			frame10.AnchorPoint = Vector2.new(0.5, 0.5)
+			frame10.Position = UDim2.fromScale(0.5, 0.5)
+			frame10.Size = UDim2.fromOffset(420, 190)
+			frame10.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+			frame10.BorderSizePixel = 0
+			frame10.Parent = frame9
+			Instance.new("UICorner", frame10).CornerRadius = UDim.new(0, 14)
+			local uiStroke2 = Instance.new("UIStroke", frame10)
+			uiStroke2.Color = Color3.fromRGB(90, 90, 90)
+			uiStroke2.Thickness = 1
+			local textLabel11 = Instance.new("TextLabel")
+			textLabel11.BackgroundTransparency = 1
+			textLabel11.Position = UDim2.fromOffset(20, 16)
+			textLabel11.Size = UDim2.new(1, -40, 0, 28)
+			textLabel11.Font = Enum.Font.GothamBold
+			textLabel11.Text = "Bot Mode Request"
+			textLabel11.TextColor3 = Color3.fromRGB(245, 245, 245)
+			textLabel11.TextSize = 20
+			textLabel11.TextXAlignment = Enum.TextXAlignment.Left
+			textLabel11.Parent = frame10
+			local textLabel12 = Instance.new("TextLabel")
+			textLabel12.BackgroundTransparency = 1
+			textLabel12.Position = UDim2.fromOffset(20, 52)
+			textLabel12.Size = UDim2.new(1, -40, 0, 54)
+			textLabel12.Font = Enum.Font.Gotham
+			textLabel12.Text = "Allow @" .. str6 .. " to control this account in Bot Mode?"
+			textLabel12.TextColor3 = Color3.fromRGB(195, 195, 195)
+			textLabel12.TextSize = 15
+			textLabel12.TextWrapped = true
+			textLabel12.TextXAlignment = Enum.TextXAlignment.Left
+			textLabel12.Parent = frame10
+
+			local function createTextButton2(text, arg3, backgroundColor3)
+				local textButton3 = Instance.new("TextButton")
+				textButton3.Position = UDim2.fromOffset(arg3, 126)
+				textButton3.Size = UDim2.fromOffset(180, 44)
+				textButton3.BackgroundColor3 = backgroundColor3
+				textButton3.BorderSizePixel = 0
+				textButton3.Font = Enum.Font.GothamBold
+				textButton3.Text = text
+				textButton3.TextColor3 = Color3.fromRGB(255, 255, 255)
+				textButton3.TextSize = 15
+				textButton3.Parent = frame10
+				Instance.new("UICorner", textButton3).CornerRadius = UDim.new(0, 10)
+				return textButton3
+			end
+
+			local Decline = createTextButton2("Decline", 20, Color3.fromRGB(65, 65, 65))
+			local flag7 = false
+
+			local function fn15(arg3)
+				if flag7 then
+					return
+				end
+				flag7 = true
+				fn14(arg3)
+				screenGui2:Destroy()
+			end
+
+			createTextButton2("Accept", 220, Color3.fromRGB(35, 145, 85)).Activated:Connect(function()
+				fn15(true)
+			end)
+
+			Decline.Activated:Connect(function()
+				fn15(false)
+			end)
+
+			task.delay(20, function()
+				if not flag7 then
+					fn15(false)
+				end
+			end)
+		end
+	end
+
+	local function createFrame(arg, arg2)
+		local frame9 = Instance.new("Frame")
+		frame9.Size = UDim2.new(1, -40, 0, arg2)
+		frame9.Position = UDim2.fromOffset(20, arg)
+		frame9.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+		frame9.BorderSizePixel = 0
+		frame9.Parent = frame8
+		Instance.new("UICorner", frame9).CornerRadius = UDim.new(0, 10)
+		local uiStroke2 = Instance.new("UIStroke")
+		uiStroke2.Color = Color3.fromRGB(55, 55, 55)
+		uiStroke2.Thickness = 1
+		uiStroke2.Parent = frame9
+		return frame9
+	end
+
+	local textLabel11 = Instance.new("TextLabel")
+	textLabel11.BackgroundTransparency = 1
+	textLabel11.Size = UDim2.new(1, -40, 0, 18)
+	textLabel11.Position = UDim2.fromOffset(20, 72)
+	textLabel11.Font = Enum.Font.GothamBold
+	textLabel11.TextSize = 11
+	textLabel11.TextColor3 = Color3.fromRGB(190, 190, 190)
+	textLabel11.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel11.Text = "BOT SETTINGS"
+	textLabel11.Parent = frame8
+	local v11 = createFrame(96, 58)
+	local textLabel12 = Instance.new("TextLabel")
+	textLabel12.BackgroundTransparency = 1
+	textLabel12.Size = UDim2.new(1, -170, 1, 0)
+	textLabel12.Position = UDim2.fromOffset(14, 0)
+	textLabel12.Font = Enum.Font.GothamMedium
+	textLabel12.TextSize = 15
+	textLabel12.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textLabel12.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel12.Text = "Auto redeem"
+	textLabel12.Parent = v11
+	local udim22 = UDim2.new
+	autoRedeem = createTextButton(v11, "Auto redeem: ON", UDim2.fromOffset(150, 34), udim22(1, -164, 0.5, -17))
+	autoModeCard = createFrame(166, 58)
+	autoModeLabel = Instance.new("TextLabel")
+	autoModeLabel.BackgroundTransparency = 1
+	autoModeLabel.Size = UDim2.new(1, -170, 1, 0)
+	autoModeLabel.Position = UDim2.fromOffset(14, 0)
+	autoModeLabel.Font = Enum.Font.GothamMedium
+	autoModeLabel.TextSize = 15
+	autoModeLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
+	autoModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+	autoModeLabel.Text = "Auto Switch Mode"
+	autoModeLabel.Parent = autoModeCard
+	local udim23 = UDim2.new
+	autoModeToggle = createTextButton(autoModeCard, "Auto Switch: OFF", UDim2.fromOffset(150, 34), udim23(1, -164, 0.5, -17))
+	local v12 = createFrame(236, 58)
+	local textLabel13 = Instance.new("TextLabel")
+	textLabel13.BackgroundTransparency = 1
+	textLabel13.Size = UDim2.new(1, -170, 1, 0)
+	textLabel13.Position = UDim2.fromOffset(14, 0)
+	textLabel13.Font = Enum.Font.GothamMedium
+	textLabel13.TextSize = 15
+	textLabel13.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textLabel13.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel13.Text = "Bot mode"
+	textLabel13.Parent = v12
+	local udim24 = UDim2.new
+	botMode = createTextButton(v12, "Bot mode: OFF", UDim2.fromOffset(150, 34), udim24(1, -164, 0.5, -17))
+	local v13 = createFrame(306, 74)
+	local textLabel14 = Instance.new("TextLabel")
+	textLabel14.BackgroundTransparency = 1
+	textLabel14.Size = UDim2.new(1, -190, 1, 0)
+	textLabel14.Position = UDim2.fromOffset(14, 0)
+	textLabel14.Font = Enum.Font.GothamMedium
+	textLabel14.TextSize = 15
+	textLabel14.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textLabel14.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel14.Text = "Redeem threshold"
+	textLabel14.Parent = v13
+	textBox = Instance.new("TextBox")
+	textBox.Size = UDim2.fromOffset(70, 34)
+	textBox.Position = UDim2.new(1, -174, 0.5, -17)
+	textBox.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
+	textBox.BorderSizePixel = 0
+	textBox.ClearTextOnFocus = false
+	textBox.Font = Enum.Font.GothamMedium
+	textBox.TextSize = 15
+	textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textBox.Text = tostring(settings.redeemThreshold)
+	textBox.Parent = v13
+	Instance.new("UICorner", textBox).CornerRadius = UDim.new(0, 8)
+	local udim25 = UDim2.new
+	save = createTextButton(v13, "Save", UDim2.fromOffset(86, 34), udim25(1, -94, 0.5, -17))
+	local v14 = createFrame(532, 58)
+	local textLabel15 = Instance.new("TextLabel")
+	textLabel15.BackgroundTransparency = 1
+	textLabel15.Size = UDim2.new(1, -170, 1, 0)
+	textLabel15.Position = UDim2.fromOffset(14, 0)
+	textLabel15.Font = Enum.Font.GothamMedium
+	textLabel15.TextSize = 15
+	textLabel15.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textLabel15.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel15.Text = "Retry Code"
+	textLabel15.Parent = v14
+	local udim26 = UDim2.new
+	retryToggle = createTextButton(v14, "Retry Code: OFF", UDim2.fromOffset(150, 34), udim26(1, -164, 0.5, -17))
+
+	local function fn14()
+		local tbl17 = {}
+		local v15 = createFrame(392, 58)
+		local textLabel16 = Instance.new("TextLabel")
+		textLabel16.BackgroundTransparency = 1
+		textLabel16.Size = UDim2.new(0, 130, 1, 0)
+		textLabel16.Position = UDim2.fromOffset(14, 0)
+		textLabel16.Font = Enum.Font.GothamMedium
+		textLabel16.TextSize = 15
+		textLabel16.TextColor3 = Color3.fromRGB(245, 245, 245)
+		textLabel16.TextXAlignment = Enum.TextXAlignment.Left
+		textLabel16.Text = "Redeem method"
+		textLabel16.Parent = v15
+		local udim27 = UDim2.new
+		tbl17.RemoteButton = createTextButton(v15, "Remote", UDim2.fromOffset(66, 34), udim27(1, -222, 0.5, -17))
+		local udim28 = UDim2.new
+		tbl17.ClickButton = createTextButton(v15, "Click", UDim2.fromOffset(66, 34), udim28(1, -150, 0.5, -17))
+		local udim29 = UDim2.new
+		tbl17.FindButton = createTextButton(v15, "Find", UDim2.fromOffset(66, 34), udim29(1, -78, 0.5, -17))
+		local v16 = createFrame(462, 58)
+		local textLabel17 = Instance.new("TextLabel")
+		textLabel17.BackgroundTransparency = 1
+		textLabel17.Size = UDim2.new(0, 150, 1, 0)
+		textLabel17.Position = UDim2.fromOffset(14, 0)
+		textLabel17.Font = Enum.Font.GothamMedium
+		textLabel17.TextSize = 15
+		textLabel17.TextColor3 = Color3.fromRGB(245, 245, 245)
+		textLabel17.TextXAlignment = Enum.TextXAlignment.Left
+		textLabel17.Text = "Scan method"
+		textLabel17.Parent = v16
+		local udim210 = UDim2.new
+		tbl17.ProbeButton = createTextButton(v16, "Probe", UDim2.fromOffset(96, 34), udim210(1, -206, 0.5, -17))
+		local udim211 = UDim2.new
+		tbl17.CaptureButton = createTextButton(v16, "Capture", UDim2.fromOffset(96, 34), udim211(1, -104, 0.5, -17))
+
+		tbl17.Update = function()
+			local function fn15(arg, arg2)
+				arg.BackgroundColor3 = arg2 and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(38, 38, 38)
+				arg.TextColor3 = arg2 and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(210, 210, 210)
+			end
+
+			fn15(tbl17.RemoteButton, remoteHandler.GetMode() == "Remote")
+			fn15(tbl17.ClickButton, remoteHandler.GetMode() == "Click")
+			fn15(tbl17.ProbeButton, remoteHandler.GetScanMethod() == "Probe")
+			fn15(tbl17.CaptureButton, remoteHandler.GetScanMethod() == "Capture")
+			tbl17.FindButton.BackgroundColor3 = Color3.fromRGB(55, 90, 130)
+			tbl17.FindButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		end
+
+		tbl17.Update()
+		return tbl17
+	end
+
+	v9 = fn14()
+end
+
+local fn11
+
+fn11 = function(arg)
+	pcall(function()
+		NotificationController:Success(arg)
+	end)
+end
+
+local fn12
+
+fn12 = function(arg)
+	pcall(function()
+		NotificationController:Error(arg)
+	end)
+end
+
+timingStatus = function(arg, arg2, arg3)
+	local tbl17 = {}
+
+	if arg2 ~= nil then
+		tbl17[#tbl17 + 1] = string.format("AI %.2fs", math.max(0, tonumber(arg2) or 0) / 1000)
+	end
+
+	if arg3 ~= nil then
+		tbl17[#tbl17 + 1] = string.format("SAB %.2fs", math.max(0, tonumber(arg3) or 0) / 1000)
+	end
+
+	tbl17[#tbl17 + 1] = tostring(arg or "")
+	return table.concat(tbl17, " | ")
+end
+
+updateSettingsUI = function()
+	if textBox then
+		textBox.Text = tostring(settings.redeemThreshold)
+	end
+
+	if autoRedeem then
+		autoRedeem.Text = settings.autoRedeemEnabled and "Auto redeem: ON" or "Auto redeem: OFF"
+	end
+
+	if retryToggle then
+		retryToggle.Text = settings.retryCodeEnabled and "Retry Code: ON" or "Retry Code: OFF"
+	end
+
+	if autoModeToggle then
+		autoModeToggle.Text = settings.autoModeEnabled and "Auto Switch: ON" or "Auto Switch: OFF"
+	end
+
+	if botMode then
+		botMode.Text = settings.botModeEnabled and "Bot mode: ON" or "Bot mode: OFF"
+	end
+
+	if priorityToggle then
+		priorityToggle.Text = settings.ownerPriorityRedeemEnabled and "Owner First: ON" or "Owner First: OFF"
+		priorityToggle.Visible = visible
+	end
+
+	if pingBoostToggle then
+		pingBoostToggle.Text = settings.pingBoostFFlagsEnabled and "FFlag Boost: ON" or "FFlag Boost: OFF"
+	end
+
+	v9.Update()
+end
+
+local fn13, fn14, fn15, fn16, v10, flag4, flag5, flag6, tbl17, fn17
+local fn18, sendRedeemMessage, sendStatusRequest, urlEncode, requestBotMode, normalizeModeName, onNotificationAdded, processNotification
+
+do
+	local function fn26()
+		local riddle = tbl2.riddle or {}
+		local tbl18 = {}
+		local flag7 = false
+
+		for i = 1, #riddle do
+			local v11 = tbl3[i]
+
+			if v11 and v11 ~= "" then
+				table.insert(tbl18, v11)
+				flag7 = true
+			end
+		end
+
+		solved = flag7 and table.concat(tbl18, "") or nil
+		return solved
+	end
+
+	fn13 = function()
+		if not textLabel4 then
+			return
+		end
+
+		if not str3 then
+			textLabel4.Text = "-"
+			return
+		end
+
+		if str3 == "riddle" then
+			local v11 = solved or fn26()
+			if v11 then
+				textLabel4.Text = v11
+				return
+			end
+		end
+
+		local tbl18 = tbl2[str3] or {}
+		textLabel4.Text = #tbl18 > 0 and table.concat(tbl18, "") or "-"
+	end
+
+	local function fn27()
+		str4 = ""
+		n2 = 0
+
+		if str3 == "riddle" then
+			n = #(tbl2.riddle or {})
+			fn26()
+		end
+
+		fn13()
+	end
+
+	local function fn28(arg)
+		local str5 = tostring(arg or "")
+		if str5 == "" then
+			return
+		end
+
+		if tbl4[1] == str5 then
+			return
+		end
+		table.insert(tbl4, 1, str5)
+
+		while n3 < #tbl4 do
+			table.remove(tbl4)
+		end
+
+		if refreshPreviousNotifications then
+			LUCKEY_PREVIOUS_REFRESH_TOKEN = (LUCKEY_PREVIOUS_REFRESH_TOKEN or 0) + 1
+			local v11 = LUCKEY_PREVIOUS_REFRESH_TOKEN
+
+			task.delay(0.05, function()
+				if v11 == LUCKEY_PREVIOUS_REFRESH_TOKEN then
+					refreshPreviousNotifications()
+				end
+			end)
+		end
+	end
+
+	refreshPreviousNotifications = function()
+		if not scrollingFrame2 then
+			return
+		end
+
+		for _, child in ipairs(scrollingFrame2:GetChildren()) do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+
+		if textLabel8 then
+			textLabel8.Visible = #tbl4 == 0
+		end
+
+		for _, v11 in ipairs(tbl4) do
+			local frame8 = Instance.new("Frame")
+			frame8.Size = UDim2.new(1, -8, 0, 28)
+			frame8.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+			frame8.BorderSizePixel = 0
+			frame8.Parent = scrollingFrame2
+			Instance.new("UICorner", frame8).CornerRadius = UDim.new(0, 10)
+			local textLabel10 = Instance.new("TextLabel")
+			textLabel10.Size = UDim2.new(1, -68, 1, 0)
+			textLabel10.Position = UDim2.fromOffset(8, 0)
+			textLabel10.BackgroundTransparency = 1
+			textLabel10.Font = Enum.Font.Code
+			textLabel10.TextSize = 12
+			textLabel10.TextColor3 = Color3.fromRGB(235, 235, 235)
+			textLabel10.TextXAlignment = Enum.TextXAlignment.Left
+			textLabel10.TextTruncate = Enum.TextTruncate.AtEnd
+			textLabel10.Text = v11
+			textLabel10.Parent = frame8
+			local textButton2 = Instance.new("TextButton")
+			textButton2.Size = UDim2.fromOffset(52, 20)
+			textButton2.Position = UDim2.new(1, -58, 0.5, -10)
+			textButton2.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+			textButton2.BorderSizePixel = 0
+			textButton2.AutoButtonColor = true
+			textButton2.Font = Enum.Font.GothamBold
+			textButton2.TextSize = 12
+			textButton2.TextColor3 = Color3.fromRGB(0, 0, 0)
+			textButton2.Text = "Add"
+			textButton2.Parent = frame8
+			Instance.new("UICorner", textButton2).CornerRadius = UDim.new(0, 6)
+
+			textButton2.Activated:Connect(function()
+				if not str3 then
+					updateStatusBar("Pick Redeem or Riddle first", false)
+					fn12("Select Code Sniper or Riddle Solver first")
+					return
+				end
+
+				local v12 = str3
+				local sniper = tbl2[v12]
+				if not sniper then
+					return
+				end
+
+				if v12 == "sniper" then
+					tbl2.sniper = { v11 }
+					sniper = tbl2.sniper
+				else
+					table.insert(sniper, v11)
+					table.insert(tbl3, false)
+					n = 0
+				end
+
+				v3 = v12
+				solved = nil
+
+				if refreshList then
+					refreshList()
+				end
+
+				local text = table.concat(sniper, v12 == "riddle" and " " or "")
+
+				if text == "" then
+					text = tostring(v11)
+				end
+
+				if textLabel4 then
+					textLabel4.Text = text
+				end
+
+				updateStatusBar("Preview: " .. tostring(text), true)
+
+				if v12 == "riddle" then
+					updateStatusBar("Solving previous notification...", true)
+					scheduleSolve(v12)
+				elseif settings.autoRedeemEnabled and #sniper >= settings.redeemThreshold then
+					updateStatusBar("Auto-redeeming previous: " .. tostring(text), true)
+					task.spawn(autoRedeemSniper)
+				end
+			end)
+		end
+	end
+
+	refreshList = function()
+		if not scrollingFrame then
+			return
+		end
+
+		for _, child in ipairs(scrollingFrame:GetChildren()) do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+
+		local tbl18 = str3 and tbl2[str3] or {}
+
+		if textLabel6 then
+			textLabel6.Visible = #tbl18 == 0
+		end
+
+		for i, v11 in ipairs(tbl18) do
+			local frame8 = Instance.new("Frame")
+			frame8.Size = UDim2.new(1, -8, 0, 28)
+			frame8.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+			frame8.BorderSizePixel = 0
+			frame8.Parent = scrollingFrame
+			Instance.new("UICorner", frame8).CornerRadius = UDim.new(0, 10)
+			local textLabel10 = Instance.new("TextLabel")
+			textLabel10.Size = UDim2.new(1, -108, 1, 0)
+			textLabel10.Position = UDim2.fromOffset(8, 0)
+			textLabel10.BackgroundTransparency = 1
+			textLabel10.Font = Enum.Font.Code
+			textLabel10.TextSize = 12
+			textLabel10.TextColor3 = Color3.fromRGB(235, 235, 235)
+			textLabel10.TextXAlignment = Enum.TextXAlignment.Left
+			textLabel10.TextTruncate = Enum.TextTruncate.AtEnd
+			textLabel10.Text = tostring(i) .. ". " .. tostring(v11)
+			textLabel10.Parent = frame8
+
+			local function createTextButton2(text, arg)
+				local textButton2 = Instance.new("TextButton")
+				textButton2.Size = UDim2.fromOffset(26, 20)
+				textButton2.Position = UDim2.new(1, arg, 0.5, -10)
+				textButton2.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+				textButton2.BorderSizePixel = 0
+				textButton2.AutoButtonColor = true
+				textButton2.Font = Enum.Font.GothamBold
+				textButton2.TextSize = 12
+				textButton2.TextColor3 = Color3.fromRGB(0, 0, 0)
+				textButton2.Text = text
+				textButton2.Parent = frame8
+				Instance.new("UICorner", textButton2).CornerRadius = UDim.new(0, 6)
+				return textButton2
+			end
+
+			local v12 = createTextButton2("^", -92)
+			local v13 = createTextButton2("v", -62)
+			local v14 = createTextButton2("X", -32)
+			v12.Visible = i > 1
+			v13.Visible = i < #tbl18
+
+			v12.Activated:Connect(function()
+				local v15 = str3 and tbl2[str3]
+				if not v15 or i <= 1 or i > #v15 then
+					return
+				end
+				local n4 = i - 1
+				local v16 = v15[i]
+				v15[i] = v15[i - 1]
+				v15[n4] = v16
+
+				if str3 == "riddle" then
+					local v17 = tbl3
+					local n5 = i - 1
+					local v18 = tbl3[i]
+					tbl3[i] = tbl3[i - 1]
+					v17[n5] = v18
+				end
+
+				refreshList()
+				fn27()
+				updateStatusBar("Moved part up", true)
+			end)
+
+			v13.Activated:Connect(function()
+				local v15 = str3 and tbl2[str3]
+				if not v15 or i < 1 or i >= #v15 then
+					return
+				end
+				local n4 = i + 1
+				local v16 = v15[i]
+				v15[i] = v15[i + 1]
+				v15[n4] = v16
+
+				if str3 == "riddle" then
+					local v17 = tbl3
+					local n5 = i + 1
+					local v18 = tbl3[i]
+					tbl3[i] = tbl3[i + 1]
+					v17[n5] = v18
+				end
+
+				refreshList()
+				fn27()
+				updateStatusBar("Moved part down", true)
+			end)
+
+			v14.Activated:Connect(function()
+				local v15 = str3 and tbl2[str3]
+				if not v15 or not v15[i] then
+					return
+				end
+				table.remove(v15, i)
+
+				if str3 == "riddle" then
+					table.remove(tbl3, i)
+				end
+
+				if #v15 == 0 and v3 == str3 then
+					v3 = nil
+				end
+
+				refreshList()
+				fn27()
+				updateStatusBar("Deleted captured part", true)
+			end)
+		end
+	end
+
+	local function fn29()
+		if not scrollingFrame then
+			return
+		end
+
+		for _, child in ipairs(scrollingFrame:GetChildren()) do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+
+		if textLabel6 then
+			textLabel6.Visible = true
+		end
+	end
+
+	local function fn30()
+		if str3 then
+			tbl2[str3] = {}
+
+			if str3 == "riddle" then
+				tbl3 = {}
+			end
+
+			if v3 == str3 then
+				v3 = nil
+			end
+
+			fn29()
+			solved = nil
+			v2 = nil
+			flag2 = false
+			str4 = ""
+			n2 = 0
+			n = 0
+			fn13()
+		end
+	end
+
+	local function fn31(arg, arg2)
+		local flag7 = arg == "sniper" and codeSniper or riddleSolver
+		if not flag7 then
+			return
+		end
+
+		if arg == "sniper" then
+			flag7.Text = arg2 and "Stop Sniper" or "Code Sniper"
+		else
+			flag7.Text = arg2 and "Stop Riddle" or "Riddle Solver"
+		end
+
+		flag7.BackgroundColor3 = arg2 and Color3.fromRGB(210, 210, 210) or Color3.fromRGB(255, 255, 255)
+		flag7.TextColor3 = Color3.fromRGB(0, 0, 0)
+	end
+
+	fn14 = function(arg)
+		if type(arg) ~= "table" then
+			warn("[Config] Invalid configs table")
+			return
+		end
+		local name_2 = localPlayer.Name
+		local flag7 = false
+
+		for _, v11 in ipairs(arg) do
+			if v11.username == name_2 then
+				local config = v11.config or {}
+
+				if config.botMode ~= nil then
+					settings.botModeEnabled = config.botMode
+				end
+
+				if config.autoRedeem ~= nil then
+					settings.autoRedeemEnabled = config.autoRedeem
+				end
+
+				if config.autoMode ~= nil then
+					settings.autoModeEnabled = config.autoMode == true
+				end
+
+				if config.redeemThreshold ~= nil then
+					settings.redeemThreshold = math.max(1, math.floor(config.redeemThreshold))
+				end
+
+				if config.retryCode ~= nil then
+					settings.retryCodeEnabled = config.retryCode == true
+				end
+
+				flag7 = true
+				break
+			end
+		end
+
+		updateSettingsUI()
+
+		if flag7 then
+			pcall(function()
+				NotificationController:Success("Config updated from server")
+			end)
+		end
+	end
+
+	fn15 = function(arg)
+		if arg == "all" then
+			tbl2.sniper = {}
+			tbl2.riddle = {}
+			tbl3 = {}
+			v3 = nil
+			solved = nil
+			v2 = nil
+			n = 0
+			str4 = ""
+			n2 = 0
+
+			if str3 then
+				fn29()
+				fn13()
+			end
+
+			updateStatusBar("Cleared all buffers", false)
+			return
+		end
+
+		if not tbl2[arg] then
+			return
+		end
+		tbl2[arg] = {}
+
+		if arg == "riddle" then
+			tbl3 = {}
+			solved = nil
+			v2 = nil
+			n = 0
+		end
+
+		if v3 == arg then
+			v3 = nil
+		end
+
+		if str3 == arg then
+			fn29()
+			fn13()
+			updateStatusBar("Cleared " .. arg .. " buffer", false)
+		end
+	end
+
+	fn16 = function(arg)
+		if arg == "all" then
+			if str3 and tbl2[str3] and #tbl2[str3] > 0 then
+				arg = str3
+			elseif v3 and tbl2[v3] and #tbl2[v3] > 0 then
+				arg = v3
+			elseif #tbl2.sniper > 0 then
+				arg = "sniper"
+			else
+				if not (#tbl2.riddle > 0) then
+					return
+				end
+				arg = "riddle"
+			end
+		end
+
+		local v11 = tbl2[arg]
+		if not v11 or #v11 == 0 then
+			return
+		end
+		table.remove(v11, #v11)
+
+		if arg == "riddle" then
+			table.remove(tbl3, #tbl3)
+		end
+
+		if #v11 == 0 and v3 == arg then
+			v3 = nil
+		end
+
+		if str3 == arg then
+			refreshList()
+			fn27()
+		end
+
+		updateStatusBar("Removed newest part from " .. arg, false)
+	end
+
+	local flag7 = false
+
+	local function fn32()
+		if flag7 then
+			return
+		end
+		flag7 = true
+
+		task.delay(0.05, function()
+			flag7 = false
+			refreshList()
+			fn13()
+			local v11 = str3 and tbl2[str3]
+
+			if v11 and #v11 > 0 then
+				updateStatusBar(#v11 .. " part(s) captured", true)
+			end
+		end)
+	end
+
+	local function fn33(arg)
+		local v11 = tbl2[str3]
+		if not v11 then
+			return false
+		end
+		local now = tick()
+		if arg == str4 and now - n2 < 0.5 then
+			return false
+		end
+		str4 = arg
+		n2 = now
+		v3 = str3
+		table.insert(v11, arg)
+
+		if str3 == "riddle" then
+			table.insert(tbl3, false)
+		end
+
+		fn32()
+		return true
+	end
+
+	v10 = nil
+	flag4 = false
+	flag5 = false
+	flag6 = false
+	tbl17 = {}
+
+	sendWebSocketMessage = function(arg)
+		return false
+	end
+
+	local function fn34(arg)
+		local v11 = fn5({ code = arg, key = str2, senderId = localPlayer.UserId, senderName = localPlayer.Name, globalRedeem = true }, 1)
+		return sendWebSocketMessage(HttpService:JSONEncode(v11))
+	end
+
+	fn17 = function(arg, arg2, partIndex, arg3, arg4)
+		local tbl18 = {
+			key = str2,
+			senderId = localPlayer.UserId,
+			senderName = localPlayer.Name,
+			command = arg,
+			mode = arg2,
+			targetId = arg3,
+		}
+
+		if type(arg4) == "table" then
+			for k, v11 in pairs(arg4) do
+				tbl18[k] = v11
+			end
+		end
+
+		if partIndex ~= nil then
+			tbl18.partIndex = partIndex
+		end
+
+		local v11 = fn5(tbl18, 1)
+		local json = HttpService:JSONEncode(v11)
+		return sendWebSocketMessage(json)
+	end
+
+	sendAnnouncementToServer = function(arg, arg2, arg3)
+		local str5 = tostring(arg or "")
+		if str5 == "" then
+			warn("[WS] Announcement text is empty")
+			return false
+		end
+
+		if not visible then
+			warn("[WS] Only configured owners can send announcements")
+			return false
+		end
+		return fn17("announcement", nil, nil, nil, { text = str5, notificationUserId = tonumber(arg2), hideFromPrevious = arg3 ~= false })
+	end
+
+	requestTargetedAnnouncementUsers = function()
+		if not targetedAnnouncementAllowed then
+			return false
+		end
+		return sendEncryptedPayload({ key = str2, type = "targetedAnnouncementUsersRequest", senderId = localPlayer.UserId })
+	end
+
+	sendTargetedAnnouncement = function(arg, arg2, arg3)
+		if not targetedAnnouncementAllowed then
+			return false
+		end
+		local str5 = tostring(arg2 or ""):gsub("^%s+", ""):gsub("%s+$", "")
+		if str5 == "" or not tonumber(arg) then
+			return false
+		end
+
+		return sendEncryptedPayload({
+			key = str2,
+			type = "targetedAnnouncement",
+			senderId = localPlayer.UserId,
+			targetId = tonumber(arg),
+			text = str5:sub(1, 300),
+			hideFromPrevious = arg3 ~= false,
+		})
+	end
+
+	updateTargetedAnnouncementWhitelist = function(arg, arg2)
+		if not visible or not tonumber(arg) then
+			return false
+		end
+
+		return sendEncryptedPayload({
+			key = str2,
+			type = "targetedAnnouncementWhitelistUpdate",
+			senderId = localPlayer.UserId,
+			targetId = tonumber(arg),
+			action = arg2 == "remove" and "remove" or "add",
+		})
+	end
+
+	fn18 = function()
+		return false
+	end
+
+	sendEncryptedPayload = function(arg)
+		return false
+	end
+
+	sendPriorityRedeemAck = function(arg, arg2, arg3, arg4)
+		return false
+	end
+
+	requestConnectedWebSocketUsers = function()
+		if not visible then
+			return false
+		end
+		connectedWebSocketUsers = {}
+
+		if refreshFanumTaxUsers then
+			refreshFanumTaxUsers()
+		end
+
+		return sendEncryptedPayload({
+			key = str2,
+			type = "connectedUsersRequest",
+			command = "connectedUsersRequest",
+			senderId = localPlayer.UserId,
+		})
+	end
+
+	requestBrainrotScan = function(arg)
+		if not visible or not arg or not arg.UserId then
+			return false
+		end
+		local v11 = HttpService:GenerateGUID(false)
+		pendingBrainrotScanRequests[v11] = { Profile = arg, sentAt = os.clock() }
+
+		if not sendEncryptedPayload({
+			key = str2,
+			type = "brainrotScanRequest",
+			command = "brainrotScanRequest",
+			requestId = v11,
+			senderId = localPlayer.UserId,
+			senderName = localPlayer.Name,
+			targetId = arg.UserId,
+		}) then
+			pendingBrainrotScanRequests[v11] = nil
+			return false
+		end
+
+		task.delay(12, function()
+			local v12 = pendingBrainrotScanRequests[v11]
+
+			if v12 then
+				pendingBrainrotScanRequests[v11] = nil
+
+				if showFanumBrainrotPopup then
+					showFanumBrainrotPopup(v12.Profile, nil, "The scan timed out. That user may be offline.")
+				end
+			end
+		end)
+
+		return true
+	end
+
+	sendFanumTax = function(arg)
+		return false
+	end
+
+	sendRedeemMessage = function(arg)
+		if not arg then
+			return false
+		end
+		local v11 = HttpService:GenerateGUID(false)
+
+		local v12 = fn5({
+			key = str2,
+			type = "controlRequest",
+			requestId = v11,
+			senderId = localPlayer.UserId,
+			senderName = localPlayer.Name,
+			senderDisplayName = localPlayer.DisplayName,
+			targetId = arg.UserId,
+			targetName = arg.Name,
+			targetDisplayName = arg.DisplayName,
+			controllerId = localPlayer.UserId,
+			storageOwnerId = localPlayer.UserId,
+		}, 1)
+
+		return sendWebSocketMessage(HttpService:JSONEncode(v12)), v11
+	end
+
+	sendStatusRequest = function(arg)
+		if type(arg) ~= "table" or #arg == 0 then
+			return false
+		end
+		local v11 = fn5({ key = str2, type = "statusRequest", senderId = localPlayer.UserId, userIds = arg }, 1)
+		return sendWebSocketMessage(HttpService:JSONEncode(v11))
+	end
+
+	urlEncode = function(arg)
+		local str5 = tostring(arg or "")
+
+		local ok_, result = pcall(function()
+			return HttpService:UrlEncode(str5)
+		end)
+
+		if ok_ and result then
+			return result
+		end
+
+		return str5:gsub("([^%w%-_%.~])", function(arg2)
+			return string.format("%%%02X", string.byte(arg2))
+		end)
+	end
+
+	requestBotMode = nil
+
+	requestBotMode = function(arg)
+		if not flag4 or not v10 then
+			warn("[Sync] WebSocket not connected, cannot request mode")
+			local botModeEnabled = settings.botModeEnabled
+
+			if botModeEnabled then
+				botModeEnabled = (arg or 0) > 0
+			end
+
+			if botModeEnabled then
+				task.delay(0.5, function()
+					requestBotMode((arg or 0) - 1)
+				end)
+			end
+
+			return
+		end
+
+		local v11 = fn5({ command = "getMode", key = str2 }, 1)
+		local json = HttpService:JSONEncode(v11)
+		sendWebSocketMessage(json)
+	end
+
+	normalizeModeName = function(arg)
+		if arg == "redeem" or arg == "code" or arg == "codes" then
+			return "sniper"
+		end
+		return arg
+	end
+
+	luckeyMetadataText = function(arg, arg2)
+		if arg == nil then
+			return arg2
+		end
+
+		if typeof(arg) == "EnumItem" then
+			return arg.Name
+		end
+
+		if type(arg) == "table" then
+			return tostring(arg.DisplayName or arg.Name or arg.Value or arg2)
+		end
+		return tostring(arg)
+	end
+
+	getRedeemWebhookInfo = function(arg, arg2)
+		local str5 = tostring(arg or arg2 or "Unknown"):gsub("%s*[Ss]pawned!$", ""):gsub("^%s+", ""):gsub("%s+$", "")
+		local datas = ReplicatedStorage:FindFirstChild("Datas")
+		local animals = datas and datas:FindFirstChild("Animals")
+		local mutations = datas and datas:FindFirstChild("Mutations")
+		local module = nil
+		local module2 = nil
+
+		if animals then
+			pcall(function()
+				module = require(animals)
+			end)
+		end
+
+		if mutations then
+			pcall(function()
+				module2 = require(mutations)
+			end)
+		end
+
+		local str6 = "None"
+		local str7
+
+		if type(module2) == "table" then
+			local v11 = string.lower(str5)
+			str6 = nil
+
+			for k in pairs(module2) do
+				local str8 = tostring(k)
+				local str9 = string.lower(str8) .. " "
+
+				if v11:sub(1, #str9) == str9 and (not str6 or #str8 > #str6) then
+					str6 = str8
+				end
+			end
+
+			local str8 = "None"
+
+			if str6 then
+				str7 = str5:sub(#str6 + 2)
+			else
+				str6 = str8
+				str7 = str5
+			end
+		else
+			str7 = str5
+		end
+
+		local str8 = "Unknown"
+		local str9 = "Unknown"
+		local index
+
+		if type(module) ~= "table" then
+			index = str5
+		else
+			local str10 = string.lower(str7):gsub("[^%w]", "")
+			local tbl18 = nil
+
+			for k, v11 in pairs(module) do
+				if type(v11) == "table" then
+					local str11 = tostring(v11.DisplayName or v11.Name or k)
+					local str12 = string.lower(str11):gsub("[^%w]", "")
+
+					if str12 == str10 then
+						tbl18 = { Index = tostring(k), Name = str11, Info = v11 }
+						break
+					elseif str10:sub(-#str12) == str12 then
+						tbl18 = tbl18 or { Index = tostring(k), Name = str11, Info = v11 }
+					end
+				end
+			end
+
+			if tbl18 then
+				index = tbl18.Index
+				str5 = tbl18.Name
+				local info = tbl18.Info
+				str9 = luckeyMetadataText(info.Rarity or info.RarityName or info.Tier or info.Category, "Unknown")
+				str8 = luckeyMetadataText(info.Generation or info.Income or info.Speed, "Unknown")
+			else
+				index = str5
+			end
+		end
+
+		return { Name = str5, Index = index, Rarity = str9, Speed = str8, Mutation = str6 }
+	end
+
+	sendRedeemWebhook = function(arg, arg2)
+		return
+	end
+
+	isRedeemRateLimited = function(arg)
+		local v11 = string.lower(tostring(arg or ""))
+		return v11:find("rate limit", 1, true) ~= nil or v11:find("ratelimit", 1, true) ~= nil or v11:find("too many request", 1, true) ~= nil or v11:find("please wait", 1, true) ~= nil or v11:find("try again", 1, true) ~= nil or v11:find("cooldown", 1, true) ~= nil or v11:find("too fast", 1, true) ~= nil
+	end
+
+	scheduleRateLimitedRetry = function(arg, arg2, arg3)
+		if not settings.retryCodeEnabled or not settings.autoRedeemEnabled then
+			return
+		end
+
+		if arg ~= settings.retrySessionId then
+			return
+		end
+		settings.retryTimerToken = settings.retryTimerToken + 1
+		local retryTimerToken = settings.retryTimerToken
+		local n4 = settings.retryAttemptCount + 1
+		setRetryStopVisible(true)
+		updateStatusBar(timingStatus(string.format("Rate limited - retry #%d in %.2fs", n4, 0.01), nil, arg3), false)
+
+		task.delay(0.01, function()
+			if retryTimerToken ~= settings.retryTimerToken then
+				return
+			end
+
+			if arg ~= settings.retrySessionId then
+				return
+			end
+
+			if not settings.retryCodeEnabled or not settings.autoRedeemEnabled then
+				return
+			end
+
+			if not flag or str3 ~= "sniper" then
+				return
+			end
+
+			if not tbl2.sniper or #tbl2.sniper < settings.redeemThreshold then
+				return
+			end
+			autoRedeemSniper()
+		end)
+	end
+
+	autoRedeemSniper = function()
+		if not settings.autoRedeemEnabled then
+			flag2 = false
+			setRetryStopVisible(false)
+			return
+		end
+
+		local sniper = tbl2.sniper
+		if not sniper or #sniper < settings.redeemThreshold then
+			return
+		end
+
+		if flag2 then
+			return
+		end
+		flag2 = true
+		local flag8 = settings.retryCodeEnabled == true
+		setRetryStopVisible(flag8)
+		local retrySessionId = settings.retrySessionId
+
+		if flag8 then
+			settings.retryTimerToken = settings.retryTimerToken + 1
+			settings.retryAttemptCount = settings.retryAttemptCount + 1
+		end
+
+		local n4 = #sniper
+		local codeRedeemed = table.concat(sniper, "")
+		updateStatusBar((flag8 and "Retry #" .. tostring(settings.retryAttemptCount) .. ": " or "Auto-redeeming: ") .. codeRedeemed, true)
+
+		if not flag8 then
+			tbl2.sniper = {}
+
+			if v3 == "sniper" then
+				v3 = nil
+			end
+
+			str4 = ""
+			n2 = 0
+			flag7 = false
+
+			if str3 == "sniper" then
+				fn29()
+				fn13()
+			end
+		end
+
+		local v11, v12, str5, v13, v14 = remoteHandler.Redeem(codeRedeemed)
+		flag2 = false
+		if flag8 and retrySessionId ~= settings.retrySessionId then
+			return
+		end
+
+		if not v11 then
+			local v15 = tostring
+			str5 = str5 or v12 or "Remote error"
+			local v16 = v15(str5)
+
+			if flag8 then
+				if isRedeemRateLimited(v16) then
+					scheduleRateLimitedRetry(retrySessionId, v16, v14)
+				else
+					updateStatusBar(timingStatus("Retry failed; waiting for the next part: " .. v16, nil, v14), false)
+
+					if n4 < #tbl2.sniper then
+						task.spawn(autoRedeemSniper)
+					end
+				end
+			else
+				updateStatusBar(timingStatus("Auto-redeem error: " .. v16, nil, v14), false)
+				fn12("Auto-redeem error: " .. v16)
+			end
+
+			return
+		end
+
+		if v13 == "Click" then
+			if flag8 then
+				updateStatusBar("Click sent; waiting for another part or Stop", true)
+
+				if n4 < #tbl2.sniper then
+					task.spawn(autoRedeemSniper)
+				end
+			else
+				updateStatusBar("Click sent (unconfirmed): " .. codeRedeemed, true)
+			end
+
+			return
+		end
+
+		if v12 == true then
+			if flag8 then
+				tbl2.sniper = {}
+
+				if v3 == "sniper" then
+					v3 = nil
+				end
+
+				str4 = ""
+				n2 = 0
+				flag7 = false
+
+				if str3 == "sniper" then
+					fn29()
+				end
+
+				flag = false
+
+				if connection then
+					connection:Disconnect()
+					connection = nil
+				end
+
+				str3 = nil
+				fn31("sniper", false)
+				fn13()
+			end
+
+			settings.retryTimerToken = settings.retryTimerToken + 1
+			settings.retryAttemptCount = 0
+			setRetryStopVisible(false)
+			updateStatusBar(timingStatus("Code redeemed: " .. codeRedeemed, nil, v14), true)
+			local str6 = typeof(str5) == "string" and str5:gsub("%s*[Ss]pawned!$", "") or codeRedeemed
+
+			if str6 == "" then
+				str6 = codeRedeemed
+			end
+
+			local str7 = "You got: " .. tostring(str6)
+
+			if ignoreNextAnnouncementNotification then
+				ignoreNextAnnouncementNotification(str7)
+			end
+
+			NotificationController:Success(string.format("U GOT A FUCKING: <%s>%s</%s> NIGGA", "phantom", str6, "phantom"))
+			task.defer(sendRedeemWebhook, codeRedeemed, str5)
+			fn34(codeRedeemed)
+			return
+		end
+
+		str5 = typeof(str5) == "string" and str5 or typeof(v12) == "string" and v12 or "Code rejected"
+
+		if flag8 then
+			if isRedeemRateLimited(str5) then
+				scheduleRateLimitedRetry(retrySessionId, str5, v14)
+			else
+				updateStatusBar(timingStatus("Not redeemed; waiting for part " .. tostring(n4 + 1), nil, v14), false)
+
+				if n4 < #tbl2.sniper then
+					task.spawn(autoRedeemSniper)
+				end
+			end
+		else
+			updateStatusBar(timingStatus("Auto-redeem failed: " .. str5, nil, v14), false)
+			fn12(str5 .. ": " .. codeRedeemed)
+		end
+	end
+
+	local function fn35()
+		if not settings.autoRedeemEnabled then
+			flag2 = false
+			return
+		end
+
+		if not solved or not str3 then
+			return
+		end
+
+		if flag2 then
+			return
+		end
+		flag2 = true
+		local v11 = solved
+		local v12 = lastRiddleSolveMs
+		updateStatusBar(timingStatus("Auto-redeeming: " .. v11, v12, nil), true)
+		tbl2.riddle = {}
+		tbl3 = {}
+
+		if v3 == "riddle" then
+			v3 = nil
+		end
+
+		solved = nil
+		v2 = nil
+		str4 = ""
+		n2 = 0
+		n = 0
+		flag7 = false
+
+		if str3 == "riddle" then
+			fn29()
+			fn13()
+		end
+
+		local v13, v14, riddleRedeemFailed, v15, v16 = remoteHandler.Redeem(v11)
+		flag = false
+		str3 = nil
+		fn31("riddle", false)
+		flag2 = false
+
+		if not v13 then
+			local v17 = tostring
+			riddleRedeemFailed = riddleRedeemFailed or v14 or "Unknown remote error"
+			local riddleRedeemError = v17(riddleRedeemFailed)
+			updateStatusBar(timingStatus("Auto-redeem error: " .. riddleRedeemError, v12, v16), false)
+			NotificationController:Error("Riddle redeem error: " .. riddleRedeemError)
+			return
+		end
+
+		if v15 == "Click" then
+			updateStatusBar(timingStatus("Click sent (unconfirmed): " .. v11, v12, nil), true)
+			return
+		end
+
+		if v14 == true then
+			updateStatusBar(timingStatus("Auto-redeemed: " .. v11, v12, v16), true)
+			task.defer(sendRedeemWebhook, v11, riddleRedeemFailed)
+			NotificationController:Success(string.format("U GOT  A FUCKING: <%s>%s</%s> NIGGA", "phantom", typeof(riddleRedeemFailed) == "string" and riddleRedeemFailed:gsub("%s*[Ss]pawned!$", "") or v11, "phantom"))
+			fn34(v11)
+		else
+			riddleRedeemFailed = typeof(riddleRedeemFailed) == "string" and riddleRedeemFailed or typeof(v14) == "string" and v14 or "Code rejected by the server"
+			updateStatusBar(timingStatus("Riddle redeem failed: " .. riddleRedeemFailed, v12, v16), false)
+			NotificationController:Error(riddleRedeemFailed .. " (answer: " .. v11 .. ")")
+		end
+	end
+
+	local function fn36()
+		local sniper = tbl2.sniper or {}
+
+		if #sniper == 0 then
+			updateStatusBar("Nothing to redeem.", false)
+			NotificationController:Error("theres nothing bru.")
+			return
+		end
+
+		local redeeming = table.concat(sniper, "")
+		updateStatusBar("Redeeming: " .. redeeming, false)
+		local v11, v12, v13, v14, v15 = remoteHandler.Redeem(redeeming)
+		fn30()
+		str3 = nil
+		local redeemError = typeof(v13) == "string" and v13 or typeof(v12) == "string" and v12 or "Code rejected"
+
+		if not v11 then
+			updateStatusBar(timingStatus("Redeem error: " .. redeemError, nil, v15), false)
+			NotificationController:Error(redeemError .. " (code: " .. redeeming .. ")")
+			return
+		end
+
+		if v14 == "Click" then
+			updateStatusBar(timingStatus("Click sent (unconfirmed): " .. redeeming, nil, nil), true)
+			return
+		end
+
+		if v12 == true then
+			updateStatusBar(timingStatus("Redeemed: " .. redeeming, nil, v15), true)
+			task.defer(sendRedeemWebhook, redeeming, v13)
+			NotificationController:Success(string.format("U GOT A FUCKING: <%s>%s</%s> NIGGA", "og", typeof(v13) == "string" and v13:gsub("%s*[Ss]pawned!$", "") or redeeming, "og"))
+			fn34(redeeming)
+		else
+			local failed = typeof(v13) == "string" and v13 or typeof(v12) == "string" and v12 or "Code rejected by the server"
+			updateStatusBar(timingStatus("Failed: " .. failed, nil, v15), false)
+			NotificationController:Error(failed .. " (code: " .. redeeming .. ")")
+		end
+	end
+
+	local function fn37()
+		local riddle = tbl2.riddle or {}
+		local redeeming = solved
+		local n4 = lastRiddleSolveMs
+
+		if not redeeming then
+			if #riddle == 0 then
+				updateStatusBar("No parts to solve.", false)
+				NotificationController:Error("theres nothing gg.")
+				return
+			end
+
+			local str5 = table.concat(riddle, "")
+			updateStatusBar("Solving...", true)
+			local now = os.clock()
+			local v11
+			redeeming, v11 = fn4(str5)
+			n4 = math.max(0, math.floor((os.clock() - now) * 1000 + 0.5))
+			lastRiddleSolveMs = n4
+
+			if not redeeming then
+				updateStatusBar(timingStatus("Solve failed: " .. (v11 or "unknown"), n4, nil), false)
+				NotificationController:Error("Riddle solve failed: " .. tostring(v11 or "Unknown solver error"))
+				return
+			end
+		end
+
+		updateStatusBar(timingStatus("Redeeming: " .. redeeming, n4, nil), true)
+		local v11, str5, redeemFailed, v12, v13 = remoteHandler.Redeem(redeeming)
+		fn30()
+		str3 = nil
+		solved = nil
+		v2 = nil
+
+		if not v11 then
+			local v14 = tostring
+			str5 = redeemFailed or str5 or "Unknown remote error"
+			local redeemError = v14(str5)
+			updateStatusBar(timingStatus("Redeem error: " .. redeemError, n4, v13), false)
+			NotificationController:Error(redeemError .. " (answer: " .. redeeming .. ")")
+			return
+		end
+
+		if v12 == "Click" then
+			updateStatusBar(timingStatus("Click sent (unconfirmed): " .. redeeming, n4, nil), true)
+			return
+		end
+
+		if str5 == true then
+			updateStatusBar(timingStatus("Redeemed: " .. redeeming, n4, v13), true)
+			task.defer(sendRedeemWebhook, redeeming, redeemFailed)
+			NotificationController:Success(string.format("U GOT A FUCKING: <%s>%s</%s> NIGGA", "phantom", typeof(redeemFailed) == "string" and redeemFailed:gsub("%s*[Ss]pawned!$", "") or redeeming, "phantom"))
+			fn34(redeeming)
+		else
+			redeemFailed = typeof(redeemFailed) == "string" and redeemFailed or typeof(str5) == "string" and str5 or "Code rejected by the server"
+			updateStatusBar(timingStatus("Redeem failed: " .. redeemFailed, n4, v13), false)
+			NotificationController:Error(redeemFailed .. " (answer: " .. redeeming .. ")")
+		end
+	end
+
+	local function fn38()
+		if thread then
+			task.cancel(thread)
+			thread = nil
+		end
+	end
+
+	local function fn39(arg)
+		if arg ~= "riddle" then
+			return
+		end
+
+		if not flag or str3 ~= "riddle" then
+			return
+		end
+		local riddle = tbl2.riddle
+		if #riddle == 0 then
+			return
+		end
+
+		if #riddle == n then
+			return
+		end
+		local now = os.clock()
+		local flag8 = false
+		local solveError = nil
+
+		for i = n + 1, #riddle do
+			local v11 = riddle[i]
+			updateStatusBar("Solving...", true)
+			local v12, v13
+			v12, solveError, v13 = fn4(v11)
+
+			if v12 then
+				tbl3[i] = v12
+				updateStatusBar((v13 and "Cached: " or "Solved: ") .. v12, true)
+				flag8 = true
+				solveError = nil
+			else
+				solveError = solveError or "unknown"
+				break
+			end
+		end
+
+		n = #riddle
+		lastRiddleSolveMs = math.max(0, math.floor((os.clock() - now) * 1000 + 0.5))
+
+		if flag8 then
+			fn26()
+			updateStatusBar(timingStatus("Solved: " .. solved, lastRiddleSolveMs, nil), true)
+			fn13()
+
+			if settings.autoRedeemEnabled and #riddle >= settings.redeemThreshold then
+				fn35()
+			end
+		elseif solveError then
+			updateStatusBar(timingStatus("Solve error: " .. solveError, lastRiddleSolveMs, nil), false)
+			fn12("Riddle solve failed: " .. solveError)
+		end
+
+		thread = nil
+	end
+
+	scheduleSolve = function(arg)
+		if arg ~= "riddle" then
+			return
+		end
+		fn38()
+
+		thread = task.spawn(function()
+			fn39(arg)
+			thread = nil
+		end)
+	end
+
+	normalizeSammyInlineCode = function(arg)
+		return (tostring(arg or ""):upper():gsub("%s+[Gg][Oo][Oo][Dd]%s+[Ll][Uu][Cc][Kk].*$", ""):gsub("[^A-Z0-9]", ""):gsub("GARAMA", "GARAM"):gsub("MANDUNDUNG", "MANDUDUNG"))
+	end
+
+	parseSammyAutoCue = function(arg)
+		local v11 = fn3(tostring(arg or ""))
+		local str5 = v11:lower()
+		if str5 == "" then
+			return nil, nil
+		end
+		local pos, v12 = str5:find("the%s+code%s+is%s*")
+
+		if not v12 then
+			pos, v12 = str5:find("code%s+is%s*")
+		end
+
+		local pos2, v13 = str5:find("the%s+riddle%s+is%s*")
+
+		if not v13 then
+			pos2, v13 = str5:find("riddle%s+is%s*")
+		end
+
+		if v12 and (not pos2 or pos < pos2) then
+			local v14 = normalizeSammyInlineCode(v11:sub(v12 + 1))
+			return "sniper", v14 ~= "" and v14 or nil
+		end
+
+		if v13 then
+			local str6 = v11:sub(v13 + 1):gsub("^%s+", ""):gsub("%s+$", "")
+			return "riddle", str6 ~= "" and str6 or nil
+		end
+		local flag8 = str5:find("sammy", 1, true) ~= nil
+		if flag8 and str5:find("riddle", 1, true) then
+			return "riddle", nil
+		end
+
+		if flag8 and str5:find("code", 1, true) then
+			return "sniper", nil
+		end
+
+		if flag8 and (str5:find("ok its", 1, true) or str5:find("ok it's", 1, true) or str5:find("ok i guess", 1, true)) then
+			return "sniper", nil
+		end
+		return nil, nil
+	end
+
+	detectSammyAutoMode = function(arg)
+		return (parseSammyAutoCue(arg))
+	end
+
+	local function fn40(arg)
+		if arg:IsA("TextLabel") then
+			return arg
+		end
+		return arg:FindFirstChildWhichIsA("TextLabel", true)
+	end
+
+	luckeyAnnouncementTextKey = function(arg)
+		return fn3(tostring(arg or "")):gsub("^%s+", ""):gsub("%s+$", "")
+	end
+
+	ignoreNextAnnouncementNotification = function(arg)
+		local v11 = luckeyAnnouncementTextKey(arg)
+		if v11 == "" then
+			return
+		end
+		local v12 = LUCKEY_PENDING_ANNOUNCEMENT_TEXTS[v11]
+		local v13 = LUCKEY_PENDING_ANNOUNCEMENT_TEXTS
+		local tbl18 = { count = (v12 and v12.count or 0) + 1 }
+		local v14 = LUCKEY_ANNOUNCEMENT_IGNORE_SECONDS
+		tbl18.expiresAt = tick() + v14
+		v13[v11] = tbl18
+	end
+
+	isIgnoredAnnouncementNotification = function(arg, arg2)
+		if LUCKEY_IGNORED_TOP_NOTIFICATION_OBJECTS[arg] then
+			return true
+		end
+		local v11 = luckeyAnnouncementTextKey(arg2)
+		local v12 = LUCKEY_PENDING_ANNOUNCEMENT_TEXTS[v11]
+		if not v12 then
+			return false
+		end
+
+		if v12.expiresAt < tick() then
+			LUCKEY_PENDING_ANNOUNCEMENT_TEXTS[v11] = nil
+			return false
+		end
+		LUCKEY_IGNORED_TOP_NOTIFICATION_OBJECTS[arg] = true
+		v12.count = v12.count - 1
+
+		if v12.count <= 0 then
+			LUCKEY_PENDING_ANNOUNCEMENT_TEXTS[v11] = nil
+		end
+
+		return true
+	end
+
+	hideRedeemUtilityNotification = function(arg, arg2)
+		local v11 = string.lower(tostring(arg2 or ""))
+		local pos = v11:find("code redeemed", 1, true) or v11:find("redeemed successfully", 1, true) or v11:find("already been redeemed", 1, true) or v11:find("remote captured", 1, true) or v11:find("captured and saved", 1, true) or v11:find("capture found", 1, true) or v11:find("redeem remote found", 1, true)
+		local pos2 = tick() <= (LUCKEY_REDEEM_UTILITY_IGNORE_UNTIL or 0) and (v11:find("invalid code", 1, true) or v11:find("does not exist", 1, true) or v11:find("please wait", 1, true))
+		local pos3 = settings.retryCodeEnabled and flag and str3 == "sniper" and (v11:find("rate limit", 1, true) or v11:find("ratelimit", 1, true) or v11:find("too many request", 1, true) or v11:find("please wait", 1, true) or v11:find("try again", 1, true) or v11:find("cooldown", 1, true) or v11:find("too fast", 1, true))
+		if not pos and not pos2 and not pos3 then
+			return false
+		end
+
+		pcall(function()
+			if arg:IsA("GuiObject") then
+				arg.Visible = false
+			end
+		end)
+
+		return true
+	end
+
+	local function fn41(arg, arg2)
+		if not flag or str3 ~= arg2 then
+			return true
+		end
+		local v11 = fn40(arg)
+		if not v11 then
+			return false
+		end
+		local v12 = fn3(v11.Text)
+		if v12 == "" then
+			return false
+		end
+
+		if hideRedeemUtilityNotification(arg, v12) then
+			return true
+		end
+
+		if isIgnoredAnnouncementNotification(arg, v12) then
+			return true
+		end
+		fn28(v12)
+		local v13, v14 = parseSammyAutoCue(v12)
+
+		if v13 then
+			if v13 ~= arg2 then
+				return true
+			end
+
+			if not v14 then
+				updateStatusBar("Cue heard. Waiting for the next " .. (arg2 == "riddle" and "riddle" or "code") .. " part...", true)
+				return true
+			end
+			v12 = v14
+		end
+
+		if not fn33(v12) then
+			return true
+		end
+
+		if arg2 == "sniper" and settings.autoRedeemEnabled and #tbl2.sniper >= settings.redeemThreshold then
+			task.spawn(autoRedeemSniper)
+		elseif arg2 == "riddle" then
+			scheduleSolve(arg2)
+		end
+
+		return true
+	end
+
+	local function fn42(arg, arg2)
+		local tbl18 = {}
+		local flag8 = false
+		local n4 = 0
+
+		local function fn43()
+			if flag8 then
+				return
+			end
+			flag8 = true
+
+			for _, v11 in ipairs(tbl18) do
+				v11:Disconnect()
+			end
+		end
+
+		local function fn44()
+			if flag8 then
+				return
+			end
+
+			if fn41(arg, arg2) then
+				fn43()
+			end
+		end
+
+		local function fn45()
+			n4 += 1
+			local v11 = n4
+
+			task.defer(function()
+				if not flag8 and v11 == n4 then
+					fn44()
+				end
+			end)
+		end
+
+		local v11 = fn40(arg)
+
+		if v11 then
+			table.insert(tbl18, v11:GetPropertyChangedSignal("Text"):Connect(fn45))
+		end
+
+		table.insert(tbl18, arg.DescendantAdded:Connect(function(descendant)
+			if descendant:IsA("TextLabel") then
+				table.insert(tbl18, descendant:GetPropertyChangedSignal("Text"):Connect(fn45))
+			end
+
+			fn45()
+		end))
+
+		fn44()
+
+		if not flag8 then
+			fn45()
+		end
+
+		task.delay(0.25, function()
+			if not flag8 then
+				fn44()
+				fn43()
+			end
+		end)
+	end
+
+	autoStartFromPreviousNotification = function(arg)
+		if not settings.autoModeEnabled then
+			return false
+		end
+
+		if flag or str3 or not fn7 then
+			return false
+		end
+		local v11, v12 = parseSammyAutoCue(arg)
+		if not v11 then
+			return false
+		end
+		fn7(v11)
+
+		if v12 then
+			if fn33(v12) then
+				updateStatusBar("Captured inline " .. (v11 == "riddle" and "riddle" or "code") .. ": " .. v12, true)
+
+				if v11 == "sniper" and settings.autoRedeemEnabled and #tbl2.sniper >= settings.redeemThreshold then
+					task.spawn(autoRedeemSniper)
+				elseif v11 == "riddle" then
+					scheduleSolve(v11)
+				end
+			end
+		else
+			updateStatusBar("Auto-started " .. (v11 == "riddle" and "Riddle" or "Redeem") .. ". Waiting for the next part...", true)
+		end
+
+		fn13()
+		return true
+	end
+
+	onNotificationAdded = function(child)
+		local tbl18 = {}
+		local flag8 = false
+		local n4 = 0
+
+		local function fn43()
+			if flag8 then
+				return
+			end
+			flag8 = true
+
+			for _, v11 in ipairs(tbl18) do
+				v11:Disconnect()
+			end
+		end
+
+		local function fn44()
+			if flag8 then
+				return
+			end
+			local v11 = fn40(child)
+			if not v11 then
+				return
+			end
+			local v12 = fn3(v11.Text)
+			if v12 == "" then
+				return
+			end
+
+			if hideRedeemUtilityNotification(child, v12) then
+				fn43()
+				return
+			end
+
+			if isIgnoredAnnouncementNotification(child, v12) then
+				fn43()
+				return
+			end
+			fn28(v12)
+
+			if autoStartFromPreviousNotification then
+				autoStartFromPreviousNotification(v12)
+			end
+
+			fn43()
+		end
+
+		local function fn45()
+			n4 += 1
+			local v11 = n4
+
+			task.defer(function()
+				if not flag8 and v11 == n4 then
+					fn44()
+				end
+			end)
+		end
+
+		local v11 = fn40(child)
+
+		if v11 then
+			table.insert(tbl18, v11:GetPropertyChangedSignal("Text"):Connect(fn45))
+		end
+
+		table.insert(tbl18, child.DescendantAdded:Connect(function(descendant)
+			if descendant:IsA("TextLabel") then
+				table.insert(tbl18, descendant:GetPropertyChangedSignal("Text"):Connect(fn45))
+			end
+
+			fn45()
+		end))
+
+		fn44()
+
+		if not flag8 then
+			fn45()
+		end
+
+		task.delay(0.25, function()
+			if not flag8 then
+				fn44()
+				fn43()
+			end
+		end)
+	end
+
+	processNotification = function(arg)
+		setRetryStopVisible(false)
+		settings.retryTimerToken = settings.retryTimerToken + 1
+		settings.retryAttemptCount = 0
+
+		if not flag then
+			str3 = nil
+			fn31("sniper", false)
+			fn31("riddle", false)
+			return
+		end
+
+		settings.retrySessionId = settings.retrySessionId + 1
+		flag = false
+		fn38()
+
+		if connection then
+			connection:Disconnect()
+			connection = nil
+		end
+
+		local v11 = str3
+		local flag8 = arg and v11 == "sniper" and tbl2.sniper and #tbl2.sniper > 0
+
+		if v11 then
+			fn31(v11, false)
+			updateStatusBar("Stopped", false)
+
+			if not arg and v11 == "sniper" then
+				fn36()
+			elseif not arg and v11 == "riddle" then
+				if not flag2 then
+					fn37()
+				else
+					fn30()
+					str3 = nil
+					solved = nil
+					v2 = nil
+					flag2 = false
+				end
+			end
+		end
+
+		if flag8 then
+			str3 = "sniper"
+			refreshList()
+			fn13()
+		else
+			str3 = nil
+		end
+
+		fn31("sniper", false)
+		fn31("riddle", false)
+	end
+
+	requestRetryStopConfirmation = function()
+		if tick() <= (settings.retryStopConfirmUntil or 0) then
+			settings.retryStopConfirmUntil = 0
+			processNotification(true)
+			updateStatusBar("Retry Code stopped", false)
+			return
+		end
+
+		if settings.retryStopPromptOpen then
+			return
+		end
+
+		if prompt and CornerNotificationController then
+			settings.retryStopPromptOpen = true
+			local clone = prompt:Clone()
+			clone.Name = "RetryCodeStopPrompt"
+			clone.Username.Text = "Stop Retry Code and stop listening for new code parts?"
+			clone.Label.Text = "Confirm Stop"
+			clone.Label.TextColor3 = Color3.fromRGB(210, 80, 80)
+			clone.Visible = true
+			local v11 = CornerNotificationController:Add(clone)
+			local flag8 = false
+
+			local function fn43()
+				if flag8 then
+					return
+				end
+				flag8 = true
+				settings.retryStopPromptOpen = false
+				v11()
+			end
+
+			clone.Yes.Activated:Connect(function()
+				if flag8 then
+					return
+				end
+				fn43()
+				processNotification(true)
+				updateStatusBar("Retry Code stopped", false)
+			end)
+
+			clone.No.Activated:Connect(function()
+				if flag8 then
+					return
+				end
+				fn43()
+				updateStatusBar("Retry Code is still listening", true)
+			end)
+
+			task.delay(10, fn43)
+			return
+		end
+
+		settings.retryStopConfirmUntil = tick() + 4
+		updateStatusBar("Click Stop Sniper again within 4 seconds to confirm", false)
+	end
+
+	fn7 = function(arg)
+		setRetryStopVisible(false)
+		settings.retryTimerToken = settings.retryTimerToken + 1
+		settings.retryAttemptCount = 0
+
+		if flag and str3 == arg then
+			if arg == "sniper" and settings.retryCodeEnabled then
+				if tick() <= (settings.retryStopConfirmUntil or 0) then
+					settings.retryStopConfirmUntil = 0
+					processNotification(true)
+					updateStatusBar("Retry Code stopped", false)
+				else
+					requestRetryStopConfirmation()
+				end
+			else
+				processNotification(true)
+			end
+
+			return
+		end
+
+		if flag then
+			processNotification(true)
+		end
+
+		fn31("sniper", false)
+		fn31("riddle", false)
+		str3 = arg
+		flag = true
+		flag2 = false
+		fn31(arg, true)
+		updateStatusBar("Listening...", true)
+		fn30()
+		solved = nil
+		v2 = nil
+		fn13()
+
+		connection = topNotification.ChildAdded:Connect(function(child)
+			fn42(child, arg)
+		end)
+	end
+end
+
+local fn26
+
+fn26 = function(arg)
+	local v11 = normalizeModeName(arg)
+	if v11 ~= "sniper" and v11 ~= "riddle" then
+		return
+	end
+
+	if flag and str3 == v11 then
+		processNotification(true)
+	end
+
+	if flag then
+		processNotification(true)
+	end
+
+	fn7(v11)
+end
+
+save.Activated:Connect(function()
+	local num = tonumber(textBox.Text)
+
+	if num and num > 0 then
+		settings.redeemThreshold = math.max(1, math.floor(num))
+	end
+
+	textBox.Text = tostring(settings.redeemThreshold)
+end)
+
+v9.RemoteButton.Activated:Connect(function()
+	remoteHandler.SetMode("Remote")
+	v9.Update()
+	updateStatusBar("Redeem method: Remote", true)
+end)
+
+v9.ClickButton.Activated:Connect(function()
+	remoteHandler.SetMode("Click")
+	v9.Update()
+	updateStatusBar("Redeem method: Click", true)
+end)
+
+v9.ProbeButton.Activated:Connect(function()
+	remoteHandler.SetScanMethod("Probe")
+	v9.Update()
+	updateStatusBar("Scan method: response Probe", true)
+end)
+
+v9.CaptureButton.Activated:Connect(function()
+	remoteHandler.SetScanMethod("Capture")
+	remoteHandler.SetMode("Remote")
+	v9.Update()
+	updateStatusBar("Capture selected - Remote will be captured automatically", true)
+end)
+
+v9.FindButton.Activated:Connect(function()
+	remoteHandler.SetMode("Remote")
+	v9.Update()
+	local v11 = remoteHandler.GetScanMethod()
+	updateStatusBar("Starting " .. v11 .. " scan...", true)
+
+	task.spawn(function()
+		local v12, v13
+
+		if v11 == "Capture" then
+			v12, v13 = remoteHandler.Capture(function(arg)
+				updateStatusBar(arg, true)
+			end)
+		else
+			v12, v13 = v.Find(true, function(arg)
+				updateStatusBar(arg, true)
+			end)
+		end
+
+		if v12 then
+			if v11 == "Capture" then
+				updateStatusBar("Remote saved for this JobId - rejoin now", true)
+			else
+				updateStatusBar("Remote found: " .. v12.Name, true)
+				fn11("Redeem remote found and cached")
+			end
+		else
+			updateStatusBar(tostring(v13), false)
+			fn12(v11 .. " scan could not find the remote")
+		end
+	end)
+end)
+
+retryToggle.Activated:Connect(function()
+	settings.retryCodeEnabled = not settings.retryCodeEnabled
+	settings.retryStopConfirmUntil = 0
+
+	if not settings.retryCodeEnabled then
+		settings.retryTimerToken = settings.retryTimerToken + 1
+		settings.retryAttemptCount = 0
+		setRetryStopVisible(false)
+	end
+
+	if settings.retryCodeEnabled and remoteHandler.GetScanMethod() == "Capture" then
+		remoteHandler.SetMode("Remote")
+	end
+
+	updateSettingsUI()
+	updateStatusBar(settings.retryCodeEnabled and "Retry Code enabled" or "Retry Code disabled", true)
+end)
+
+autoRedeem.Activated:Connect(function()
+	settings.autoRedeemEnabled = not settings.autoRedeemEnabled
+	updateSettingsUI()
+
+	if settings.autoRedeemEnabled then
+		fn11("Auto Redeem ON")
+	else
+		flag2 = false
+		fn12("Auto Redeem OFF")
+		updateStatusBar("Auto Redeem is OFF - automatic codes blocked", false)
+	end
+end)
+
+autoModeToggle.Activated:Connect(function()
+	settings.autoModeEnabled = not settings.autoModeEnabled
+	updateSettingsUI()
+
+	if settings.autoModeEnabled then
+		fn11("Auto Switch Mode ON")
+	else
+		fn12("Auto Switch Mode OFF")
+	end
+end)
+
+botMode.Activated:Connect(function()
+	settings.botModeEnabled = not settings.botModeEnabled
+	updateSettingsUI()
+
+	if settings.botModeEnabled then
+		fn11("Bot Mode ON")
+
+		task.delay(0.5, function()
+			requestBotMode(6)
+		end)
+	else
+		fn12("Bot Mode OFF")
+	end
+end)
+
+setPingBoostFFlags = function(arg)
+	if typeof(setfflag) ~= "function" then
+		return false, 0, #pingBoostFFlags, "setfflag is not supported by this executor"
+	end
+
+	if arg then
+		local n4 = 0
+		local n5 = 0
+
+		for _, v11 in ipairs(pingBoostFFlags) do
+			local v12 = v11[1]
+			local v13 = v11[2]
+
+			if pingBoostOriginalValues[v12] == nil and typeof(getfflag) == "function" then
+				local ok_, result = pcall(getfflag, v12)
+
+				if ok_ and result ~= nil then
+					pingBoostOriginalValues[v12] = tostring(result)
+				end
+			end
+
+			if pcall(setfflag, v12, v13) then
+				pingBoostAppliedFlags[v12] = true
+				n4 += 1
+			else
+				n5 += 1
+			end
+		end
+
+		return n4 > 0, n4, n5, nil
+	end
+
+	local tbl18 = {}
+	local n4 = 0
+	local n5 = 0
+
+	for k in pairs(pingBoostAppliedFlags) do
+		local v11 = pingBoostOriginalValues[k]
+
+		if v11 ~= nil then
+			if pcall(setfflag, k, v11) then
+				n4 += 1
+			else
+				tbl18[k] = true
+				n5 += 1
+			end
+		else
+			tbl18[k] = true
+			n5 += 1
+		end
+	end
+
+	pingBoostAppliedFlags = tbl18
+	return true, n4, n5, nil
+end
+
+pingBoostToggle.Activated:Connect(function()
+	local pingBoostFFlagsEnabled = not settings.pingBoostFFlagsEnabled
+	pingBoostToggle.Text = pingBoostFFlagsEnabled and "Applying..." or "Restoring..."
+	local v11, v12, v13, v14 = setPingBoostFFlags(pingBoostFFlagsEnabled)
+
+	if not v11 then
+		settings.pingBoostFFlagsEnabled = false
+		updateSettingsUI()
+		fn12(v14 or "No supported FFlags were applied")
+		updateStatusBar(v14 or "FFlag Boost unavailable", false)
+		return
+	end
+
+	settings.pingBoostFFlagsEnabled = pingBoostFFlagsEnabled
+	updateSettingsUI()
+
+	if pingBoostFFlagsEnabled then
+		local str5 = "FFlag Boost ON - " .. tostring(v12) .. " applied"
+
+		if v13 > 0 then
+			str5 ..= ", " .. tostring(v13) .. " unsupported"
+		end
+
+		fn11(str5)
+		updateStatusBar(str5, true)
+	else
+		local str5 = "FFlag Boost OFF - " .. tostring(v12) .. " restored"
+
+		if v13 > 0 then
+			str5 ..= "; restart needed for " .. tostring(v13)
+		end
+
+		if v13 > 0 then
+			fn12(str5)
+		else
+			fn11(str5)
+		end
+
+		updateStatusBar(str5, v13 == 0)
+	end
+end)
+
+priorityToggle.Activated:Connect(function()
+	if not visible then
+		fn12("Owner-first redeem is owner-only")
+		return
+	end
+	settings.ownerPriorityRedeemEnabled = not settings.ownerPriorityRedeemEnabled
+	updateSettingsUI()
+
+	if sendEncryptedPayload({
+		type = "ownerPriorityRedeemToggle",
+		key = str2,
+		senderId = localPlayer.UserId,
+		enabled = settings.ownerPriorityRedeemEnabled,
+	}) then
+		updateStatusBar(settings.ownerPriorityRedeemEnabled and "Owner-first redeem enabled" or "Owner-first redeem disabled", true)
+	else
+		updateStatusBar("Priority saved locally; WebSocket is offline", false)
+	end
+end)
+
+sendBotOwnerCommand = function(arg, arg2, arg3)
+	sentAny = false
+
+	for k in pairs(botRedeemCache) do
+		if fn17(arg, arg2, arg3, tonumber(k)) then
+			sentAny = true
+		end
+	end
+
+	return sentAny
+end
+
+if announcementHistoryToggle then
+	announcementHistoryToggle.Activated:Connect(function()
+		announcementHideFromPrevious = not announcementHideFromPrevious
+		announcementHistoryToggle.Text = announcementHideFromPrevious and "Hide: ON" or "Hide: OFF"
+
+		if announcementHideFromPrevious then
+			fn11("Announcements hidden from Previous")
+		else
+			fn11("Announcements will appear in Previous")
+		end
+	end)
+end
+
+if announcementSendBtn then
+	announcementSendBtn.Activated:Connect(function()
+		if not visible then
+			fn12("Only owner can send announcements")
+			return
+		end
+		local str5 = tostring(announcementBox and announcementBox.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+		if str5 == "" then
+			fn12("Type an announcement first")
+			return
+		end
+
+		if not sendAnnouncementToServer(str5, tonumber(announcementUserIdBox and announcementUserIdBox.Text or ""), announcementHideFromPrevious) then
+			fn12("WebSocket not connected")
+		end
+	end)
+end
+
+sniperSwitchBtn.Activated:Connect(function()
+	if sendBotOwnerCommand("switch", "sniper") then
+		updateStatusBar("Command sent: Sniper", true)
+		fn11("Sent switch to accepted bots")
+	else
+		fn12("No accepted bots yet")
+	end
+end)
+
+riddleSwitchBtn.Activated:Connect(function()
+	if sendBotOwnerCommand("switch", "riddle") then
+		updateStatusBar("Command sent: Riddle", true)
+		fn11("Sent riddle to accepted bots")
+	else
+		fn12("No accepted bots yet")
+	end
+end)
+
+clearSniperBtn.Activated:Connect(function()
+	if sendBotOwnerCommand("clearAll", "all") then
+		updateStatusBar("Clear command sent", true)
+		fn11("Clearing accepted bots")
+	else
+		fn12("No accepted bots yet")
+	end
+end)
+
+popSniperBtn.Activated:Connect(function()
+	if sendBotOwnerCommand("removeNewest", "all") then
+		updateStatusBar("Pop command sent", true)
+		fn11("Removing newest from accepted bots")
+	else
+		fn12("No accepted bots yet")
+	end
+end)
+
+addBotsOverlay = Instance.new("Frame")
+addBotsOverlay.Name = "BotPage"
+addBotsOverlay.Size = UDim2.fromScale(1, 1)
+addBotsOverlay.Position = UDim2.fromScale(1, 0)
+addBotsOverlay.BackgroundTransparency = 1
+addBotsOverlay.BorderSizePixel = 0
+addBotsOverlay.Visible = true
+addBotsOverlay.ZIndex = 30
+addBotsOverlay.Parent = frame5
+addBotsPanel = Instance.new("Frame")
+addBotsPanel.Size = UDim2.new(1, -40, 1, -24)
+addBotsPanel.Position = UDim2.fromOffset(20, 12)
+addBotsPanel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+addBotsPanel.BorderSizePixel = 0
+addBotsPanel.ZIndex = 31
+addBotsPanel.Parent = addBotsOverlay
+Instance.new("UICorner", addBotsPanel).CornerRadius = UDim.new(0, 12)
+addBotsStroke = Instance.new("UIStroke")
+addBotsStroke.Color = Color3.fromRGB(55, 55, 55)
+addBotsStroke.Thickness = 0
+addBotsStroke.Transparency = 1
+addBotsStroke.Parent = addBotsPanel
+addBotsTitle = Instance.new("TextLabel")
+addBotsTitle.BackgroundTransparency = 1
+addBotsTitle.Size = UDim2.new(1, -70, 0, 34)
+addBotsTitle.Position = UDim2.fromOffset(14, 10)
+addBotsTitle.Font = Enum.Font.GothamBold
+addBotsTitle.TextSize = 18
+addBotsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+addBotsTitle.TextXAlignment = Enum.TextXAlignment.Left
+addBotsTitle.Text = "Add Bots"
+addBotsTitle.ZIndex = 32
+addBotsTitle.Parent = addBotsPanel
+closeAddBotsBtn = Instance.new("TextButton")
+closeAddBotsBtn.Size = UDim2.fromOffset(58, 28)
+closeAddBotsBtn.Position = UDim2.new(1, -70, 0, 12)
+closeAddBotsBtn.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+closeAddBotsBtn.BorderSizePixel = 0
+closeAddBotsBtn.Font = Enum.Font.GothamBold
+closeAddBotsBtn.TextSize = 14
+closeAddBotsBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+closeAddBotsBtn.Text = "Back"
+closeAddBotsBtn.ZIndex = 32
+closeAddBotsBtn.Parent = addBotsPanel
+Instance.new("UICorner", closeAddBotsBtn).CornerRadius = UDim.new(0, 8)
+botSearchBox = Instance.new("TextBox")
+botSearchBox.Size = UDim2.new(1, -28, 0, 36)
+botSearchBox.Position = UDim2.fromOffset(14, 54)
+botSearchBox.BackgroundColor3 = Color3.fromRGB(36, 36, 36)
+botSearchBox.BorderSizePixel = 0
+botSearchBox.ClearTextOnFocus = false
+botSearchBox.PlaceholderText = "Search username or display name"
+botSearchBox.Font = Enum.Font.Gotham
+botSearchBox.TextSize = 14
+botSearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+botSearchBox.PlaceholderColor3 = Color3.fromRGB(135, 135, 135)
+botSearchBox.Text = ""
+botSearchBox.ZIndex = 32
+botSearchBox.Parent = addBotsPanel
+Instance.new("UICorner", botSearchBox).CornerRadius = UDim.new(0, 8)
+botResultsFrame = Instance.new("ScrollingFrame")
+botResultsFrame.Size = UDim2.new(1, -28, 0, 188)
+botResultsFrame.Position = UDim2.fromOffset(14, 98)
+botResultsFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+botResultsFrame.BorderSizePixel = 0
+botResultsFrame.ScrollBarThickness = 3
+botResultsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+botResultsFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+botResultsFrame.ZIndex = 32
+botResultsFrame.Parent = addBotsPanel
+Instance.new("UICorner", botResultsFrame).CornerRadius = UDim.new(0, 8)
+botResultsLayout = Instance.new("UIListLayout")
+botResultsLayout.Padding = UDim.new(0, 4)
+botResultsLayout.Parent = botResultsFrame
+botResultsPad = Instance.new("UIPadding")
+botResultsPad.PaddingTop = UDim.new(0, 8)
+botResultsPad.PaddingBottom = UDim.new(0, 8)
+botResultsPad.PaddingLeft = UDim.new(0, 8)
+botResultsPad.PaddingRight = UDim.new(0, 8)
+botResultsPad.Parent = botResultsFrame
+emptyBotsLabel = Instance.new("TextLabel")
+emptyBotsLabel.Size = UDim2.new(1, 0, 0, 24)
+emptyBotsLabel.BackgroundTransparency = 1
+emptyBotsLabel.Font = Enum.Font.Gotham
+emptyBotsLabel.TextSize = 12
+emptyBotsLabel.TextColor3 = Color3.fromRGB(135, 135, 135)
+emptyBotsLabel.TextXAlignment = Enum.TextXAlignment.Left
+emptyBotsLabel.Text = "Search for players in this server."
+emptyBotsLabel.ZIndex = 33
+emptyBotsLabel.Parent = botResultsFrame
+botSettingsCard = Instance.new("Frame")
+botSettingsCard.Size = UDim2.new(1, -28, 0, 230)
+botSettingsCard.Position = UDim2.fromOffset(14, 294)
+botSettingsCard.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+botSettingsCard.BorderSizePixel = 0
+botSettingsCard.ZIndex = 32
+botSettingsCard.Parent = addBotsPanel
+Instance.new("UICorner", botSettingsCard).CornerRadius = UDim.new(0, 8)
+selectedBotLabel = Instance.new("TextLabel")
+selectedBotLabel.Size = UDim2.new(1, -20, 0, 22)
+selectedBotLabel.Position = UDim2.fromOffset(10, 8)
+selectedBotLabel.BackgroundTransparency = 1
+selectedBotLabel.Font = Enum.Font.GothamBold
+selectedBotLabel.TextSize = 12
+selectedBotLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
+selectedBotLabel.TextXAlignment = Enum.TextXAlignment.Left
+selectedBotLabel.Text = "Select an accepted bot"
+selectedBotLabel.ZIndex = 33
+selectedBotLabel.Parent = botSettingsCard
+local udim22 = UDim2.fromOffset
+botAutoBtn = createTextButton(botSettingsCard, "Auto: ON", UDim2.fromOffset(84, 28), udim22(10, 38))
+local udim23 = UDim2.fromOffset
+botModeBtn = createTextButton(botSettingsCard, "Bot: ON", UDim2.fromOffset(84, 28), udim23(104, 38))
+botThresholdBox = Instance.new("TextBox")
+botThresholdBox.Size = UDim2.fromOffset(54, 28)
+botThresholdBox.Position = UDim2.fromOffset(198, 38)
+botThresholdBox.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
+botThresholdBox.BorderSizePixel = 0
+botThresholdBox.ClearTextOnFocus = false
+botThresholdBox.Font = Enum.Font.GothamMedium
+botThresholdBox.TextSize = 13
+botThresholdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+botThresholdBox.Text = "1"
+botThresholdBox.ZIndex = 33
+botThresholdBox.Parent = botSettingsCard
+Instance.new("UICorner", botThresholdBox).CornerRadius = UDim.new(0, 8)
+local udim24 = UDim2.fromOffset
+botSaveBtn = createTextButton(botSettingsCard, "Save", UDim2.fromOffset(78, 28), udim24(262, 38))
+local udim25 = UDim2.fromOffset
+botRedeemMethodBtn = createTextButton(botSettingsCard, "Redeem: Remote", UDim2.fromOffset(104, 28), udim25(10, 76))
+local udim26 = UDim2.fromOffset
+botScanMethodBtn = createTextButton(botSettingsCard, "Scan: Capture", UDim2.fromOffset(104, 28), udim26(120, 76))
+local udim27 = UDim2.fromOffset
+botFindRemoteBtn = createTextButton(botSettingsCard, "Find Remote", UDim2.fromOffset(106, 28), udim27(230, 76))
+local udim28 = UDim2.fromOffset
+botShareRemoteBtn = createTextButton(botSettingsCard, "Share + Test My Remote", UDim2.fromOffset(180, 28), udim28(10, 114))
+botHintLabel = Instance.new("TextLabel")
+botHintLabel.Size = UDim2.new(1, -20, 0, 42)
+botHintLabel.Position = UDim2.fromOffset(10, 152)
+botHintLabel.BackgroundTransparency = 1
+botHintLabel.Font = Enum.Font.Gotham
+botHintLabel.TextSize = 11
+botHintLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+botHintLabel.TextXAlignment = Enum.TextXAlignment.Left
+botHintLabel.TextYAlignment = Enum.TextYAlignment.Top
+botHintLabel.TextWrapped = true
+botHintLabel.Text = "Choose Remote/Click per bot. Find runs on the bot; Share + Test sends your remote path only when both users are in this server."
+botHintLabel.ZIndex = 33
+botHintLabel.Parent = botSettingsCard
+
+getBotSettings = function(arg)
+	key = tostring(arg or "")
+
+	botProfileUI[key] = botProfileUI[key] or {
+		autoRedeem = true,
+		botMode = true,
+		redeemThreshold = 1,
+		redeemMethod = "Remote",
+		scanMethod = "Capture",
+	}
+
+	return botProfileUI[key]
+end
+
+updateSelectedBotSettingsUI = function()
+	cfg = v4 and getBotSettings(v4) or nil
+	local v11 = selectedBotLabel
+	local text = v4
+
+	if v4 then
+		text = "Selected: @" .. tostring(name_ or v4)
+	end
+
+	v11.Text = text or "Select an accepted bot"
+	botAutoBtn.Text = cfg and (cfg.autoRedeem and "Auto: ON" or "Auto: OFF") or "Auto: --"
+	botModeBtn.Text = cfg and (cfg.botMode and "Bot: ON" or "Bot: OFF") or "Bot: --"
+	local v12 = botThresholdBox
+	local text2 = cfg
+
+	if text2 then
+		text2 = tostring(cfg.redeemThreshold or 1)
+	end
+
+	v12.Text = text2 or "1"
+	local v13 = botRedeemMethodBtn
+	local text3 = cfg
+
+	if text3 then
+		text3 = "Redeem: " .. tostring(cfg.redeemMethod or "Remote")
+	end
+
+	v13.Text = text3 or "Redeem: --"
+	local v14 = botScanMethodBtn
+	local text4 = cfg
+
+	if text4 then
+		text4 = "Scan: " .. tostring(cfg.scanMethod or "Capture")
+	end
+
+	v14.Text = text4 or "Scan: --"
+end
+
+sendSelectedBotSettings = function()
+	if not v4 then
+		fn12("Select an accepted bot first")
+		return false
+	end
+	cfg = getBotSettings(v4)
+	cfg.redeemThreshold = math.max(1, math.floor(tonumber(botThresholdBox.Text) or cfg.redeemThreshold or 1))
+	botThresholdBox.Text = tostring(cfg.redeemThreshold)
+	local tbl18 = { settings = cfg }
+	ok = fn17("applySettings", nil, nil, tonumber(v4), tbl18)
+
+	if ok then
+		fn11("Saved settings for @" .. tostring(name_ or v4))
+	else
+		fn12("Failed to save bot settings")
+	end
+
+	return ok
+end
+
+botAutoBtn.Activated:Connect(function()
+	if not v4 then
+		fn12("Select an accepted bot first")
+		return
+	end
+	cfg = getBotSettings(v4)
+	cfg.autoRedeem = not cfg.autoRedeem
+	updateSelectedBotSettingsUI()
+	sendSelectedBotSettings()
+end)
+
+botModeBtn.Activated:Connect(function()
+	if not v4 then
+		fn12("Select an accepted bot first")
+		return
+	end
+	cfg = getBotSettings(v4)
+	cfg.botMode = not cfg.botMode
+	updateSelectedBotSettingsUI()
+	sendSelectedBotSettings()
+end)
+
+botRedeemMethodBtn.Activated:Connect(function()
+	if not v4 then
+		fn12("Select an accepted bot first")
+		return
+	end
+	cfg = getBotSettings(v4)
+	cfg.redeemMethod = cfg.redeemMethod == "Click" and "Remote" or "Click"
+	updateSelectedBotSettingsUI()
+	sendSelectedBotSettings()
+end)
+
+botScanMethodBtn.Activated:Connect(function()
+	if not v4 then
+		fn12("Select an accepted bot first")
+		return
+	end
+	cfg = getBotSettings(v4)
+	cfg.scanMethod = cfg.scanMethod == "Capture" and "Probe" or "Capture"
+
+	if cfg.scanMethod == "Capture" then
+		cfg.redeemMethod = "Remote"
+	end
+
+	updateSelectedBotSettingsUI()
+	sendSelectedBotSettings()
+end)
+
+botFindRemoteBtn.Activated:Connect(function()
+	if not v4 then
+		fn12("Select an accepted bot first")
+		return
+	end
+	cfg = getBotSettings(v4)
+
+	if fn17("findRedeemRemote", nil, nil, tonumber(v4), { redeemMethod = cfg.redeemMethod or "Remote", scanMethod = cfg.scanMethod or "Capture" }) then
+		updateStatusBar("Asked @" .. tostring(name_ or v4) .. " to scan", true)
+	else
+		fn12("Could not send bot scan command")
+	end
+end)
+
+botShareRemoteBtn.Activated:Connect(function()
+	if not v4 then
+		fn12("Select an accepted bot first")
+		return
+	end
+	local v11, v12 = v.Find(false)
+	if not v11 then
+		fn12("Your redeem remote is not ready: " .. tostring(v12 or "not found"))
+		return
+	end
+
+	if fn17("shareRedeemRemote", nil, nil, tonumber(v4), { remotePath = v11:GetFullName(), jobId = tostring(game.JobId), placeId = tostring(game.PlaceId) }) then
+		updateStatusBar("Shared remote with @" .. tostring(name_ or v4) .. "; waiting for test", true)
+	else
+		fn12("Could not share the remote")
+	end
+end)
+
+botSaveBtn.Activated:Connect(sendSelectedBotSettings)
+updateSelectedBotSettingsUI()
+
+botAvailabilityText = function(arg)
+	key = tostring(arg.UserId)
+	return botOnlineStatus[key] and "Online now" or "Offline"
+end
+
+botStatusText = function(arg)
+	key = tostring(arg.UserId)
+	if botRedeemCache[key] then
+		return v4 == key and "Selected" or "Accepted"
+	end
+
+	if botRequestCache[key] then
+		return "Pending"
+	end
+	return "Request"
+end
+
+applyBotOnlineVisuals = function(arg)
+	local v11 = botProfileData[arg]
+	if not v11 then
+		return
+	end
+	local flag7 = botOnlineStatus[arg] == true
+
+	if botStatusLabels[arg] then
+		botStatusLabels[arg].Text = botStatusText(v11)
+	end
+
+	if botAvailLabels[arg] then
+		botAvailLabels[arg].Text = botAvailabilityText(v11)
+		botAvailLabels[arg].TextColor3 = flag7 and Color3.fromRGB(126, 232, 164) or Color3.fromRGB(255, 96, 96)
+	end
+
+	if botIndicatorDots[arg] then
+		botIndicatorDots[arg].BackgroundColor3 = flag7 and Color3.fromRGB(126, 232, 164) or Color3.fromRGB(255, 76, 76)
+		botIndicatorDots[arg].BackgroundTransparency = flag7 and 0.1 or 0
+	end
+
+	if botAvatarImages[arg] then
+		botAvatarImages[arg].ImageColor3 = flag7 and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(155, 155, 155)
+		botAvatarImages[arg].ImageTransparency = flag7 and 0 or 0.18
+	end
+end
+
+latestBotSearchToken = 0
+botSearchDebounceToken = 0
+
+clearBotRows = function()
+	botStatusLabels = {}
+	botAvailLabels = {}
+	botIndicatorDots = {}
+	botAvatarImages = {}
+
+	for _, child in ipairs(botResultsFrame:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+end
+
+drawBotResults = function(arg, arg2)
+	clearBotRows()
+	emptyBotsLabel.Visible = #arg == 0
+
+	if arg2 == "" then
+		emptyBotsLabel.Text = "Search any Roblox username or display name."
+	elseif #arg == 0 then
+		emptyBotsLabel.Text = "No players found."
+	else
+		emptyBotsLabel.Text = ""
+	end
+
+	statusIds = {}
+
+	for _, v11 in ipairs(arg) do
+		keyForProfile = tostring(v11.UserId)
+		botProfileData[keyForProfile] = { UserId = v11.UserId, Name = v11.Name, DisplayName = v11.DisplayName }
+		table.insert(statusIds, v11.UserId)
+		row = Instance.new("TextButton")
+		row.Size = UDim2.new(1, -8, 0, 68)
+		row.BackgroundColor3 = Color3.fromRGB(27, 27, 27)
+		row.BorderSizePixel = 0
+		row.AutoButtonColor = false
+		row.Text = ""
+		row.ZIndex = 33
+		row.Parent = botResultsFrame
+		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+		rowStroke = Instance.new("UIStroke")
+		rowStroke.Color = Color3.fromRGB(52, 52, 52)
+		rowStroke.Thickness = 1
+		rowStroke.Transparency = 0.35
+		rowStroke.Parent = row
+
+		row.MouseEnter:Connect(function()
+			TweenService:Create(row, TweenInfo.new(0.14), { BackgroundColor3 = Color3.fromRGB(36, 36, 36) }):Play()
+			TweenService:Create(rowStroke, TweenInfo.new(0.14), { Transparency = 0.12 }):Play()
+		end)
+
+		row.MouseLeave:Connect(function()
+			TweenService:Create(row, TweenInfo.new(0.14), { BackgroundColor3 = Color3.fromRGB(27, 27, 27) }):Play()
+			TweenService:Create(rowStroke, TweenInfo.new(0.14), { Transparency = 0.35 }):Play()
+		end)
+
+		headshot = Instance.new("ImageLabel")
+		headshot.Size = UDim2.fromOffset(44, 44)
+		headshot.Position = UDim2.fromOffset(9, 12)
+		headshot.BackgroundTransparency = 1
+		headshot.Image = "rbxthumb://type=AvatarHeadShot&id=" .. v11.UserId .. "&w=100&h=100"
+		headshot.ZIndex = 34
+		headshot.Parent = row
+		botAvatarImages[keyForProfile] = headshot
+		Instance.new("UICorner", headshot).CornerRadius = UDim.new(1, 0)
+		displayLabel = Instance.new("TextLabel")
+		displayLabel.Size = UDim2.new(1, -154, 0, 20)
+		displayLabel.Position = UDim2.fromOffset(64, 9)
+		displayLabel.BackgroundTransparency = 1
+		displayLabel.Font = Enum.Font.GothamBold
+		displayLabel.TextSize = 13
+		displayLabel.TextColor3 = Color3.fromRGB(245, 245, 245)
+		displayLabel.TextXAlignment = Enum.TextXAlignment.Left
+		displayLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		displayLabel.Text = v11.DisplayName
+		displayLabel.ZIndex = 34
+		displayLabel.Parent = row
+		local textLabel10 = Instance.new("TextLabel")
+		textLabel10.Size = UDim2.new(1, -154, 0, 16)
+		textLabel10.Position = UDim2.fromOffset(64, 29)
+		textLabel10.BackgroundTransparency = 1
+		textLabel10.Font = Enum.Font.Gotham
+		textLabel10.TextSize = 12
+		textLabel10.TextColor3 = Color3.fromRGB(160, 160, 160)
+		textLabel10.TextXAlignment = Enum.TextXAlignment.Left
+		textLabel10.TextTruncate = Enum.TextTruncate.AtEnd
+		textLabel10.Text = "@" .. v11.Name
+		textLabel10.ZIndex = 34
+		textLabel10.Parent = row
+		local textLabel11 = Instance.new("TextLabel")
+		local frame8 = Instance.new("Frame")
+		frame8.Size = UDim2.fromOffset(6, 6)
+		frame8.Position = UDim2.fromOffset(64, 51)
+		frame8.BorderSizePixel = 0
+		frame8.ZIndex = 34
+		frame8.Parent = row
+		Instance.new("UICorner", frame8).CornerRadius = UDim.new(1, 0)
+		botIndicatorDots[keyForProfile] = frame8
+
+		task.spawn(function()
+			while frame8.Parent do
+				if botOnlineStatus[keyForProfile] == true then
+					frame8.Position = UDim2.fromOffset(64, 51)
+					task.wait(0.45)
+					continue
+				else
+					TweenService:Create(frame8, TweenInfo.new(0.42, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(70, 51) }):Play()
+					task.wait(0.42)
+
+					if frame8.Parent then
+						TweenService:Create(frame8, TweenInfo.new(0.42, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Position = UDim2.fromOffset(64, 51) }):Play()
+						task.wait(0.42)
+						continue
+					end
+				end
+
+				break
+			end
+		end)
+
+		textLabel11.Size = UDim2.new(1, -164, 0, 14)
+		textLabel11.Position = UDim2.fromOffset(76, 47)
+		textLabel11.BackgroundTransparency = 1
+		textLabel11.Font = Enum.Font.GothamMedium
+		textLabel11.TextSize = 10
+		textLabel11.TextXAlignment = Enum.TextXAlignment.Left
+		textLabel11.Text = botAvailabilityText(v11)
+		textLabel11.ZIndex = 34
+		textLabel11.Parent = row
+		botAvailLabels[keyForProfile] = textLabel11
+		local textLabel12 = Instance.new("TextLabel")
+		textLabel12.Size = UDim2.fromOffset(96, 24)
+		textLabel12.Position = UDim2.new(1, -104, 0.5, -12)
+		textLabel12.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+		textLabel12.BorderSizePixel = 0
+		textLabel12.Font = Enum.Font.GothamBold
+		textLabel12.TextSize = 11
+		textLabel12.TextColor3 = Color3.fromRGB(0, 0, 0)
+		textLabel12.Text = botStatusText(v11)
+		botStatusLabels[keyForProfile] = textLabel12
+		textLabel12.ZIndex = 34
+		textLabel12.Parent = row
+		Instance.new("UICorner", textLabel12).CornerRadius = UDim.new(0, 7)
+		applyBotOnlineVisuals(keyForProfile)
+
+		row.Activated:Connect(function()
+			key = tostring(v11.UserId)
+
+			if botRedeemCache[key] then
+				v4 = key
+				name_ = v11.Name
+				getBotSettings(key)
+				updateSelectedBotSettingsUI()
+				refreshBotSearch()
+				fn11("Selected @" .. v11.Name)
+				return
+			end
+
+			local v12, v13 = sendRedeemMessage(v11)
+
+			if v12 then
+				botRequestCache[key] = { requestId = v13, name = v11.Name }
+				textLabel3.Text = "Sending..."
+				updateStatusBar("Delivering request to @" .. v11.Name, true)
+
+				task.delay(8, function()
+					local v14 = botRequestCache[key]
+
+					if type(v14) == "table" and v14.requestId == v13 then
+						botRequestCache[key] = nil
+
+						if v5 then
+							v5()
+						end
+
+						fn12("No delivery confirmation from @" .. v11.Name)
+					end
+				end)
+			else
+				fn12("Failed to request @" .. v11.Name)
+			end
+		end)
+	end
+
+	sendStatusRequest(statusIds)
+end
+
+savedBotMatches = function(arg)
+	lowered = string.lower(arg or "")
+	matches = {}
+
+	for k in pairs(botRedeemCache) do
+		profile = botProfileData[tostring(k)]
+
+		if profile then
+			name = string.lower(profile.Name or "")
+			display = string.lower(profile.DisplayName or "")
+
+			if lowered == "" or string.find(name, lowered, 1, true) or string.find(display, lowered, 1, true) then
+				table.insert(matches, profile)
+			end
+		end
+	end
+
+	return matches
+end
+
+addUniqueBotMatch = function(arg, arg2, arg3)
+	if not arg3 or not arg3.UserId then
+		return
+	end
+	key = tostring(arg3.UserId)
+	if arg2[key] then
+		return
+	end
+	arg2[key] = true
+	local v11 = botProfileData
+	local v12 = key
+	local tbl18 = botProfileData[key]
+
+	if not tbl18 then
+		tbl18 = { UserId = arg3.UserId, Name = arg3.Name, DisplayName = arg3.DisplayName or arg3.Name }
+	end
+
+	v11[v12] = tbl18
+	table.insert(arg, botProfileData[key])
+end
+
+mergedLocalBotMatches = function(arg)
+	lowered = string.lower(arg or "")
+	matches = {}
+	seen = {}
+
+	for _, v11 in ipairs(savedBotMatches(arg)) do
+		addUniqueBotMatch(matches, seen, v11)
+	end
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer then
+			name = string.lower(player.Name or "")
+			display = string.lower(player.DisplayName or "")
+
+			if lowered == "" or string.find(name, lowered, 1, true) or string.find(display, lowered, 1, true) then
+				addUniqueBotMatch(matches, seen, { UserId = player.UserId, Name = player.Name, DisplayName = player.DisplayName })
+			end
+		end
+	end
+
+	return matches, seen
+end
+
+fallbackServerMatches = function(arg)
+	return mergedLocalBotMatches(arg)
+end
+
+searchRobloxUsers = function(arg, arg2)
+	encoded = urlEncode(arg)
+	url = "https://users.roblox.com/v1/users/search?keyword=" .. encoded .. "&limit=10"
+
+	local ok_, result = pcall(function()
+		return request_({ Url = url, Method = "GET", Headers = { Accept = "application/json" } })
+	end)
+
+	ok = ok_
+	response = result
+
+	if ok and response and (response.Success or response.StatusCode == 200) and response.Body then
+		local ok_2, result2 = pcall(function()
+			return HttpService:JSONDecode(response.Body)
+		end)
+
+		decodeOk = ok_2
+		decoded = result2
+
+		if decodeOk and decoded and type(decoded.data) == "table" then
+			local v11, v12 = mergedLocalBotMatches(arg)
+			matches = v11
+			seen = v12
+
+			for _, v13 in ipairs(decoded.data) do
+				userId = v13.id or v13.userId or v13.UserId
+				username = v13.name or v13.username or v13.Name
+				displayName = v13.displayName or v13.DisplayName or username
+
+				if userId and username and tostring(userId) ~= tostring(localPlayer.UserId) then
+					addUniqueBotMatch(matches, seen, {
+						UserId = tonumber(userId) or userId,
+						Name = tostring(username),
+						DisplayName = tostring(displayName or username),
+					})
+				end
+			end
+
+			if arg2 == latestBotSearchToken then
+				drawBotResults(matches, arg)
+			end
+
+			return
+		end
+	end
+
+	if arg2 == latestBotSearchToken then
+		drawBotResults(mergedLocalBotMatches(arg), arg)
+
+		if #mergedLocalBotMatches(arg) == 0 then
+			emptyBotsLabel.Visible = true
+			emptyBotsLabel.Text = "Search failed. Check HTTP access to users.roblox.com."
+		end
+	end
+end
+
+refreshBotSearch = function()
+	latestBotSearchToken = latestBotSearchToken + 1
+	token = latestBotSearchToken
+	query = tostring(botSearchBox.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+	if query == "" then
+		drawBotResults(mergedLocalBotMatches(""), "")
+		return
+	end
+	localMatches = mergedLocalBotMatches(query)
+	drawBotResults(localMatches, query)
+
+	if #localMatches == 0 then
+		emptyBotsLabel.Visible = true
+		emptyBotsLabel.Text = "Searching online..."
+	end
+
+	task.spawn(function()
+		searchRobloxUsers(query, token)
+	end)
+end
+
+queueBotSearchRefresh = function()
+	botSearchDebounceToken = botSearchDebounceToken + 1
+	local v11 = botSearchDebounceToken
+
+	task.delay(0.2, function()
+		if v11 == botSearchDebounceToken then
+			refreshBotSearch()
+		end
+	end)
+end
+
+v5 = refreshBotSearch
+
+goToBots = function()
+	if flag3 then
+		return
+	end
+	flag3 = true
+	addBotsOverlay.Position = UDim2.fromScale(1, 0)
+	tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	TweenService:Create(frame7, tweenInfo, { Position = UDim2.fromScale(-1, 0) }):Play()
+	t = TweenService:Create(addBotsOverlay, tweenInfo, { Position = UDim2.fromScale(0, 0) })
+	t:Play()
+
+	t.Completed:Connect(function()
+		flag3 = false
+	end)
+end
+
+goHomeFromBots = function()
+	if flag3 then
+		return
+	end
+	flag3 = true
+	tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	t = TweenService:Create(frame7, tweenInfo, { Position = UDim2.fromScale(0, 0) })
+	TweenService:Create(addBotsOverlay, tweenInfo, { Position = UDim2.fromScale(1, 0) }):Play()
+	t:Play()
+
+	t.Completed:Connect(function()
+		flag3 = false
+	end)
+end
+
+local udim29 = UDim2.fromOffset
+addBotsBtn = createTextButton(frame7, "Add Bots", UDim2.fromOffset(122, 32), udim29(278, 512))
+addBotsBtn.TextSize = 12
+
+addBotsBtn.Activated:Connect(function()
+	refreshBotSearch()
+	goToBots()
+end)
+
+closeAddBotsBtn.Activated:Connect(goHomeFromBots)
+botSearchBox:GetPropertyChangedSignal("Text"):Connect(queueBotSearchRefresh)
+Players.PlayerAdded:Connect(refreshBotSearch)
+
+Players.PlayerRemoving:Connect(function(player)
+	local str5 = tostring(player.UserId)
+	botRequestCache[str5] = nil
+	botOnlineStatus[str5] = false
+
+	if applyBotOnlineVisuals then
+		applyBotOnlineVisuals(str5)
+	end
+
+	refreshBotSearch()
+end)
+
+setupFanumTaxUI = function()
+	return
+end
+
+setupFanumTaxUI()
+
+setupLeUserAnnouncementsUI = function()
+	local frame8 = Instance.new("Frame")
+	frame8.Name = "LeUserAnnouncementsPage"
+	frame8.Size = UDim2.fromScale(1, 1)
+	frame8.Position = UDim2.fromScale(1, 0)
+	frame8.BackgroundTransparency = 1
+	frame8.BorderSizePixel = 0
+	frame8.ZIndex = 70
+	frame8.Parent = frame5
+	local frame9 = Instance.new("Frame")
+	frame9.Size = UDim2.new(1, -40, 1, -24)
+	frame9.Position = UDim2.fromOffset(20, 12)
+	frame9.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+	frame9.BorderSizePixel = 0
+	frame9.ZIndex = 71
+	frame9.Parent = frame8
+	Instance.new("UICorner", frame9).CornerRadius = UDim.new(0, 12)
+	local textLabel10 = Instance.new("TextLabel")
+	textLabel10.Size = UDim2.new(1, -90, 0, 34)
+	textLabel10.Position = UDim2.fromOffset(14, 10)
+	textLabel10.BackgroundTransparency = 1
+	textLabel10.Font = Enum.Font.GothamBold
+	textLabel10.TextSize = 18
+	textLabel10.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel10.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel10.Text = "Le User Announcements"
+	textLabel10.ZIndex = 72
+	textLabel10.Parent = frame9
+	local udim210 = UDim2.new
+	local back = createTextButton(frame9, "Back", UDim2.fromOffset(58, 28), udim210(1, -72, 0, 12))
+	back.ZIndex = 72
+	local textBox2 = Instance.new("TextBox")
+	textBox2.Size = UDim2.new(1, -104, 0, 34)
+	textBox2.Position = UDim2.fromOffset(14, 52)
+	textBox2.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+	textBox2.BorderSizePixel = 0
+	textBox2.ClearTextOnFocus = false
+	textBox2.PlaceholderText = "Search online script users"
+	textBox2.Font = Enum.Font.Gotham
+	textBox2.TextSize = 13
+	textBox2.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textBox2.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+	textBox2.Text = ""
+	textBox2.ZIndex = 72
+	textBox2.Parent = frame9
+	Instance.new("UICorner", textBox2).CornerRadius = UDim.new(0, 8)
+	local udim211 = UDim2.new
+	local refresh = createTextButton(frame9, "Refresh", UDim2.fromOffset(82, 34), udim211(1, -96, 0, 52))
+	refresh.ZIndex = 72
+	local scrollingFrame3 = Instance.new("ScrollingFrame")
+	scrollingFrame3.Size = UDim2.new(1, -28, 0, 238)
+	scrollingFrame3.Position = UDim2.fromOffset(14, 94)
+	scrollingFrame3.BackgroundColor3 = Color3.fromRGB(24, 24, 24)
+	scrollingFrame3.BorderSizePixel = 0
+	scrollingFrame3.ScrollBarThickness = 3
+	scrollingFrame3.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scrollingFrame3.CanvasSize = UDim2.new(0, 0, 0, 0)
+	scrollingFrame3.ZIndex = 72
+	scrollingFrame3.Parent = frame9
+	Instance.new("UICorner", scrollingFrame3).CornerRadius = UDim.new(0, 8)
+	local uiListLayout3 = Instance.new("UIListLayout")
+	uiListLayout3.Padding = UDim.new(0, 5)
+	uiListLayout3.Parent = scrollingFrame3
+	local uiPadding3 = Instance.new("UIPadding")
+	uiPadding3.PaddingTop = UDim.new(0, 7)
+	uiPadding3.PaddingBottom = UDim.new(0, 7)
+	uiPadding3.PaddingLeft = UDim.new(0, 7)
+	uiPadding3.PaddingRight = UDim.new(0, 7)
+	uiPadding3.Parent = scrollingFrame3
+	local textBox3 = Instance.new("TextBox")
+	textBox3.Size = UDim2.new(1, -28, 0, 34)
+	textBox3.Position = UDim2.fromOffset(14, 340)
+	textBox3.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+	textBox3.BorderSizePixel = 0
+	textBox3.ClearTextOnFocus = false
+	textBox3.PlaceholderText = "Target username or UserId"
+	textBox3.Font = Enum.Font.Gotham
+	textBox3.TextSize = 12
+	textBox3.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textBox3.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+	textBox3.Text = ""
+	textBox3.ZIndex = 72
+	textBox3.Parent = frame9
+	Instance.new("UICorner", textBox3).CornerRadius = UDim.new(0, 8)
+	local textLabel11 = Instance.new("TextLabel")
+	textLabel11.Size = UDim2.new(1, -28, 0, 22)
+	textLabel11.Position = UDim2.fromOffset(14, 380)
+	textLabel11.BackgroundTransparency = 1
+	textLabel11.Font = Enum.Font.GothamBold
+	textLabel11.TextSize = 12
+	textLabel11.TextColor3 = Color3.fromRGB(205, 205, 205)
+	textLabel11.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel11.Text = "Select one online user"
+	textLabel11.ZIndex = 72
+	textLabel11.Parent = frame9
+	local textBox4 = Instance.new("TextBox")
+	textBox4.Size = UDim2.new(1, -142, 0, 64)
+	textBox4.Position = UDim2.fromOffset(14, 408)
+	textBox4.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+	textBox4.BorderSizePixel = 0
+	textBox4.ClearTextOnFocus = false
+	textBox4.MultiLine = true
+	textBox4.TextWrapped = true
+	textBox4.TextXAlignment = Enum.TextXAlignment.Left
+	textBox4.TextYAlignment = Enum.TextYAlignment.Top
+	textBox4.PlaceholderText = "Announcement shown only to the selected user"
+	textBox4.Font = Enum.Font.Gotham
+	textBox4.TextSize = 13
+	textBox4.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textBox4.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+	textBox4.Text = ""
+	textBox4.ZIndex = 72
+	textBox4.Parent = frame9
+	Instance.new("UICorner", textBox4).CornerRadius = UDim.new(0, 8)
+	local udim212 = UDim2.new
+	local sendToUser = createTextButton(frame9, "Send to User", UDim2.fromOffset(106, 64), udim212(1, -120, 0, 408))
+	sendToUser.ZIndex = 72
+	local textBox5 = Instance.new("TextBox")
+	textBox5.Size = UDim2.new(1, -206, 0, 34)
+	textBox5.Position = UDim2.fromOffset(14, 484)
+	textBox5.BackgroundColor3 = Color3.fromRGB(34, 34, 34)
+	textBox5.BorderSizePixel = 0
+	textBox5.ClearTextOnFocus = false
+	textBox5.PlaceholderText = "Username/UserId (offline OK)"
+	textBox5.Font = Enum.Font.Gotham
+	textBox5.TextSize = 12
+	textBox5.TextColor3 = Color3.fromRGB(245, 245, 245)
+	textBox5.PlaceholderColor3 = Color3.fromRGB(140, 140, 140)
+	textBox5.Text = ""
+	textBox5.Visible = visible
+	textBox5.ZIndex = 72
+	textBox5.Parent = frame9
+	Instance.new("UICorner", textBox5).CornerRadius = UDim.new(0, 8)
+	local udim213 = UDim2.new
+	local allow = createTextButton(frame9, "Allow", UDim2.fromOffset(78, 34), udim213(1, -184, 0, 484))
+	local udim214 = UDim2.new
+	local remove = createTextButton(frame9, "Remove", UDim2.fromOffset(86, 34), udim214(1, -98, 0, 484))
+	allow.Visible = visible
+	remove.Visible = visible
+	allow.ZIndex = 72
+	remove.ZIndex = 72
+	local leUserAnnouncements = createTextButton(frame7, "Le User Announcements", UDim2.fromOffset(380, 32), UDim2.fromOffset(20, 552))
+	leUserAnnouncements.TextSize = 10
+	leUserAnnouncements.Visible = targetedAnnouncementAllowed
+
+	local function fn27()
+		for _, child in ipairs(scrollingFrame3:GetChildren()) do
+			if child:IsA("GuiButton") or child:IsA("TextLabel") then
+				child:Destroy()
+			end
+		end
+	end
+
+	local fn28 = nil
+
+	fn28 = function()
+		fn27()
+		local v11 = string.lower(tostring(textBox2.Text or ""))
+		local tbl18 = {}
+
+		for _, v12 in pairs(targetedAnnouncementUsers) do
+			if tostring(v12.UserId) ~= tostring(localPlayer.UserId) then
+				local v13 = string.lower(tostring(v12.Name or ""))
+				local v14 = string.lower(tostring(v12.DisplayName or ""))
+
+				if v11 == "" or v13:find(v11, 1, true) or v14:find(v11, 1, true) or tostring(v12.UserId):find(v11, 1, true) then
+					table.insert(tbl18, v12)
+				end
+			end
+		end
+
+		table.sort(tbl18, function(arg, arg2)
+			return string.lower(tostring(arg.Name)) < string.lower(tostring(arg2.Name))
+		end)
+
+		if #tbl18 == 0 then
+			local textLabel12 = Instance.new("TextLabel")
+			textLabel12.Size = UDim2.new(1, -4, 0, 28)
+			textLabel12.BackgroundTransparency = 1
+			textLabel12.Font = Enum.Font.Gotham
+			textLabel12.TextSize = 12
+			textLabel12.TextColor3 = Color3.fromRGB(135, 135, 135)
+			textLabel12.Text = "No matching online script users"
+			textLabel12.ZIndex = 73
+			textLabel12.Parent = scrollingFrame3
+			return
+		end
+
+		for _, v12 in ipairs(tbl18) do
+			local str5 = tostring(v12.UserId)
+			local textButton2 = Instance.new("TextButton")
+			textButton2.Size = UDim2.new(1, -4, 0, 38)
+			textButton2.BackgroundColor3 = selectedTargetedAnnouncementUser and tostring(selectedTargetedAnnouncementUser.UserId) == str5 and Color3.fromRGB(62, 82, 72) or Color3.fromRGB(34, 34, 34)
+			textButton2.BorderSizePixel = 0
+			textButton2.Font = Enum.Font.GothamMedium
+			textButton2.TextSize = 12
+			textButton2.TextColor3 = Color3.fromRGB(245, 245, 245)
+			textButton2.TextXAlignment = Enum.TextXAlignment.Left
+			textButton2.Text = "  @" .. tostring(v12.Name) .. "  |  " .. string.upper(tostring(v12.Tier or "lite"))
+			textButton2.ZIndex = 73
+			textButton2.Parent = scrollingFrame3
+			Instance.new("UICorner", textButton2).CornerRadius = UDim.new(0, 8)
+
+			textButton2.Activated:Connect(function()
+				selectedTargetedAnnouncementUser = v12
+				textBox3.Text = tostring(v12.Name)
+				local str6 = " (" .. str5 .. ")"
+				textLabel11.Text = "Selected: @" .. tostring(v12.Name) .. str6
+				fn28()
+			end)
+		end
+	end
+
+	local function fn29(arg)
+		targetedAnnouncementAllowed = arg == true or visible
+		leUserAnnouncements.Visible = targetedAnnouncementAllowed
+
+		if not targetedAnnouncementAllowed then
+			frame8.Position = UDim2.fromScale(1, 0)
+		end
+	end
+
+	setTargetedAnnouncementAccess = fn29
+	refreshTargetedAnnouncementUsersUI = fn28
+	fn29(targetedAnnouncementAllowed)
+
+	local function fn30()
+		if not targetedAnnouncementAllowed or flag3 then
+			return
+		end
+		flag3 = true
+		TweenService:Create(frame7, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromScale(-1, 0) }):Play()
+		local v11
+		local tween = TweenService:Create(frame8, v11, { Position = UDim2.fromScale(0, 0) })
+		tween:Play()
+
+		tween.Completed:Connect(function()
+			flag3 = false
+		end)
+
+		requestTargetedAnnouncementUsers()
+		fn28()
+	end
+
+	local function fn31()
+		if flag3 then
+			return
+		end
+		flag3 = true
+		local tweenInfo_ = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(frame7, tweenInfo_, { Position = UDim2.fromScale(0, 0) })
+		TweenService:Create(frame8, tweenInfo_, { Position = UDim2.fromScale(1, 0) }):Play()
+		tween:Play()
+
+		tween.Completed:Connect(function()
+			flag3 = false
+		end)
+	end
+
+	local function fn32(arg, arg2)
+		local str5 = tostring(arg or ""):gsub("^%s*@?", ""):gsub("%s+$", "")
+		if str5 == "" then
+			fn12("Enter a Roblox username or UserId")
+			return
+		end
+		local num = tonumber(str5)
+		if num then
+			arg2(num, str5)
+			return
+		end
+
+		task.spawn(function()
+			local ok_, result = pcall(function()
+				return Players:GetUserIdFromNameAsync(str5)
+			end)
+
+			if ok_ and result then
+				arg2(result, str5)
+			else
+				fn12("Could not resolve that username")
+			end
+		end)
+	end
+
+	leUserAnnouncements.Activated:Connect(fn30)
+	back.Activated:Connect(fn31)
+
+	refresh.Activated:Connect(function()
+		requestTargetedAnnouncementUsers()
+	end)
+
+	textBox2:GetPropertyChangedSignal("Text"):Connect(fn28)
+
+	sendToUser.Activated:Connect(function()
+		local str5 = tostring(textBox4.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+		if str5 == "" then
+			fn12("Type an announcement first")
+			return
+		end
+		local str6 = tostring(textBox3.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+
+		if str6 == "" and selectedTargetedAnnouncementUser then
+			str6 = tostring(selectedTargetedAnnouncementUser.UserId)
+		end
+
+		fn32(str6, function(arg, arg2)
+			if sendTargetedAnnouncement(arg, str5, false) then
+				updateStatusBar("Sending private announcement to @" .. tostring(arg2), true)
+			else
+				fn12("WebSocket not connected")
+			end
+		end)
+	end)
+
+	allow.Activated:Connect(function()
+		fn32(textBox5.Text, function(arg)
+			if updateTargetedAnnouncementWhitelist(arg, "add") then
+				updateStatusBar("Adding announcement sender...", true)
+			end
+		end)
+	end)
+
+	remove.Activated:Connect(function()
+		fn32(textBox5.Text, function(arg)
+			if updateTargetedAnnouncementWhitelist(arg, "remove") then
+				updateStatusBar("Removing announcement sender...", true)
+			end
+		end)
+	end)
+end
+
+setupLeUserAnnouncementsUI()
+
+onWebSocketMessage = function(arg)
+	return
+end
+
+createWebSocket = function(arg)
+	return nil
+end
+
+connectWebSocket = function()
+	return false
+end
+
+codeSniper.Activated:Connect(function()
+	if flag and str3 == "sniper" then
+		if settings.retryCodeEnabled and retryStopButton and retryStopButton.Visible then
+			requestRetryStopConfirmation()
+		else
+			processNotification(false)
+		end
+	else
+		fn7("sniper")
+	end
+end)
+
+riddleSolver.Activated:Connect(function()
+	if flag and str3 == "riddle" then
+		processNotification(false)
+	else
+		fn7("riddle")
+	end
+end)
+
+startAutomaticRemoteCapture = function()
+	remoteHandler.SetMode("Remote")
+	remoteHandler.SetScanMethod("Capture")
+
+	if v9 then
+		v9.Update()
+	end
+
+	task.spawn(function()
+		local codes = playerGui:FindFirstChild("Codes")
+
+		if not codes and not flag then
+			updateStatusBar("Auto Capture: waiting for the Codes GUI...", true)
+		end
+
+		if not (codes or playerGui:WaitForChild("Codes", 15)) then
+			if not flag then
+				updateStatusBar("Auto Capture: Codes GUI was not loaded", false)
+			end
+
+			return
+		end
+
+		for i = 1, 3 do
+			local v11 = remoteHandler.GetCachedRemote()
+			local v12 = nil
+
+			if not v11 then
+				if not flag then
+					updateStatusBar("Auto Capture " .. i .. "/3: preparing Remote...", true)
+				end
+
+				v11, v12 = remoteHandler.Capture(function(arg)
+					if not flag then
+						updateStatusBar("Auto Capture: " .. tostring(arg), true)
+					end
+				end)
+			end
+
+			if v11 then
+				if not flag then
+					updateStatusBar("Remote ready: " .. tostring(v11.Name), true)
+				end
+
+				return
+			end
+
+			if tostring(v12):find("unsupported", 1, true) then
+				if not flag then
+					updateStatusBar("Auto Capture unsupported by this executor", false)
+				end
+
+				return
+			end
+
+			if i < 3 then
+				task.wait(2)
+			end
+		end
+
+		if not flag then
+			updateStatusBar("Auto Capture will retry on the first code", false)
+		end
+	end)
+end
+
+updateStatusBar("Idle", false)
+topNotification.ChildAdded:Connect(onNotificationAdded)
+startAutomaticRemoteCapture()
+
+end
