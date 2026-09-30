@@ -360,13 +360,13 @@ load = function()
 	textLabel.Name = "CreatorLabel"
 	textLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 	textLabel.Position = UDim2.new(0.5, 0, 0.5, 130)
-	textLabel.Size = UDim2.fromOffset(420, 30)
+	textLabel.Size = UDim2.fromOffset(200, 20)
 	textLabel.BackgroundTransparency = 1
 	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	textLabel.TextTransparency = 1
 	textLabel.Font = Enum.Font.GothamMedium
-	textLabel.TextSize = 14
-	textLabel.Text = "leaked by sticky"
+	textLabel.TextSize = 10
+	textLabel.Text = "leaked by brn782k"
 	textLabel.ZIndex = 11
 	textLabel.Parent = frame
 	local imageLabel2 = Instance.new("ImageLabel")
@@ -395,7 +395,7 @@ load = function()
 			sound:Play()
 		end)
 
-		fn2(imageLabel, 0.45, { ImageTransparency = 0.01, Size = UDim2.fromOffset(200, 200) })
+		fn2(imageLabel, 0.45, { ImageTransparency = 0.01, Size = UDim2.fromOffset(100, 100) })
 		fn2(textLabel, 0.45, { TextTransparency = 0.3 })
 
 		task.delay(0.2, function()
