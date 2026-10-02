@@ -271,46 +271,59 @@ end
 ----------------------------------------------------------------------
 
 local function redeemOnce(code)
+	-- Nettoyage strict de la chaîne assemblée
 	code = tostring(code or ""):gsub("%s+", "")
-	
-	local r = remote
-	if not (r and r.Parent) then
-		r = resolveRemote()
-	end
-	
-	if r and r.Parent then
-		for i = 1, (cfg.burst or 6) do
-			task.spawn(function()
-				pcall(r.InvokeServer, r, code)
-			end)
+
+	if cfg.mode == "Remote" then
+		local r = remote
+		if not (r and r.Parent) then
+			r = resolveRemote()
+		end
+
+		if not (r and r.Parent) and cache.found then
+			local net = getNet()
+			if net then
+				for _, d in ipairs(net:GetDescendants()) do
+					if d:IsA("RemoteFunction") and d:GetFullName() == cache.found then
+						remote = d
+						r = d
+						break
+					end
+				end
+			end
+		end
+
+		if r and r.Parent then
+			local t = os.clock()
+			
+			-- On envoie 2 requêtes en parallèle propre pour maximiser la vitesse sans flood excessif
+			local lastOk, lastA, lastB, lastMs
+			for i = 1, 2 do
+				task.spawn(function()
+					local ok, a, b = pcall(r.InvokeServer, r, code)
+					local ms = math.floor((os.clock() - t) * 1000 + 0.5)
+					lastOk, lastA, lastB, lastMs = ok, a, b, ms
+				end)
+			end
+			
+			-- Petite pause imperceptible pour laisser le temps aux threads de s'exécuter
+			task.wait(0.01)
+			
+			if lastOk == false then
+				return "error", tostring(lastA), lastMs or 0
+			end
+			if lastA == true or (lastA and tostring(lastA):lower():find("success")) then
+				return "success", lastB or lastA, lastMs or 0
+			end
+			return "fail", tostring(lastB or lastA or "Rejeté"), lastMs or 0
 		end
 	end
 
-	task.spawn(function()
-		clickRedeem(code)
-	end)
-end
-
-local function lowerHas(msg, ...)
-	for _, p in ipairs({ ... }) do
-		if msg:find(p, 1, true) then
-			return true
-		end
+	-- Secours en Mode Click
+	if clickRedeem(code) then
+		return "click", nil, 0
 	end
-	return false
-end
-
-local function onSuccess(code, msg, ms)
-	local name = code
-	if type(msg) == "string" then
-		local n = msg:gsub("%s*[Ss]pawned!$", "")
-		if n ~= "" then
-			name = n
-		end
-	end
-	stopListening()
-	setStatus(string.format("OK  %s  (%d ms)  %s", code, ms or 0, name), C.ok)
-	refreshStart()
+	return "error", "Remote et Click indisponibles", 0
 end
 
 -- Envoie le code en boucle (burst parallèle) jusqu'à succès, nouvelle partie ou timeout.
