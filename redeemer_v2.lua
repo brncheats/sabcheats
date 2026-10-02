@@ -466,7 +466,9 @@ local function onText(text)
 			setStatus("Indice reçu, j'attends le code...", C.warn)
 			return
 		end
-		return addPart(inline, true)
+		-- Si on attend plus d'une part, on traite comme une part normale (false)
+		-- au lieu de tout écraser avec 'true'
+		return addPart(inline, cfg.parts == 1)
 	end
 	addPart(text, false)
 end
