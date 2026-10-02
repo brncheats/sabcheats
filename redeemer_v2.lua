@@ -476,7 +476,7 @@ local function addPart(text, full)
 end
 
 ----------------------------------------------------------------------
--- TON FILTRE EST PLACÉ PIL PIL ICI
+-- FILTRE CORRIGÉ (%a en minuscule pour les lettres)
 ----------------------------------------------------------------------
 local function isValidCode(text)
     text = text:gsub("^%s*(.-)%s*$", "%1")
@@ -485,15 +485,18 @@ local function isValidCode(text)
         return false
     end
 
+    -- 1. Uniquement des chiffres (ex: 1234)
     if text:match("^%d+$") then
         return true
     end
 
-    if text:match("^%A+$") and text == text:upper() then
+    -- 2. Uniquement des lettres en majuscules (ex: CODE)
+    if text:match("^%a+$") and text == text:upper() then
         return true
     end
 
-    if text:match("^[%A%d]+$") and text == text:upper() and text:find("%A") and text:find("%d") then
+    -- 3. Lettres majuscules + chiffres (ex: CODE123)
+    if text:match("^[%a%d]+$") and text == text:upper() and text:find("%a") and text:find("%d") then
         return true
     end
 
@@ -501,14 +504,13 @@ local function isValidCode(text)
 end
 
 ----------------------------------------------------------------------
--- ET TU RAJOUTES CETTE LIGNE DANS ONTEXT
+-- APPLICATION DANS ONTEXT
 ----------------------------------------------------------------------
 local function onText(text)
 	if not listening or text == "" or isUtility(text) then
 		return
 	end
 
-	-- L'APPEL DU FILTRE (si c'est pas valide, ça stoppe direct) :
 	if not isValidCode(text) then
 		return
 	end
