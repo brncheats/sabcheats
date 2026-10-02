@@ -264,6 +264,7 @@ local function capture()
 	return nil, "Aucun appel capturé"
 end
 
+
 ----------------------------------------------------------------------
 -- REDEEM (1 tentative)
 -- retourne : "success" | "click" | "fail" | "error", message, ms
@@ -314,14 +315,6 @@ local function redeemOnce(code)
 	end
 	return "error", "Remote et Click indisponibles", 0
 end
-		-- pas de remote prêt : on bascule sur le click pour ne pas perdre de temps
-	end
-
-	if clickRedeem(code) then
-		return "click", nil, 0
-	end
-	return "error", "Remote et Click indisponibles", 0
-end
 
 local function lowerHas(msg, ...)
 	for _, p in ipairs({ ... }) do
@@ -344,6 +337,7 @@ local function onSuccess(code, msg, ms)
 	setStatus(string.format("OK  %s  (%d ms)  %s", code, ms or 0, name), C.ok)
 	refreshStart()
 end
+
 
 -- Envoie le code en boucle (burst parallèle) jusqu'à succès, nouvelle partie ou timeout.
 -- En cas d'erreur, le code est automatiquement renvoyé.
