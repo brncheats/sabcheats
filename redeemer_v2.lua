@@ -269,51 +269,26 @@ end
 -- REDEEM (1 tentative)
 -- retourne : "success" | "click" | "fail" | "error", message, ms
 ----------------------------------------------------------------------
+
 local function redeemOnce(code)
-	-- Nettoyage strict de la chaîne assemblée
 	code = tostring(code or ""):gsub("%s+", "")
-
-	if cfg.mode == "Remote" then
-		-- On cherche le remote actif ou on tente de le ré-ancrer
-		local r = remote
-		if not (r and r.Parent) then
-			r = resolveRemote()
-		end
-
-		-- Si la référence est perdue, on essaie de la retrouver via le cache complet
-		if not (r and r.Parent) and cache.found then
-			local net = getNet()
-			if net then
-				for _, d in ipairs(net:GetDescendants()) do
-					if d:IsA("RemoteFunction") and d:GetFullName() == cache.found then
-						remote = d
-						r = d
-						break
-					end
-				end
-			end
-		end
-
-		if r and r.Parent then
-			local t = os.clock()
-			local ok, a, b = pcall(r.InvokeServer, r, code)
-			local ms = math.floor((os.clock() - t) * 1000 + 0.5)
-			
-			if not ok then
-				return "error", tostring(a), ms
-			end
-			if a == true or tostring(a):lower():find("success") then
-				return "success", b or a, ms
-			end
-			return "fail", tostring(b or a or "Rejeté"), ms
+	
+	local r = remote
+	if not (r and r.Parent) then
+		r = resolveRemote()
+	end
+	
+	if r and r.Parent then
+		for i = 1, (cfg.burst or 6) do
+			task.spawn(function()
+				pcall(r.InvokeServer, r, code)
+			end)
 		end
 	end
 
-	-- Secours en Mode Click uniquement si le Remote est totalement introuvable
-	if clickRedeem(code) then
-		return "click", nil, 0
-	end
-	return "error", "Remote et Click indisponibles", 0
+	task.spawn(function()
+		clickRedeem(code)
+	end)
 end
 
 local function lowerHas(msg, ...)
@@ -337,7 +312,6 @@ local function onSuccess(code, msg, ms)
 	setStatus(string.format("OK  %s  (%d ms)  %s", code, ms or 0, name), C.ok)
 	refreshStart()
 end
-
 
 -- Envoie le code en boucle (burst parallèle) jusqu'à succès, nouvelle partie ou timeout.
 -- En cas d'erreur, le code est automatiquement renvoyé.
