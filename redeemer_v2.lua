@@ -269,23 +269,51 @@ end
 -- retourne : "success" | "click" | "fail" | "error", message, ms
 ----------------------------------------------------------------------
 local function redeemOnce(code)
+	-- Nettoyage strict de la chaîne assemblée
+	code = tostring(code or ""):gsub("%s+", "")
+
 	if cfg.mode == "Remote" then
+		-- On cherche le remote actif ou on tente de le ré-ancrer
 		local r = remote
 		if not (r and r.Parent) then
 			r = resolveRemote()
 		end
-		if r then
+
+		-- Si la référence est perdue, on essaie de la retrouver via le cache complet
+		if not (r and r.Parent) and cache.found then
+			local net = getNet()
+			if net then
+				for _, d in ipairs(net:GetDescendants()) do
+					if d:IsA("RemoteFunction") and d:GetFullName() == cache.found then
+						remote = d
+						r = d
+						break
+					end
+				end
+			end
+		end
+
+		if r and r.Parent then
 			local t = os.clock()
 			local ok, a, b = pcall(r.InvokeServer, r, code)
 			local ms = math.floor((os.clock() - t) * 1000 + 0.5)
+			
 			if not ok then
 				return "error", tostring(a), ms
 			end
-			if a == true then
-				return "success", b, ms
+			if a == true or tostring(a):lower():find("success") then
+				return "success", b or a, ms
 			end
 			return "fail", tostring(b or a or "Rejeté"), ms
 		end
+	end
+
+	-- Secours en Mode Click uniquement si le Remote est totalement introuvable
+	if clickRedeem(code) then
+		return "click", nil, 0
+	end
+	return "error", "Remote et Click indisponibles", 0
+end
 		-- pas de remote prêt : on bascule sur le click pour ne pas perdre de temps
 	end
 
