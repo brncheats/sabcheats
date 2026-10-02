@@ -34,8 +34,8 @@ local cfg = {
 	mode = "Remote", -- "Remote" ou "Click"
 	parts = 3, -- nb de parties avant le 1er redeem (2, 3 ou 4)
 	burst = 3, -- requêtes envoyées en parallèle
-	interval = 0.010, -- délai entre deux vagues d'envoi
-	slowInterval = 0.010, -- délai après une réponse "invalid code"
+	interval = 0.04, -- délai entre deux vagues d'envoi
+	slowInterval = 0.12, -- délai après une réponse "invalid code"
 	maxSeconds = 10, -- arrêt du renvoi après X secondes
 	staleSeconds = 20, -- parties plus vieilles que ça = on repart de zéro
 }
