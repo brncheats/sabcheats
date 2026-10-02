@@ -475,10 +475,44 @@ local function addPart(text, full)
 	end
 end
 
+----------------------------------------------------------------------
+-- TON FILTRE EST PLACÉ PIL PIL ICI
+----------------------------------------------------------------------
+local function isValidCode(text)
+    text = text:gsub("^%s*(.-)%s*$", "%1")
+    
+    if text:find("%s") then
+        return false
+    end
+
+    if text:match("^%d+$") then
+        return true
+    end
+
+    if text:match("^%A+$") and text == text:upper() then
+        return true
+    end
+
+    if text:match("^[%A%d]+$") and text == text:upper() and text:find("%A") and text:find("%d") then
+        return true
+    end
+
+    return false
+end
+
+----------------------------------------------------------------------
+-- ET TU RAJOUTES CETTE LIGNE DANS ONTEXT
+----------------------------------------------------------------------
 local function onText(text)
 	if not listening or text == "" or isUtility(text) then
 		return
 	end
+
+	-- L'APPEL DU FILTRE (si c'est pas valide, ça stoppe direct) :
+	if not isValidCode(text) then
+		return
+	end
+
 	local kind, inline = parseCue(text)
 	if kind then
 		if kind ~= "sniper" then
@@ -488,8 +522,6 @@ local function onText(text)
 			setStatus("Indice reçu, j'attends le code...", C.warn)
 			return
 		end
-		-- Si on attend plus d'une part, on traite comme une part normale (false)
-		-- au lieu de tout écraser avec 'true'
 		return addPart(inline, cfg.parts == 1)
 	end
 	addPart(text, false)
