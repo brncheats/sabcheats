@@ -33,11 +33,11 @@ local CACHE_FILE = "BRN782K_RemoteCache.json"
 local cfg = {
 	mode = "Remote", -- "Remote" ou "Click"
 	parts = 3, -- nb de parties avant le 1er redeem (2, 3 ou 4)
-	burst = 1, -- requêtes envoyées en parallèle
-	interval = 0.33, -- délai entre deux vagues d'envoi
-	slowInterval = 0.33, -- délai après une réponse "invalid code"
-	maxSeconds = 5, -- arrêt du renvoi après X secondes
-	staleSeconds = 10, -- parties plus vieilles que ça = on repart de zéro
+	burst = 3, -- requêtes envoyées en parallèle
+	interval = 0.010, -- délai entre deux vagues d'envoi
+	slowInterval = 0.010, -- délai après une réponse "invalid code"
+	maxSeconds = 10, -- arrêt du renvoi après X secondes
+	staleSeconds = 20, -- parties plus vieilles que ça = on repart de zéro
 }
 
 local C = {
@@ -341,59 +341,50 @@ end
 
 -- Envoie le code en boucle (burst parallèle) jusqu'à succès, nouvelle partie ou timeout.
 -- En cas d'erreur, le code est automatiquement renvoyé.
+
 startSpam = function(code)
 	session.token += 1
 	local token = session.token
-	local t0 = os.clock()
-	local inflight, tries, slow = 0, 0, false
 	lastAttemptAt = tick()
 	setStatus("Envoi : " .. code, C.warn)
 
-	local function attempt()
-		inflight += 1
-		tries += 1
-		local n = tries
-		task.spawn(function()
-			local res, msg, ms = redeemOnce(code)
-			inflight -= 1
-			if token ~= session.token then
-				return
-			end
-			lastAttemptAt = tick()
-
-			if res == "success" then
-				session.token += 1
-				onSuccess(code, msg, ms)
-			elseif res == "click" then
-				session.token += 1
-				setStatus("Click envoyé : " .. code, C.ok)
-			else
-				local low = string.lower(tostring(msg or ""))
-				if lowerHas(low, "already") and lowerHas(low, "redeem") then
-					session.token += 1
-					session.parts = {}
-					setStatus("Déjà redeem : " .. code, C.dim)
-				else
-					if lowerHas(low, "invalid code", "does not exist") then
-						slow = true
-					end
-					setStatus(string.format("Renvoi #%d (%dms) %s", n, ms or 0, tostring(msg):sub(1, 40)), C.bad)
-				end
-			end
-		end)
-	end
-
 	task.spawn(function()
-		while token == session.token and os.clock() - t0 < cfg.maxSeconds do
-			local cap = slow and 1 or cfg.burst
-			for _ = inflight + 1, cap do
-				attempt()
-			end
-			task.wait(slow and cfg.slowInterval or cfg.interval)
+		local res, msg, ms = redeemOnce(code)
+
+		if token ~= session.token then
+			return
 		end
-		if token == session.token then
-			setStatus("Timeout - j'attends la prochaine partie", C.warn)
+
+		local reply = tostring(msg or ""):lower()
+
+		-- 1. SUCCÈS : Le Brainrot a spawned
+		if res == "success" or reply:find("spawned") then
+			stopListening()
+			onSuccess(code, msg, ms)
+			return
 		end
+
+		-- 2. SOLD OUT : Stock épuisé
+		if reply:find("sold out") then
+			stopListening()
+			setStatus(string.format("Épuisé (%dms) : Sold Out !", ms or 0), C.bad)
+			refreshStart()
+			return
+		end
+
+		-- 3. DÉJÀ REDEEM
+		if lowerHas(reply, "already") and lowerHas(reply, "redeem") then
+			stopListening()
+			session.parts = {}
+			setStatus("Déjà redeem : " .. code, C.dim)
+			refreshStart()
+			return
+		end
+
+		-- Tout autre échec : stoppe proprement sans spammer
+		stopListening()
+		setStatus(string.format("Refusé (%dms) : %s", ms or 0, tostring(msg):sub(1, 35)), C.bad)
+		refreshStart()
 	end)
 end
 
