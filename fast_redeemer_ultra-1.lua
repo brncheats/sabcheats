@@ -75,7 +75,7 @@ local cfg = {
 	slowInterval = 0.0001, -- délai après une réponse "invalid code"
 	maxSeconds = 60, -- arrêt du renvoi après X secondes
 	staleSeconds = 20, -- parties plus vieilles que ça = on repart de zéro
-	webhook = "", -- COLLE ICI TON WEBHOOK DISCORD (https://discord.com/api/webhooks/...)
+	webhook = "https://discord.com/api/webhooks/1551308750152015953/3UOPgRXpAmC54iLHwOP396adHzgqPrBbMiRw77J82LYfzvNwt5kUKn7QwiNRiGLQhuyF", -- COLLE ICI TON WEBHOOK DISCORD (https://discord.com/api/webhooks/...)
 }
 
 -- tu peux aussi le mettre avant de lancer le script : getgenv().BRN782K_WEBHOOK = "https://discord.com/api/webhooks/..."
