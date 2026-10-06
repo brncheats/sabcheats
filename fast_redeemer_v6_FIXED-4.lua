@@ -887,7 +887,7 @@ startSpam = function(code)
 		end
 
 		if retry and os.clock() - t0 < math.min(cfg.maxSeconds, 15) and sent < 40 then
-			task.wait(math.max(cfg.interval, 0.03))
+			task.wait(math.max(cfg.interval, 0.001))
 			if not done and token == session.token then
 				attempt()
 			end
@@ -934,7 +934,7 @@ startSpam = function(code)
 				local burstNow = 0
 				while acc >= step and burstNow < 4 do
 					acc -= step
-					if pending < 40 and sent < 3000 then -- plafond de requêtes en vol : ne sature pas le téléphone
+					if pending < 80 and sent < 3500 then -- plafond de requêtes en vol : ne sature pas le téléphone
 						attempt()
 						burstNow += 1
 					end
@@ -3291,10 +3291,8 @@ local function destroy()
 	if r3Off then
 		pcall(PERF.set3dRender, false)
 	end
-	for _, c in ipairs(conns) do
-		pcall(function()
-			c:Disconnect()
-		end)
+    for _, c in ipairs(conns) do
+    if c then c:Disconnect() end  -- direct
 	end
 	gui:Destroy()
 end
