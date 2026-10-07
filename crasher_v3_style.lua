@@ -111,7 +111,7 @@ local title = mk("TextLabel", {
 	Font = Enum.Font.GothamBlack,
 	TextSize = 13,
 	TextColor3 = T.text,
-	Text = "Crasher",
+	Text = "Crasher by brn782k",
 	TextXAlignment = Enum.TextXAlignment.Left,
 }, bar)
 
