@@ -198,7 +198,7 @@ local function runCrash()
 
 	task.wait(0.1);
 
-	for Iteration = 1, 9e9 do
+	for Iteration = 1, 5e10 do
 		if not isActive then break end -- SEUL ajout : permet d'arrêter la boucle
 		replicatesignal(Humanoid.ServerBreakJoints);
 		replicatesignal(Humanoid.ServerResetCharacter);
