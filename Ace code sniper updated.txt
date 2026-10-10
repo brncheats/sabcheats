@@ -784,7 +784,10 @@ Plus.Font = Enum.Font.GothamBold
 Plus.Parent = CounterShell
 addCorner(Plus, 5)
 
+local lastCounterToggle = 0
 local function decr()
+    if tick() - lastCounterToggle < 0.15 then return end
+    lastCounterToggle = tick()
     _submitAfter = math.max(1, _submitAfter - 1)
     Count.Text = tostring(_submitAfter)
     savedConfig.submitAfter = _submitAfter
@@ -792,6 +795,8 @@ local function decr()
     saveConfig()
 end
 local function incr()
+    if tick() - lastCounterToggle < 0.15 then return end
+    lastCounterToggle = tick()
     _submitAfter += 1
     Count.Text = tostring(_submitAfter)
     savedConfig.submitAfter = _submitAfter
