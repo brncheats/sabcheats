@@ -308,7 +308,6 @@ local function typeAndSubmitCode(code)
 
             if box then
                 pcall(function() box.Text = code end)
-                task.wait(0.05)
                 if submitBtn then clickButton(submitBtn) end
                 fireBoxFocusLost(box)
                 return true, "submitted via PlayerGui.Codes"
@@ -320,10 +319,7 @@ local function typeAndSubmitCode(code)
     local btns = findCodeButtons(pg)
     for _, btn in ipairs(btns) do
         clickButton(btn)
-        task.wait(0.05)
     end
-
-    task.wait(0.2)
 
     local box = nil
     local deadline = tick() + 2
@@ -345,13 +341,12 @@ local function typeAndSubmitCode(code)
             end
         end
         if box then break end
-        task.wait(0.1)
+        RunService.Heartbeat:Wait()
     end
 
     if not box then return false, "no codebox visible" end
 
     pcall(function() box.Text = code end)
-    task.wait(0.05)
 
     local redeemBtn = nil
     local searchNames = {"submit","redeem","claim","confirm","enter","send","apply","ok","use","go","check"}
