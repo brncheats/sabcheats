@@ -1628,7 +1628,7 @@ task.spawn(function()
 	end
 end)
 
-local str2 = "https://autojoiner2-2d181-default-rtdb.firebaseio.com/logs.json?orderBy=%22%24key%22&limitToLast=10000"
+local str2 = "https://autojoiner2-2d181-default-rtdb.firebaseio.com/logs.json?orderBy=%22%24key%22&"
 local tbl8 = {}
 local flag5 = true
 local tbl9 = {}
