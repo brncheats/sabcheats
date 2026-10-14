@@ -1,0 +1,10536 @@
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+local _syncJobId = tostring(game.JobId)
+if _G.__SABCOM_SYNC_JOB ~= _syncJobId then
+    _G.__SABCOM_SYNC_JOB = _syncJobId
+    _G.SabcomPreloadedSynchronizer = nil
+    _G.SabcomSynchronizerReady = nil
+end
+
+local function _tryRequireSynchronizer()
+    local rs = game:GetService("ReplicatedStorage")
+    local pkg = rs:FindFirstChild("Packages")
+    local syncMod = pkg and pkg:FindFirstChild("Synchronizer")
+    if not syncMod then return nil end
+    local ok, mod = pcall(function()
+        if setthreadidentity then pcall(setthreadidentity, 8) end
+        return require(syncMod)
+    end)
+    return ok and mod or nil
+end
+
+if _G.SabcomPreloadedSynchronizer then
+    _G.SabcomSynchronizerReady = true
+else
+    local syncMod = _tryRequireSynchronizer()
+    if not syncMod then
+        local rs = game:GetService("ReplicatedStorage")
+        local rsWait = game:GetService("RunService")
+        local t0 = os.clock()
+        while os.clock() - t0 < 1 do
+            syncMod = _tryRequireSynchronizer()
+            if syncMod then break end
+            if rs:FindFirstChild("Packages") and rs.Packages:FindFirstChild("Synchronizer") then
+                syncMod = _tryRequireSynchronizer()
+                if syncMod then break end
+            end
+            rsWait.Heartbeat:Wait()
+        end
+    end
+    if syncMod then
+        _G.SabcomPreloadedSynchronizer = syncMod
+        _G.SabcomSynchronizerReady = true
+    else
+        local rs = game:GetService("ReplicatedStorage")
+        local conn
+        conn = rs.DescendantAdded:Connect(function(d)
+            if d.Name ~= "Synchronizer" and d.Name ~= "Packages" then return end
+            local m = _tryRequireSynchronizer()
+            if m then
+                _G.SabcomPreloadedSynchronizer = m
+                _G.SabcomSynchronizerReady = true
+                if conn then conn:Disconnect() end
+            end
+        end)
+    end
+end
+
+do
+    local HS = game:GetService("HttpService")
+    local CFG_FILE = "sabcom12dddd3.json"
+    local D = {
+        autoTp = true,
+        autoSteal = false,
+        stealMode = "priority",
+        tpMode = "priority",
+        tpKey = "T",
+        resetKey = "X",
+        cloneKey = "C",
+        dropKey = "B",
+        floatKey = "Z",
+        carpetSpeedKey = "Q",
+        autoBuyKey = "K",
+        walkSpeedKey = "V",
+        walkSpeed = 16,
+        walkSpeedOn = false,
+        walkSpeedGui = true,
+        walkSpeedX = 16,
+        walkSpeedY = 560,
+        fovOn = false,
+        fov = 70,
+        fovGui = true,
+        fovX = 16,
+        fovY = 660,
+        infJumpKey = "G",
+        infJumpOn = false,
+        kickKey = "P",
+        hideGuiKey = "RightShift",
+        resetRepeats = 1,
+        resetDelay = 0.05,
+        tpDelay = 0,
+        tpVelocity = 400,
+        climbSpeed = 160,
+        climbSafe = 250,
+        climbFull = false,
+        goSpeed = 200,
+        closeSpeed = 80,
+        landingDelay = 0.35,
+        postCloneDelay = 0.1,
+        boostWindow = 20,
+        sideTpRange = 100,
+        preferFrontOnRow = true,
+        directPath = true,
+        jumpOnce = true,
+        minGen = 0,
+        carpetTool = "",
+        carpetWaitMs = 200,
+        carpetRelance = true,
+        grappleWaitMs = 200,
+        grappleSettleMs = 60,
+        pingThresh = 170,
+        highPingSpeed = 400,
+        stallSec = 0.6,
+        repushAt = 0.9,
+        pathCell = 4,
+        pathRadius = 2.5,
+        pathHeight = 5,
+        pathPad = 40,
+        rowBoxX = 26,
+        rowBoxZ = 30,
+        rowLane = 30,
+        voidY = -50,
+        cloneBackoff = 0.5,
+        frontRunIn = 130,
+        settleFrames = 4,
+        settleMaxMs = 250,
+        stealHz = 0.05,
+        stealHoldDuration = 1.3,
+        antiDieHz = 0.1,
+        tpHealLock = false,
+        noAnim = true,
+        hotScanSec = 8,
+        upvalDepth = 128,
+        uiDelay = 0,
+        seqQuiet = true,
+        grappleQuiet = true,
+        strictSweep = true,
+        approachFloor2FromFloor1 = false,
+        panelX = 24,
+        panelY = 180,
+        panelMinimized = false,
+        settingsOpen = false,
+        stealTargetX = 16,
+        stealTargetY = 220,
+        autoKickX = 16,
+        autoKickY = 320,
+        psX = 224,
+        psY = 320,
+        invisGuiX = 16,
+        invisGuiY = 450,
+        faceAwayX = 240,
+        faceAwayY = 80,
+        priorityX = 300,
+        priorityY = 80,
+        priorityItems = {},
+        xray = false,
+        espPlayer = false,
+        brainrotEsp = false,
+        lineToBase = false,
+        lineToBrainrot = false,
+        autoGoOnSwitch = false,
+        autoTurret = false,
+        invis = false,
+        invisGui = false,
+        invisKey = "U",
+        autoInvis = false,
+        autoRecover = true,
+        invisAngle = 225,
+        sinkSlider = 7,
+        superOptimizer = false,
+        autoKickGui = false,
+        autoKick = false,
+        kickToPs = true,
+        psCode = "",
+        faceAwayGui = false,
+        faceAway = false,
+        faceAwayBaseOwner = true,
+        faceAwayNearest = false,
+        faceAwayTarget = "",
+        faceAwayClick = false,
+        autoCloseGui = false,
+        lockUi = false,
+        extrasX = 276,
+        extrasY = 80,
+    }
+
+    local readJson = (function(name)
+        if not readfile then return nil end
+        local raw
+        pcall(function() raw = readfile(name) end)
+        if type(raw) ~= "string" or #raw == 0 then return nil end
+        local ok, d = pcall(HS.JSONDecode, HS, raw)
+        if ok and type(d) == "table" then return d end
+        return nil
+    end)
+
+    local merge = (function(dst, src)
+        if type(src) ~= "table" then return dst end
+        for k, def in pairs(D) do
+            local v = src[k]
+            if v ~= nil and type(v) == type(def) then dst[k] = v end
+        end
+        return dst
+    end)
+
+    local cfg = {}
+    for k, v in pairs(D) do cfg[k] = v end
+    merge(cfg, readJson(CFG_FILE))
+
+    local function flag(on, offVal)
+        if on then return nil end
+        return offVal
+    end
+
+    local function loadKey(v, default)
+        if type(v) == "string" and v ~= "" then return v end
+        return default
+    end
+
+    _G.SabcomAutoTP = cfg.autoTp
+    _G.SabcomStealMode = (type(cfg.stealMode) == "string" and cfg.stealMode ~= "" and cfg.stealMode) or "priority"
+    if _G.SabcomStealMode == "highest" or _G.SabcomStealMode == "value" or _G.SabcomStealMode == "gen" then
+        _G.SabcomStealMode = "priority"
+    end
+    if _G.SabcomStealMode ~= "nearest" then _G.SabcomStealMode = "priority" end
+    _G.SabcomTPMode = _G.SabcomStealMode
+    _G.SabcomAutoSteal = cfg.autoSteal == true
+    _G._stp_tpKeyName = loadKey(cfg.tpKey, "T")
+    _G._stp_resetKeyName = loadKey(cfg.resetKey, "X")
+    _G._stp_cloneKeyName = loadKey(cfg.cloneKey, "C")
+    _G._stp_dropKeyName = loadKey(cfg.dropKey, "B")
+    _G._stp_floatKeyName = loadKey(cfg.floatKey, "Z")
+    _G._stp_carpetSpeedKeyName = loadKey(cfg.carpetSpeedKey, "Q")
+    _G._stp_autoBuyKeyName = loadKey(cfg.autoBuyKey, "K")
+    _G._stp_walkSpeedKeyName = loadKey(cfg.walkSpeedKey, "V")
+    _G.SabcomWalkSpeed = math.clamp(tonumber(cfg.walkSpeed) or 16, 16, 100)
+    _G.SabcomWalkSpeedOn = cfg.walkSpeedOn == true
+    _G.SabcomWalkSpeedGui = cfg.walkSpeedGui ~= false
+    _G.SabcomFovOn = cfg.fovOn == true
+    _G.SabcomFov = math.clamp(tonumber(cfg.fov) or 70, 70, 120)
+    _G.SabcomFovGui = cfg.fovGui ~= false
+    _G._stp_infJumpKeyName = loadKey(cfg.infJumpKey, "G")
+    _G.SabcomInfJump = cfg.infJumpOn == true
+    _G._stp_kickKeyName = loadKey(cfg.kickKey, "P")
+    _G._stp_hideGuiKeyName = loadKey(cfg.hideGuiKey, "RightShift")
+    _G.SabcomResetRepeats = 1
+    _G.SabcomResetDelay = math.clamp(tonumber(cfg.resetDelay) or 0.05, 0, 1)
+    _G._stp_tpDelay = cfg.tpDelay
+    _G.TPDelay = cfg.tpDelay
+    _G.TPVelocity = math.clamp(cfg.tpVelocity, 200, 750)
+    _G.SabcomClimb = math.clamp(cfg.climbSpeed, 100, 800)
+    _G.SabcomClimbSafe = math.clamp(cfg.climbSafe, 50, 400)
+    _G.SabcomClimbFull = cfg.climbFull
+    _G.SabcomGoSpeed = math.clamp(cfg.goSpeed, 80, 800)
+    _G.SabcomBrainrotSpeed = math.clamp(cfg.goSpeed, 150, 800)
+    _G.SabcomCloseSpeed = math.clamp(cfg.closeSpeed, 20, 250)
+    _G.LandingDelay = math.clamp(cfg.landingDelay, 0.15, 0.75)
+    _G.SabcomPostCloneDelay = 0.1
+    _G.SabcomBoostWindow = math.clamp(cfg.boostWindow, 1, 60)
+    _G.SabcomSideTPRange = cfg.sideTpRange
+    _G.SabcomPreferFrontOnRow = flag(cfg.preferFrontOnRow, false)
+    _G.SabcomDirect = flag(cfg.directPath, false)
+    _G.SabcomJumpOnce = flag(cfg.jumpOnce, false)
+    _G.SabcomMinGen = tonumber(cfg.minGen) or 0
+    if type(cfg.carpetTool) == "string" and cfg.carpetTool ~= "" then
+        _G.SabcomCarpetTool = cfg.carpetTool
+    end
+    _G.SabcomCarpetWaitMs = cfg.carpetWaitMs
+    _G.SabcomCarpetRelance = flag(cfg.carpetRelance, false)
+    _G.SabcomGrappleWaitMs = cfg.grappleWaitMs
+    _G.SabcomGrappleSettleMs = cfg.grappleSettleMs
+    _G.SabcomPingThresh = cfg.pingThresh
+    _G.SabcomHighPingSpeed = cfg.highPingSpeed
+    _G.SabcomStallSec = cfg.stallSec
+    _G.SabcomRepushAt = cfg.repushAt
+    _G.SabcomPathCell = cfg.pathCell
+    _G.SabcomPathRadius = cfg.pathRadius
+    _G.SabcomPathHeight = cfg.pathHeight
+    _G.SabcomPathPad = cfg.pathPad
+    _G.SabcomRowBoxX = cfg.rowBoxX
+    _G.SabcomRowBoxZ = cfg.rowBoxZ
+    _G.SabcomRowLane = cfg.rowLane
+    _G.SabcomVoidY = cfg.voidY
+    _G.SabcomCloneBackoff = cfg.cloneBackoff
+    _G.SabcomFrontRunIn = cfg.frontRunIn
+    _G.SabcomSettleFrames = cfg.settleFrames
+    _G.SabcomSettleMaxMs = cfg.settleMaxMs
+    _G.SabcomStealHz = cfg.stealHz
+    _G.SabcomStealHoldDuration = cfg.stealHoldDuration
+    _G.SabcomAntiDieHz = cfg.antiDieHz
+    _G.SabcomTPHealLock = cfg.tpHealLock
+    _G.SabcomNoAnim = flag(cfg.noAnim, false)
+    _G.SabcomHotScanSec = cfg.hotScanSec
+    _G.SabcomUpvalDepth = cfg.upvalDepth
+    _G.SabcomUiDelay = 0
+    _G.SabcomSeqQuiet = cfg.seqQuiet
+    _G.SabcomGrappleQuiet = cfg.grappleQuiet
+    _G.SabcomStrictSweep = flag(cfg.strictSweep, false)
+    _G.ApproachFloor2FromFloor1 = cfg.approachFloor2FromFloor1
+    _G.SabcomXray = cfg.xray == true
+    _G.SabcomEspPlayer = cfg.espPlayer == true
+    _G.SabcomBrainrotEsp = cfg.brainrotEsp == true
+    _G.SabcomLineToBase = cfg.lineToBase == true
+    _G.SabcomLineToBrainrot = cfg.lineToBrainrot == true
+    _G.SabcomAutoGoOnSwitch = cfg.autoGoOnSwitch == true
+    _G.SabcomAutoTurret = cfg.autoTurret == true
+    _G.SabcomInvisGui = cfg.invisGui == true
+    _G._stp_invisKeyName = loadKey(cfg.invisKey, "U")
+    _G.AutoInvisDuringSteal = cfg.autoInvis == true
+    _G.AutoRecoverLagback = cfg.autoRecover ~= false
+    _G.InvisStealAngle = tonumber(cfg.invisAngle) or 225
+    _G.SinkSliderValue = tonumber(cfg.sinkSlider) or 7
+    _G.SabcomSuperOptimizer = cfg.superOptimizer == true
+    _G.SabcomAutoKickGui = cfg.autoKickGui == true
+    _G.SabcomAutoKick = cfg.autoKick == true
+    _G.SabcomKickToPS = cfg.kickToPs ~= false
+    _G.SabcomPSCode = (type(cfg.psCode) == "string" and cfg.psCode) or ""
+    _G.SabcomFaceAwayGui = cfg.faceAwayGui == true
+    _G.SabcomFaceAway = cfg.faceAway == true
+    if cfg.faceAwayBaseOwner ~= nil then
+        _G.SabcomFaceAwayBaseOwner = cfg.faceAwayBaseOwner == true
+    else
+        _G.SabcomFaceAwayBaseOwner = (type(cfg.faceAwayMode) == "string" and cfg.faceAwayMode or "baseowner") ~= "nearest"
+    end
+    if cfg.faceAwayNearest ~= nil then
+        _G.SabcomFaceAwayNearest = cfg.faceAwayNearest == true
+    else
+        _G.SabcomFaceAwayNearest = cfg.faceAwayMode == "nearest"
+    end
+    _G.SabcomFaceAwayTarget = (type(cfg.faceAwayTarget) == "string" and cfg.faceAwayTarget) or ""
+    _G.SabcomFaceAwayClick = cfg.faceAwayClick == true
+    _G.SabcomAutoCloseGui = cfg.autoCloseGui == true
+    _G.SabcomLockUi = cfg.lockUi == true
+    do
+        local px = tonumber(cfg.panelX) or 24
+        local py = tonumber(cfg.panelY) or 180
+        if px < 8 or py < 12 or px > 2400 or py > 1400 then
+            px, py = 24, 180
+        end
+        _G._stp_panelX = px
+        _G._stp_panelY = py
+    end
+    do
+        local sx = tonumber(cfg.stealTargetX) or 16
+        local sy = tonumber(cfg.stealTargetY) or 220
+        if sy == 390 then sy = 220 end
+        if sx < -400 or sy < -200 or sx > 2400 or sy > 1400 then
+            sx, sy = 16, 220
+        end
+        _G._stp_stealX = sx
+        _G._stp_stealY = sy
+    end
+    local function loadPanelPos(cfgKeyX, cfgKeyY, gX, gY, defX, defY)
+        local x = tonumber(cfg[cfgKeyX]) or defX
+        local y = tonumber(cfg[cfgKeyY]) or defY
+        if x < -400 or y < -200 or x > 2400 or y > 1400 then
+            x, y = defX, defY
+        end
+        _G[gX] = x
+        _G[gY] = y
+    end
+    loadPanelPos("autoKickX", "autoKickY", "_stp_akX", "_stp_akY", 16, 320)
+    loadPanelPos("psX", "psY", "_stp_psX", "_stp_psY", 224, 320)
+    loadPanelPos("invisGuiX", "invisGuiY", "_stp_ivX", "_stp_ivY", 16, 450)
+    loadPanelPos("walkSpeedX", "walkSpeedY", "_stp_wsX", "_stp_wsY", 16, 560)
+    loadPanelPos("fovX", "fovY", "_stp_fovX", "_stp_fovY", 16, 660)
+    loadPanelPos("faceAwayX", "faceAwayY", "_stp_faX", "_stp_faY", 240, 80)
+    loadPanelPos("priorityX", "priorityY", "_stp_priX", "_stp_priY", 300, 80)
+    loadPanelPos("extrasX", "extrasY", "_stp_exX", "_stp_exY", 276, 80)
+    _G.SabcomMinimized = cfg.panelMinimized
+    _G.SabcomSettingsOpen = cfg.settingsOpen
+    _G.SabcomCfgFile = CFG_FILE
+    _G.SabcomCfgDefaults = D
+    do
+        local pri = cfg.priorityItems
+        local out = {}
+        if type(pri) == "table" then
+            for _, n in ipairs(pri) do
+                if type(n) == "string" and n ~= "" then out[#out + 1] = n end
+            end
+        end
+        if #out > 0 then _G._stp_priorityCfg = out end
+    end
+
+    local collect = (function()
+        local t = {}
+        for k, v in pairs(D) do t[k] = v end
+        t.autoTp = _G.SabcomAutoTP ~= false
+        t.autoSteal = _G.SabcomAutoSteal == true
+        t.stealMode = (type(_G.SabcomStealMode) == "string" and _G.SabcomStealMode) or "priority"
+        t.tpMode = t.stealMode
+        t.tpKey = loadKey(_G._stp_tpKeyName, "T")
+        t.resetKey = loadKey(_G._stp_resetKeyName, "X")
+        t.cloneKey = loadKey(_G._stp_cloneKeyName, "C")
+        t.dropKey = loadKey(_G._stp_dropKeyName, "B")
+        t.floatKey = loadKey(_G._stp_floatKeyName, "Z")
+        t.carpetSpeedKey = loadKey(_G._stp_carpetSpeedKeyName, "Q")
+        t.autoBuyKey = loadKey(_G._stp_autoBuyKeyName, "K")
+        t.walkSpeedKey = loadKey(_G._stp_walkSpeedKeyName, "V")
+        t.walkSpeed = math.clamp(tonumber(_G.SabcomWalkSpeed) or 16, 16, 100)
+        t.walkSpeedOn = _G.SabcomWalkSpeedOn == true
+        t.walkSpeedGui = _G.SabcomWalkSpeedGui ~= false
+        t.fovOn = _G.SabcomFovOn == true
+        t.fov = math.clamp(tonumber(_G.SabcomFov) or 70, 70, 120)
+        t.fovGui = _G.SabcomFovGui ~= false
+        t.infJumpKey = loadKey(_G._stp_infJumpKeyName, "G")
+        t.infJumpOn = _G.SabcomInfJump == true
+        t.kickKey = loadKey(_G._stp_kickKeyName, "P")
+        t.hideGuiKey = loadKey(_G._stp_hideGuiKeyName, "RightShift")
+        t.resetRepeats = math.max(1, math.floor(tonumber(_G.SabcomResetRepeats) or 1))
+        t.resetDelay = tonumber(_G.SabcomResetDelay) or 0.05
+        t.tpDelay = tonumber(_G._stp_tpDelay) or tonumber(_G.TPDelay) or 0
+        t.tpVelocity = tonumber(_G.TPVelocity) or 400
+        t.climbSpeed = tonumber(_G.SabcomClimb) or 160
+        t.climbSafe = tonumber(_G.SabcomClimbSafe) or 250
+        t.climbFull = _G.SabcomClimbFull == true
+        t.goSpeed = tonumber(_G.SabcomGoSpeed) or tonumber(_G.SabcomBrainrotSpeed) or 200
+        t.closeSpeed = tonumber(_G.SabcomCloseSpeed) or 80
+        t.landingDelay = tonumber(_G.LandingDelay) or 0.35
+        t.postCloneDelay = tonumber(_G.SabcomPostCloneDelay) or 0.1
+        t.boostWindow = tonumber(_G.SabcomBoostWindow) or 20
+        t.sideTpRange = tonumber(_G.SabcomSideTPRange) or 100
+        t.preferFrontOnRow = _G.SabcomPreferFrontOnRow ~= false
+        t.directPath = _G.SabcomDirect ~= false
+        t.jumpOnce = _G.SabcomJumpOnce ~= false
+        t.minGen = tonumber(_G.SabcomMinGen) or 0
+        t.carpetTool = (type(_G.SabcomCarpetTool) == "string" and _G.SabcomCarpetTool) or ""
+        t.carpetWaitMs = tonumber(_G.SabcomCarpetWaitMs) or 200
+        t.carpetRelance = _G.SabcomCarpetRelance ~= false
+        t.grappleWaitMs = tonumber(_G.SabcomGrappleWaitMs) or 200
+        t.grappleSettleMs = tonumber(_G.SabcomGrappleSettleMs) or 60
+        t.pingThresh = tonumber(_G.SabcomPingThresh) or 170
+        t.highPingSpeed = tonumber(_G.SabcomHighPingSpeed) or 400
+        t.stallSec = tonumber(_G.SabcomStallSec) or 0.6
+        t.repushAt = tonumber(_G.SabcomRepushAt) or 0.9
+        t.pathCell = tonumber(_G.SabcomPathCell) or 4
+        t.pathRadius = tonumber(_G.SabcomPathRadius) or 2.5
+        t.pathHeight = tonumber(_G.SabcomPathHeight) or 5
+        t.pathPad = tonumber(_G.SabcomPathPad) or 40
+        t.rowBoxX = tonumber(_G.SabcomRowBoxX) or 26
+        t.rowBoxZ = tonumber(_G.SabcomRowBoxZ) or 30
+        t.rowLane = tonumber(_G.SabcomRowLane) or 30
+        t.voidY = tonumber(_G.SabcomVoidY) or -50
+        t.cloneBackoff = tonumber(_G.SabcomCloneBackoff) or 0.5
+        t.frontRunIn = tonumber(_G.SabcomFrontRunIn) or 130
+        t.settleFrames = tonumber(_G.SabcomSettleFrames) or 4
+        t.settleMaxMs = tonumber(_G.SabcomSettleMaxMs) or 250
+        t.stealHz = tonumber(_G.SabcomStealHz) or 0.05
+        t.stealHoldDuration = tonumber(_G.SabcomStealHoldDuration) or 1.3
+        t.antiDieHz = tonumber(_G.SabcomAntiDieHz) or 0.1
+        t.tpHealLock = _G.SabcomTPHealLock == true
+        t.noAnim = _G.SabcomNoAnim ~= false
+        t.hotScanSec = tonumber(_G.SabcomHotScanSec) or 8
+        t.upvalDepth = tonumber(_G.SabcomUpvalDepth) or 128
+        t.uiDelay = tonumber(_G.SabcomUiDelay) or 0
+        t.seqQuiet = _G.SabcomSeqQuiet == true
+        t.grappleQuiet = _G.SabcomGrappleQuiet == true
+        t.strictSweep = _G.SabcomStrictSweep ~= false
+        t.approachFloor2FromFloor1 = _G.ApproachFloor2FromFloor1 == true
+        local px = tonumber(_G._stp_panelX) or 24
+        local py = tonumber(_G._stp_panelY) or 180
+        if px < 8 or py < 12 or px > 2400 or py > 1400 then
+            px, py = 24, 180
+        end
+        t.panelX = px
+        t.panelY = py
+        t.panelMinimized = _G.SabcomMinimized == true
+        t.settingsOpen = _G.SabcomSettingsOpen == true
+        do
+            local sx = tonumber(_G._stp_stealX) or 16
+            local sy = tonumber(_G._stp_stealY) or 390
+            if sx < -400 or sy < -200 or sx > 2400 or sy > 1400 then
+                sx, sy = 16, 220
+            end
+            t.stealTargetX = sx
+            t.stealTargetY = sy
+        end
+        local function savePanelPos(gX, gY, cfgKeyX, cfgKeyY, defX, defY)
+            local x = tonumber(_G[gX]) or defX
+            local y = tonumber(_G[gY]) or defY
+            if x < -400 or y < -200 or x > 2400 or y > 1400 then
+                x, y = defX, defY
+            end
+            t[cfgKeyX] = x
+            t[cfgKeyY] = y
+        end
+        savePanelPos("_stp_akX", "_stp_akY", "autoKickX", "autoKickY", 16, 320)
+        savePanelPos("_stp_psX", "_stp_psY", "psX", "psY", 224, 320)
+        savePanelPos("_stp_ivX", "_stp_ivY", "invisGuiX", "invisGuiY", 16, 450)
+        savePanelPos("_stp_wsX", "_stp_wsY", "walkSpeedX", "walkSpeedY", 16, 560)
+        savePanelPos("_stp_fovX", "_stp_fovY", "fovX", "fovY", 16, 660)
+        savePanelPos("_stp_faX", "_stp_faY", "faceAwayX", "faceAwayY", 240, 80)
+        savePanelPos("_stp_priX", "_stp_priY", "priorityX", "priorityY", 300, 80)
+        do
+            local pri = _G.SHARED_PRIORITY_ITEMS
+            if type(pri) ~= "table" or #pri == 0 then
+                pri = _G._stp_priorityCfg
+            end
+            local out = {}
+            if type(pri) == "table" then
+                for _, n in ipairs(pri) do
+                    if type(n) == "string" and n ~= "" then out[#out + 1] = n end
+                end
+            end
+            t.priorityItems = out
+        end
+        t.xray = _G.SabcomXray == true
+        t.espPlayer = _G.SabcomEspPlayer == true
+        t.brainrotEsp = _G.SabcomBrainrotEsp == true
+        t.lineToBase = _G.SabcomLineToBase == true
+        t.lineToBrainrot = _G.SabcomLineToBrainrot == true
+        t.autoGoOnSwitch = _G.SabcomAutoGoOnSwitch == true
+        t.autoTurret = _G.SabcomAutoTurret == true
+        t.invis = _G.invisibleStealEnabled == true
+        t.invisGui = _G.SabcomInvisGui == true
+        t.invisKey = loadKey(_G._stp_invisKeyName, "U")
+        t.autoInvis = _G.AutoInvisDuringSteal == true
+        t.autoRecover = _G.AutoRecoverLagback ~= false
+        t.invisAngle = tonumber(_G.InvisStealAngle) or 225
+        t.sinkSlider = tonumber(_G.SinkSliderValue) or 7
+        t.superOptimizer = _G.SabcomSuperOptimizer == true
+        t.autoKickGui = _G.SabcomAutoKickGui == true
+        t.autoKick = _G.SabcomAutoKick == true
+        t.kickToPs = _G.SabcomKickToPS ~= false
+        t.psCode = (type(_G.SabcomPSCode) == "string" and _G.SabcomPSCode) or ""
+        t.faceAwayGui = _G.SabcomFaceAwayGui == true
+        t.faceAway = _G.SabcomFaceAway == true
+        t.faceAwayBaseOwner = _G.SabcomFaceAwayBaseOwner == true
+        t.faceAwayNearest = _G.SabcomFaceAwayNearest == true
+        t.faceAwayTarget = (type(_G.SabcomFaceAwayTarget) == "string" and _G.SabcomFaceAwayTarget) or ""
+        t.faceAwayClick = _G.SabcomFaceAwayClick == true
+        t.autoCloseGui = _G.SabcomAutoCloseGui == true
+        t.lockUi = _G.SabcomLockUi == true
+        savePanelPos("_stp_exX", "_stp_exY", "extrasX", "extrasY", 276, 80)
+        return t
+    end)
+
+    local _saveQ = false
+    local _saveDirty = false
+    local saveNow = (function()
+        if not writefile then return end
+        _saveDirty = false
+        pcall(function() writefile(CFG_FILE, HS:JSONEncode(collect())) end)
+    end)
+    local save = (function()
+        if not writefile then return end
+        _saveDirty = true
+        if _saveQ then return end
+        _saveQ = true
+        task.delay(0.2, function()
+            _saveQ = false
+            if _saveDirty then
+                saveNow()
+            end
+            if type(_G.SabcomSyncBabySharkTpGlobals) == "function" then
+                pcall(_G.SabcomSyncBabySharkTpGlobals)
+            end
+        end)
+    end)
+
+    _G.SabcomCollectConfig = collect
+    _G.SabcomSaveConfig = save
+    _G.SabcomSaveConfigNow = saveNow
+    _G.Sabcom_SaveSettings = save
+    if type(_G.SabcomSyncBabySharkTpGlobals) == "function" then
+        pcall(_G.SabcomSyncBabySharkTpGlobals)
+    end
+end
+
+function _G.Sabcom_Step() end
+
+_G.Sabcom_SeqT0 = _G.Sabcom_SeqT0 or os.clock()
+_G.Sabcom_SeqLog = _G.Sabcom_SeqLog or {}
+_G.Sabcom_SeqDone = _G.Sabcom_SeqDone or false
+if type(_G.Sabcom_Step) ~= "function" then
+    function _G.Sabcom_Step(nom, detail)
+        local L = _G.Sabcom_SeqLog
+        if #L > 120 then return end
+        L[#L + 1] = {
+            ms = math.floor((os.clock() - _G.Sabcom_SeqT0) * 1000),
+            nom = nom,
+            det = detail,
+        }
+    end
+end
+
+local function _syncBabySharkTpGlobals()
+    if _G.SabcomAutoTP ~= nil then
+        _G.sabcomAutoTP = (_G.SabcomAutoTP ~= false)
+    end
+    if _G.SabcomVoidY ~= nil then _G.sabcomVoidY = _G.SabcomVoidY end
+    if _G.SabcomPingThresh ~= nil then _G.sabcomPingThresh = _G.SabcomPingThresh end
+    if _G.SabcomHighPingSpeed ~= nil then _G.sabcomHighPingSpeed = _G.SabcomHighPingSpeed end
+    if _G.SabcomGrappleWaitMs ~= nil then _G.sabcomGrappleWaitMs = _G.SabcomGrappleWaitMs end
+    if _G.SabcomGrappleSettleMs ~= nil then _G.sabcomGrappleSettleMs = _G.SabcomGrappleSettleMs end
+    if _G.SabcomCarpetWaitMs ~= nil then _G.sabcomCarpetWaitMs = _G.SabcomCarpetWaitMs end
+    if _G.SabcomSettleFrames ~= nil then _G.sabcomSettleFrames = _G.SabcomSettleFrames end
+    if _G.SabcomSettleMaxMs ~= nil then _G.sabcomSettleMaxMs = _G.SabcomSettleMaxMs end
+    if _G.SabcomBoostWindow ~= nil then _G.sabcomBoostWindow = _G.SabcomBoostWindow end
+    if _G.sabcomBoostWindow == nil then _G.sabcomBoostWindow = tonumber(_G.SabcomBoostWindow) or 20 end
+    if _G.SabcomBrainrotSpeed ~= nil then _G.sabcomBrainrotSpeed = _G.SabcomBrainrotSpeed end
+    if _G.SabcomCloneBackoff ~= nil then _G.sabcomCloneBackoff = _G.SabcomCloneBackoff end
+    if _G.SabcomFrontRunIn ~= nil then _G.sabcomFrontRunIn = _G.SabcomFrontRunIn end
+    if _G.SabcomSideTPRange ~= nil then _G.sabcomSideTPRange = _G.SabcomSideTPRange end
+    if _G.SabcomPostCloneDelay ~= nil then _G.sabcomPostCloneDelay = _G.SabcomPostCloneDelay end
+    if _G.SabcomPreferFrontOnRow ~= nil then _G.sabcomPreferFrontOnRow = _G.SabcomPreferFrontOnRow end
+    if _G.SabcomNoAnim ~= nil then _G.sabcomNoAnim = _G.SabcomNoAnim end
+    if _G.SabcomTPStop ~= nil then _G.sabcomTPStop = _G.SabcomTPStop end
+    if _G.SabcomStealHold ~= nil then _G.sabcomStealHold = _G.SabcomStealHold end
+
+    if _G.SabcomClimb ~= nil then _G.sabcomClimb = _G.SabcomClimb end
+    if _G.sabcomClimb == nil then _G.sabcomClimb = tonumber(_G.SabcomClimb) or 400 end
+    if _G.SabcomClimbSafe ~= nil then _G.sabcomClimbSafe = _G.SabcomClimbSafe end
+    if _G.SabcomClimbFull ~= nil then _G.sabcomClimbFull = _G.SabcomClimbFull end
+    if _G.SabcomDirect ~= nil then _G.sabcomDirect = _G.SabcomDirect end
+    if _G.SabcomStallSec ~= nil then _G.sabcomStallSec = _G.SabcomStallSec end
+    if _G.SabcomRepushAt ~= nil then _G.sabcomRepushAt = _G.SabcomRepushAt end
+    if _G.SabcomJumpOnce ~= nil then _G.sabcomJumpOnce = _G.SabcomJumpOnce end
+    if _G.SabcomStrictSweep ~= nil then _G.sabcomStrictSweep = _G.SabcomStrictSweep end
+    if _G.SabcomPathCell ~= nil then _G.sabcomPathCell = _G.SabcomPathCell end
+    if _G.SabcomPathRadius ~= nil then _G.sabcomPathRadius = _G.SabcomPathRadius end
+    if _G.SabcomPathHeight ~= nil then _G.sabcomPathHeight = _G.SabcomPathHeight end
+    if _G.SabcomPathPad ~= nil then _G.sabcomPathPad = _G.SabcomPathPad end
+    if _G.SabcomRowBoxX ~= nil then _G.sabcomRowBoxX = _G.SabcomRowBoxX end
+    if _G.SabcomRowBoxZ ~= nil then _G.sabcomRowBoxZ = _G.SabcomRowBoxZ end
+    if _G.SabcomRowLane ~= nil then _G.sabcomRowLane = _G.SabcomRowLane end
+end
+_G.SabcomSyncBabySharkTpGlobals = _syncBabySharkTpGlobals
+
+_G.__sabcomT0 = _G.__sabcomT0 or os.clock()
+_G.__TP_T0 = nil
+_G.__sabcomRestReady = false
+_G.sabcomFreezeUntil = _G.sabcomFreezeUntil or (os.clock() + 10)
+function _G.sabcomFrozen() return os.clock() < (_G.sabcomFreezeUntil or 0) end
+
+local function _afterTpLoad(fn)
+    task.spawn(function()
+        while not _G.__sabcomRestReady do
+            task.wait(0.05)
+        end
+        pcall(fn)
+    end)
+end
+_G.SabcomAfterTpLoad = _afterTpLoad
+
+task.spawn(function()
+    local t0 = os.clock()
+    while not _G.__sabcomRestReady do
+        if os.clock() - t0 > 25 then
+            _G.__sabcomRestReady = true
+            break
+        end
+        task.wait(0.1)
+    end
+end)
+
+_G.SHARED_PRIORITY_ITEMS = {
+    "headless horseman","signore carapace","strawberry elephant","meowl","john pork",
+    "skibidi toilet","griffin","elefanto frigo","arcadragon","love love bear",
+    "grabatron","antonio","dragon gingerini","kalika bros","dragon aquanini",
+    "la supreme combinasion","digi narwhal","kraken","fishino clownino","tirilikalika tirilikalako",
+    "jelly moby","ginger gerat","moby bros","hydra bunny","pancake and syrup",
+    "hydra dragon cannelloni","dragon cannelloni","bunny and eggy","venuspino","los admins",
+    "rico dinero","dug dug dug","ketupat bros","duggy bros","rubiko and kubiko",
+    "la casa boo","los hackers","rosey and teddy","foxini lanternini","rubrikiko",
+    "los sekolahs","cerberus","capitano americano","bearito cabinito","abyssaloco",
+    "globa steppa","sammyni fattini","cloverat clapat","fortunu and cashuru","los chillis",
+    "los amigos","spooky and pumpky","guest 666","fragrama and chocrama","cooki and milki",
+    "reinito sleighito","celestial pegasus","popcuru and fizzuru","quackini snackini","la food combinasion",
+    "hopilikalika hopilikalika","gym bros","money money bros","burguro and fryuro","capitano moby",
+    "garama and madundung","cash or card",
+}
+if type(_G._stp_priorityCfg) == "table" and #_G._stp_priorityCfg > 0 then
+    local _priCopy = {}
+    for i, v in ipairs(_G._stp_priorityCfg) do _priCopy[i] = v end
+    _G.SHARED_PRIORITY_ITEMS = _priCopy
+    _G._stp_priorityCfg = _priCopy
+end
+task.defer(function()
+    if writefile and type(_G.SabcomSaveConfigNow) == "function" then
+        pcall(_G.SabcomSaveConfigNow)
+    end
+end)
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS        = game:GetService("UserInputService")
+local RS         = game:GetService("ReplicatedStorage")
+
+local LP = Players.LocalPlayer
+if not LP then
+    repeat RunService.Heartbeat:Wait() until Players.LocalPlayer
+    LP = Players.LocalPlayer
+end
+
+do
+    task.spawn(function()
+        local char = LP.Character or LP.CharacterAdded:Wait()
+        local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 8)
+        if hrp then
+            pcall(function() LP:RequestStreamAroundAsync(hrp.Position) end)
+        end
+    end)
+end
+
+_G.SabcomGrappleValue = _G.SabcomGrappleValue or 0.33
+do
+    local function muteAndStopPull(tool, hrp)
+        if tool then
+            for _, s in ipairs(tool:GetDescendants()) do
+                if s:IsA("Sound") then
+                    pcall(function()
+                        s.Volume = 0
+                        s:Stop()
+                    end)
+                elseif s:IsA("Beam") then
+                    pcall(function()
+                        s.Enabled = false
+                        s.Attachment0 = nil
+                    end)
+                end
+            end
+        end
+        if hrp then
+            local fp = hrp:FindFirstChild("FlightPower")
+            if fp then fp:Destroy() end
+            if not _G.SabcomIsTeleporting then
+                pcall(function()
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.AssemblyAngularVelocity = Vector3.zero
+                end)
+            end
+        end
+    end
+
+    local function holdNoPull(tool, hrp, seconds)
+        local t0 = os.clock()
+        local conn
+        local RSvc = game:GetService("RunService")
+        conn = RSvc.Heartbeat:Connect(function()
+            muteAndStopPull(tool, hrp)
+            if os.clock() - t0 > seconds then
+                conn:Disconnect()
+                muteAndStopPull(tool, hrp)
+            end
+        end)
+    end
+
+    _G.__SabcomGrappleDisparar = function(tool, pos, alvo, char, RSv)
+        local refs = (getgenv and getgenv().__SabcomPMRefs) or _G.__SabcomPMRefs
+        if not refs then
+            refs = {}
+            pcall(function()
+                local mouse = require((RSv or RS).Packages.PlayerMouse)
+                if type(mouse) == "table" then refs[1] = mouse end
+            end)
+            if getgenv then getgenv().__SabcomPMRefs = refs end
+            _G.__SabcomPMRefs = refs
+        end
+
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        muteAndStopPull(tool, hrp)
+
+        local mira = CFrame.new(pos)
+        local antes = {}
+        for i, t in ipairs(refs) do
+            antes[i] = { rawget(t, "Hit"), rawget(t, "Target") }
+            pcall(function()
+                t.Hit = mira
+                t.Target = alvo
+            end)
+        end
+
+        local ok = pcall(function() tool:Activate() end)
+        if not ok then
+            ok = pcall(function() firesignal(tool.Activated) end)
+        end
+
+        muteAndStopPull(tool, hrp)
+        holdNoPull(tool, hrp, 0.6)
+
+        task.spawn(function()
+            local RSvc = game:GetService("RunService")
+            for _ = 1, 4 do
+                for _, t in ipairs(refs) do
+                    pcall(function()
+                        t.Hit = mira
+                        t.Target = alvo
+                    end)
+                end
+                muteAndStopPull(tool, hrp)
+                RSvc.Heartbeat:Wait()
+            end
+            for i, t in ipairs(refs) do
+                local a = antes[i]
+                pcall(function()
+                    t.Hit = a[1]
+                    t.Target = a[2]
+                end)
+            end
+            muteAndStopPull(tool, hrp)
+        end)
+
+        return ok
+    end
+
+    _G.SabcomFireGrapple2 = function(value, exato)
+        local RSv = game:GetService("ReplicatedStorage")
+        local Plrs = game:GetService("Players")
+        local eu = Plrs.LocalPlayer
+        local char = eu and eu.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return false end
+
+        if eu:GetAttribute("Stealing") then return false end
+
+        local tool = char:FindFirstChild("Grapple Hook")
+        if not tool then
+            local bp = eu:FindFirstChildOfClass("Backpack")
+            local t2 = bp and bp:FindFirstChild("Grapple Hook")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not t2 or not hum then return false end
+            pcall(function() hum:EquipTool(t2) end)
+            local t0 = os.clock()
+            repeat
+                game:GetService("RunService").Heartbeat:Wait()
+                char = eu.Character
+                tool = char and char:FindFirstChild("Grapple Hook")
+            until tool or os.clock() - t0 > 0.5
+            if not tool then return false end
+            hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp then return false end
+        end
+
+        local par0 = RaycastParams.new()
+        par0.FilterType = Enum.RaycastFilterType.Exclude
+        par0.FilterDescendantsInstances = { char }
+
+        if exato and typeof(value) == "Vector3" then
+            local pos = value
+            local m = (pos - hrp.Position).Magnitude
+            if m < 10 or m > 50 then return false end
+
+            local alvo
+            local hit = workspace:Raycast(hrp.Position, pos - hrp.Position, par0)
+            if hit then alvo = hit.Instance end
+            if not alvo then
+                for _, p in ipairs(workspace:GetPartBoundsInRadius(pos, 6)) do
+                    if p:IsA("BasePart") and not p:IsDescendantOf(char) then alvo = p; break end
+                end
+            end
+            if not alvo then return false end
+            return _G.__SabcomGrappleDisparar(tool, pos, alvo, char, RSv)
+        end
+
+        local destino
+        if typeof(value) == "Vector3" then destino = value
+        elseif typeof(value) == "Instance" and value:IsA("BasePart") then destino = value.Position end
+
+        local dir
+        if destino then
+            dir = destino - hrp.Position
+            dir = Vector3.new(dir.X, 0, dir.Z)
+        end
+        if not dir or dir.Magnitude < 1 then
+            local lv = hrp.CFrame.LookVector
+            dir = Vector3.new(lv.X, 0, lv.Z)
+        end
+        if dir.Magnitude < 0.01 then return false end
+        dir = dir.Unit
+
+        local par = RaycastParams.new()
+        par.FilterType = Enum.RaycastFilterType.Exclude
+        par.FilterDescendantsInstances = { char }
+
+        local pos, alvo, melhorM
+        for _, d in ipairs({ 9, 10, 11, 12, 13, 14, 16, 18, 21, 24, 28, 32, 36, 40, 45 }) do
+            local origem = hrp.Position + dir * d + Vector3.new(0, 3, 0)
+            local hit = workspace:Raycast(origem, Vector3.new(0, -60, 0), par)
+            if hit then
+                local m = (hit.Position - hrp.Position).Magnitude
+                if m >= 10 and m <= 50 and (not melhorM or m < melhorM) then
+                    pos, alvo, melhorM = hit.Position, hit.Instance, m
+                end
+            end
+        end
+        if not pos then
+            for _, d in ipairs({ 11, 14, 18, 24, 32, 42, 48 }) do
+                local hit = workspace:Raycast(hrp.Position, dir * d, par)
+                if hit then
+                    local m = (hit.Position - hrp.Position).Magnitude
+                    if m >= 10 and m <= 50 and (not melhorM or m < melhorM) then
+                        pos, alvo, melhorM = hit.Position, hit.Instance, m
+                    end
+                end
+            end
+        end
+        if not pos or not alvo then return false end
+
+        return _G.__SabcomGrappleDisparar(tool, pos, alvo, char, RSv)
+    end
+
+    _G.Sabcom_FireGrapple = _G.SabcomFireGrapple2
+    _G.SabcomGrappleReady = function()
+        return type(_G.SabcomFireGrapple2) == "function"
+    end
+end
+
+do
+
+    local _mask
+    local _maskNow = (function()
+        if _mask and _mask.Parent then return _mask end
+        local c = RS:FindFirstChild("Controllers")
+        _mask = c and c:FindFirstChild("PlotController")
+        return _mask
+    end)
+
+    local _syncMod = _G.SabcomPreloadedSynchronizer
+    local _reqInFlight
+    local function _getSyncMod()
+        if type(_syncMod) == "table" then return _syncMod end
+        if type(_G.SabcomPreloadedSynchronizer) == "table" then
+            _syncMod = _G.SabcomPreloadedSynchronizer
+            return _syncMod
+        end
+        local p = RS:FindFirstChild("Packages")
+        local m = p and p:FindFirstChild("Synchronizer")
+        if not m then return nil end
+
+
+        if _reqInFlight then return nil end
+        _reqInFlight = true
+        task.spawn(function()
+            local ok, mod = pcall(function()
+                if setthreadidentity then pcall(setthreadidentity, 8) end
+                return require(m)
+            end)
+            if ok and type(mod) == "table" then
+                _syncMod = mod
+                _G.SabcomPreloadedSynchronizer = mod
+                _G.SabcomSynchronizerReady = true
+            end
+            _reqInFlight = false
+        end)
+        return nil
+    end
+    _getSyncMod()
+    _G.SabcomGetSyncMod = _getSyncMod
+
+    _G.Sabcom_MaskNow = _maskNow
+
+    local _xchan, _nextTry, _full = nil, 0, false
+    local _fullRecheck = 0
+    local function _regComplete(reg)
+        local p = workspace:FindFirstChild("Plots")
+        if not p then return false end
+        local kids = p:GetChildren()
+        if #kids == 0 then return false end
+        for _, plot in ipairs(kids) do
+            if reg[plot.Name] == nil then return false end
+        end
+        return true
+    end
+    local function _getUpvalues(fn)
+        local g = getupvalues or (debug and debug.getupvalues)
+        if type(g) == "function" then
+            local ok, t = pcall(g, fn)
+            if ok and type(t) == "table" then return t end
+        end
+        local gu = getupvalue or (debug and debug.getupvalue)
+        if type(gu) ~= "function" then return nil end
+        local out = {}
+        local lim = tonumber(_G.sabcomUpvalDepth) or 128
+        for i = 1, lim do
+            local ok, a, b = pcall(gu, fn, i)
+            if not ok then break end
+            local v = (b ~= nil) and b or a
+            if v == nil then break end
+            out[i] = v
+        end
+        return out
+    end
+    local function _findChannels(upvals)
+        local found
+        pcall(function()
+            for _, upval in next, upvals do
+                if type(upval) == "table" then
+                    for _, val in next, upval do
+                        if type(val) == "table" and rawget(val, "CacheTable") then
+                            found = upval
+                            return
+                        end
+                    end
+                    for _, v1 in next, upval do
+                        if type(v1) == "table" then
+                            for _, v2 in next, v1 do
+                                if type(v2) == "table" and rawget(v2, "CacheTable") then
+                                    found = v1
+                                    return
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        return found
+    end
+
+    local function _chans()
+
+        if _xchan then
+
+
+            if os.clock() >= _fullRecheck then
+                _fullRecheck = os.clock() + 0.5
+                _full = _regComplete(_xchan)
+            end
+            return _xchan
+        end
+
+
+        local hot = (os.clock() - (_G.__sabcomT0 or 0)) < (tonumber(_G.sabcomHotScanSec) or 8)
+        if not hot and os.clock() < _nextTry then return nil end
+        _nextTry = os.clock() + 0.05
+
+        local sync = _getSyncMod()
+        if not sync then return nil end
+        local getfn
+        pcall(function() getfn = sync.Get end)
+        if type(getfn) ~= "function" then getfn = rawget(sync, "Get") end
+        if type(getfn) ~= "function" then return nil end
+
+        local ups = _getUpvalues(getfn)
+        if type(ups) ~= "table" then
+            return nil
+        end
+
+        local reg = _findChannels(ups)
+        if type(reg) == "table" then
+            local n = 0
+            for _ in pairs(reg) do n = n + 1 end
+            if n > 0 then
+                _xchan = reg
+                if _regComplete(reg) then _full = true end
+                _G.SabcomSyncDiag = string.format("bypassed via upvalues - %d channels", n)
+                return _xchan
+            end
+        end
+        return nil
+    end
+
+    _G.SabcomSyncAll = function() return _chans() end
+    _G.SabcomSyncGet = function(idx)
+        local t = _chans()
+        if not t or idx == nil then return nil end
+        local ok, cd = pcall(rawget, t, idx)
+        if ok and type(cd) == "table" then return cd end
+        local ok2, cd2 = pcall(function() return t[idx] end)
+        if ok2 and type(cd2) == "table" then return cd2 end
+        return nil
+    end
+
+    _G.sProp = function(ch, key)
+        if type(ch) ~= "table" or key == nil then return nil end
+        local ct = rawget(ch, "CacheTable")
+        if type(ct) ~= "table" then
+            local okC, c2 = pcall(function() return ch.CacheTable end)
+            if okC and type(c2) == "table" then ct = c2 end
+        end
+        if type(ct) ~= "table" then return nil end
+        local v = rawget(ct, key)
+        if v ~= nil then return v end
+        local okV, v2 = pcall(function() return ct[key] end)
+        if okV then return v2 end
+        return nil
+    end
+    _G.Sabcom_ChannelGet = _G.sProp
+
+    local function _rawChanGet(c, k) return c:Get(k) end
+    function _G.sabcomChannelGet(ch, key)
+        if ch == nil or key == nil then return nil end
+        if type(ch) == "table" then
+            local t = rawget(ch, "CacheTable")
+            if type(t) == "table" then
+                local v = t[key]
+                if v ~= nil then return v end
+            end
+        end
+        local ok, v = pcall(_rawChanGet, ch, key)
+        if ok then return v end
+        return nil
+    end
+    function _G.sabcomGetPlotChannel(name)
+        if name == nil then return nil end
+        if typeof(name) == "Instance" then
+            local ord
+            pcall(function() ord = name:GetAttribute("Order") end)
+            if ord ~= nil then
+                local ch = _G.SabcomSyncGet("Plot" .. tostring(ord))
+                if type(ch) == "table" then return ch end
+            end
+            name = name.Name
+        end
+        local plotsFolder = workspace:FindFirstChild("Plots")
+        local plotInst = plotsFolder and plotsFolder:FindFirstChild(tostring(name))
+        if plotInst then
+            local ord
+            pcall(function() ord = plotInst:GetAttribute("Order") end)
+            if ord ~= nil then
+                local ch = _G.SabcomSyncGet("Plot" .. tostring(ord))
+                if type(ch) == "table" then return ch end
+            end
+        end
+        return _G.SabcomSyncGet(tostring(name))
+    end
+
+    _G._sabcomRawCT = function(plotName)
+        local c = _G.SabcomSyncGet(plotName)
+        if not c then return nil end
+        return rawget(c, "CacheTable")
+    end
+    _G._sabcomGenShim = setmetatable({
+        GetGeneration = function(_, index, mutation, traits)
+            if type(_G.SabcomGen) == "function" then
+                return _G.SabcomGen(index, mutation, traits)
+            end
+            return 0
+        end,
+    }, {
+        __index = function(_, k)
+            local shim = _G.SabcomAnimShim
+            if type(shim) == "table" then return shim[k] end
+            return nil
+        end,
+    })
+
+    function _G.Sabcom_GetPlotChannel(plotRef)
+        local plot = plotRef
+        if type(plotRef) == "string" then
+            local pl = workspace:FindFirstChild("Plots")
+            plot = pl and pl:FindFirstChild(plotRef) or nil
+        end
+        if typeof(plot) == "Instance" then
+            local ord
+            pcall(function() ord = plot:GetAttribute("Order") end)
+            if ord ~= nil then
+                local ch = _G.SabcomSyncGet("Plot" .. tostring(ord))
+                if type(ch) == "table" then return ch end
+            end
+            local ch = _G.SabcomSyncGet(plot.Name)
+            if type(ch) == "table" then return ch end
+        elseif plotRef ~= nil then
+            local ch = _G.SabcomSyncGet(tostring(plotRef))
+            if type(ch) == "table" then return ch end
+        end
+        return nil
+    end
+    _G.Sabcom_GetAllPlots = function() return _G.SabcomSyncAll() or {} end
+    _G.Sabcom_GetPlotAnimalList = function(plotName)
+        local ct = _G._sabcomRawCT(plotName)
+        local al = ct and ct.AnimalList
+        return type(al) == "table" and al or nil
+    end
+
+    function _G.Sabcom_SynStatus()
+        local t = _chans()
+        local n = 0
+        if type(t) == "table" then for _ in pairs(t) do n = n + 1 end end
+        return { mod = _syncMod ~= nil, mask = _maskNow() ~= nil, full = _full, channels = n, diag = _G.SabcomSyncDiag }
+    end
+    pcall(_chans)
+
+end
+
+task.spawn(function()
+    local plots
+    local t0 = os.clock()
+    repeat
+        plots = workspace:FindFirstChild("Plots")
+        if not plots then RunService.Heartbeat:Wait() end
+    until plots or (os.clock() - t0) > 25
+    if not plots then return end
+    local done = {}
+    local _lastPlotWarm = 0
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        local now = os.clock()
+        if now - _lastPlotWarm < 0.12 then return end
+        _lastPlotWarm = now
+        pcall(_G.SabcomSyncAll)
+        local kids = plots:GetChildren()
+        local pending = 0
+        for _, plot in ipairs(kids) do
+            if not done[plot.Name] then
+                pending = pending + 1
+                local ch
+                if _G.SabcomSyncGet then
+                    local ord
+                    pcall(function() ord = plot:GetAttribute("Order") end)
+                    if ord ~= nil then ch = _G.SabcomSyncGet("Plot" .. tostring(ord)) end
+                    if not ch then ch = _G.SabcomSyncGet(plot.Name) end
+                end
+                if ch then
+                    pcall(function()
+                        if ch.Get then
+                            ch:Get("AnimalList")
+                            ch:Get("Owner")
+                        end
+                    end)
+                    local al = _G.sProp and _G.sProp(ch, "AnimalList")
+                    if al ~= nil then done[plot.Name] = true end
+                end
+            end
+        end
+        if #kids > 0 and pending == 0 and conn then
+            conn:Disconnect()
+            conn = nil
+        end
+    end)
+end)
+
+do
+    local RunSvc = game:GetService("RunService")
+    local conns = {}
+    local stopped = false
+    local function stopAll()
+        if stopped then return end
+        stopped = true
+        for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+        conns = {}
+    end
+    local probe = function()
+        if stopped then return end
+        if _G.__sabcomRestReady then
+            stopAll()
+            return
+        end
+        pcall(_G.Sabcom_MaskNow)
+        pcall(_G.SabcomSyncAll)
+    end
+
+    local function sig(...)
+        for _, n in ipairs({ ... }) do
+            local ok, s = pcall(function() return RunSvc[n] end)
+            if ok and typeof(s) == "RBXScriptSignal" then return s end
+        end
+        return nil
+    end
+    for _, s in ipairs({
+        sig("PostSimulation", "Heartbeat"),
+    }) do
+        local ok, c = pcall(function() return s:Connect(probe) end)
+        if ok and c then conns[#conns + 1] = c end
+    end
+
+    local watch = {
+        Synchronizer = true, PlotController = true,
+        Packages = true, Controllers = true,
+    }
+    do
+        local ok, c = pcall(function()
+            return RS.DescendantAdded:Connect((function(d)
+                if watch[d.Name] then probe() end
+            end))
+        end)
+        if ok and c then conns[#conns + 1] = c end
+    end
+
+    task.spawn(function()
+        local t = os.clock()
+        while os.clock() - t < 20 and not stopped do
+            local plots = workspace:FindFirstChild("Plots")
+            if plots then
+                local ok, c = pcall(function() return plots.ChildAdded:Connect(probe) end)
+                if ok and c then conns[#conns + 1] = c end
+                return
+            end
+            RunSvc.Heartbeat:Wait()
+        end
+    end)
+
+end
+
+do
+local _AD,_MD,_TD
+local _data = (function()
+if _AD then return true end
+local ok=pcall(function()
+local d=RS:FindFirstChild("Datas")
+if not d then return end
+local a,m,t=d:FindFirstChild("Animals"),d:FindFirstChild("Mutations"),d:FindFirstChild("Traits")
+if not a or not m or not t then return end
+_AD=require(a)
+_MD=require(m)
+_TD=require(t)
+end)
+return ok and _AD~=nil
+end)
+_G.SabcomGen=function(index,mutation,traits)
+if not _data() then return 0 end
+local info=_AD[index]
+if not info or not info.Generation then return 0 end
+local mult=1
+if mutation and mutation~="None" and mutation~="" then
+local m=_MD[mutation]
+if m and m.Modifier then mult=mult+m.Modifier end
+end
+if type(traits)=="table" then
+for _,tr in ipairs(traits)do
+local t=_TD[tr]
+if t and t.MultiplierModifier then mult=mult+t.MultiplierModifier end
+end
+end
+return info.Generation*mult
+end
+_G.SabcomAnimShim=setmetatable({GetGeneration=(function(_,index,mutation,traits)return _G.SabcomGen(index,mutation,traits)end)},{
+__index=(function(_,k)
+local ok,real=pcall(function()local sh=RS:FindFirstChild("Shared"); local an=sh and sh:FindFirstChild("Animals"); return an and require(an)end)
+if ok and type(real)=="table" then return rawget(real,k) end
+return nil
+end)})
+end
+
+local AnimalsData, AnimalsShared, NumberUtils
+local MutationsData, TraitsData, SyncMod
+
+local function safeRequire(path)
+    if not path then return nil end
+    local ok, res = pcall(require, path)
+    return ok and res or nil
+end
+
+local loadModules = (function()
+    if AnimalsData then return true end
+    local datas = RS:FindFirstChild("Datas")
+    local animals = datas and datas:FindFirstChild("Animals")
+    local utils = RS:FindFirstChild("Utils")
+    local numberUtils = utils and utils:FindFirstChild("NumberUtils")
+    if not animals or not numberUtils then return false end
+    AnimalsData = safeRequire(animals)
+    AnimalsShared = _G.SabcomAnimShim
+    NumberUtils = safeRequire(numberUtils)
+    MutationsData = MutationsData or safeRequire(datas and datas:FindFirstChild("Mutations"))
+    TraitsData = TraitsData or safeRequire(datas and datas:FindFirstChild("Traits"))
+    return AnimalsData ~= nil
+end)
+
+do
+    local pkg = RS:FindFirstChild("Packages")
+    local datas = RS:FindFirstChild("Datas")
+    local utils = RS:FindFirstChild("Utils")
+    SyncMod = _G.SabcomPreloadedSynchronizer or safeRequire(pkg and pkg:FindFirstChild("Synchronizer"))
+    AnimalsData = AnimalsData or safeRequire(datas and datas:FindFirstChild("Animals"))
+    MutationsData = MutationsData or safeRequire(datas and datas:FindFirstChild("Mutations"))
+    TraitsData = TraitsData or safeRequire(datas and datas:FindFirstChild("Traits"))
+    NumberUtils = NumberUtils or safeRequire(utils and utils:FindFirstChild("NumberUtils"))
+    AnimalsShared = _G.SabcomAnimShim
+    _G.SabcomSyncMod = SyncMod
+end
+
+local function getSyncChannel(name)
+    if type(name) ~= "string" or name == "" then return nil end
+    local mod = SyncMod
+    if type(mod) ~= "table" then
+        local p = RS:FindFirstChild("Packages")
+        local m = p and p:FindFirstChild("Synchronizer")
+        if m then
+            mod = safeRequire(m)
+            if type(mod) == "table" then SyncMod = mod end
+        end
+    end
+    if type(mod) == "table" and type(mod.GetTableFromChannel) == "function" then
+        local ok, t = pcall(function()
+            local old
+            if getthreadidentity then old = getthreadidentity() end
+            if setthreadidentity then setthreadidentity(8) end
+            local res = mod:GetTableFromChannel(name)
+            if old and setthreadidentity then pcall(setthreadidentity, old) end
+            return res
+        end)
+        if ok and type(t) == "table" then return t end
+    end
+    if type(_G.Sabcom_GetPlotChannel) == "function" then
+        local ok, t = pcall(_G.Sabcom_GetPlotChannel, name)
+        if ok and type(t) == "table" then return t end
+    end
+    return nil
+end
+_G.SabcomGetSyncChannel = getSyncChannel
+
+local GRAPPLE_ARG = 0.8
+
+local CARPET_SPEED = 280
+local INBASE_SPEED = 450
+local SKY_CLONE_WAIT = 0.3
+local CARPET_NAMES = { "Flying Carpet", "Waverider", "Santa's Sleigh", "Witch's Broom", "Cupid's Wings" }
+local TP_ITEM_NAMES = { "Flying Carpet", "Waverider", "Santa's Sleigh", "Witch's Broom", "Cupid's Wings" }
+local function findTool(name)
+    local char = LP.Character
+    local bp = LP:FindFirstChild("Backpack") or LP:FindFirstChildOfClass("Backpack")
+    local sg = LP:FindFirstChild("StarterGear")
+    local t = (char and char:FindFirstChild(name)) or (bp and bp:FindFirstChild(name)) or (sg and sg:FindFirstChild(name))
+    return t
+end
+
+local function _pokePlayerTools()
+    pcall(function()
+        local bp = LP:FindFirstChild("Backpack")
+        if bp then
+            bp:GetChildren()
+            bp:FindFirstChild("Grapple Hook")
+        end
+        local sg = LP:FindFirstChild("StarterGear")
+        if sg then sg:GetChildren() end
+        local char = LP.Character
+        if char then char:FindFirstChild("Grapple Hook") end
+    end)
+end
+
+local function _streamPlayerNow()
+    pcall(function()
+        local char = LP.Character
+        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart)
+        if not hrp then return end
+        pcall(function() LP:RequestStreamAroundAsync(hrp.Position) end)
+    end)
+end
+
+local function _waitGrapple(timeout)
+    timeout = tonumber(timeout) or 5
+    _pokePlayerTools()
+    local found = findTool("Grapple Hook")
+    if found then return found end
+
+    local done, tool = false, nil
+    local conns = {}
+    local function take(inst)
+        if done or not inst then return end
+        if inst.Name == "Grapple Hook" and (inst:IsA("Tool") or inst:IsA("HopperBin")) then
+            tool = inst
+            done = true
+        end
+    end
+    local function watch(folder)
+        if not folder then return end
+        local ex = folder:FindFirstChild("Grapple Hook")
+        if ex then
+            take(ex)
+            return
+        end
+        conns[#conns + 1] = folder.ChildAdded:Connect(take)
+        task.spawn(function()
+            local ok, w = pcall(function()
+                return folder:WaitForChild("Grapple Hook", timeout)
+            end)
+            if ok then take(w) end
+        end)
+    end
+
+    local bp = LP:FindFirstChild("Backpack")
+    if bp then
+        watch(bp)
+    else
+        task.spawn(function()
+            local ok, got = pcall(function()
+                return LP:WaitForChild("Backpack", timeout)
+            end)
+            if ok then watch(got) end
+        end)
+    end
+    watch(LP.Character)
+    watch(LP:FindFirstChild("StarterGear"))
+    conns[#conns + 1] = LP.CharacterAdded:Connect(function(c)
+        watch(c)
+        task.spawn(_streamPlayerNow)
+    end)
+
+    local t0 = os.clock()
+    while not done and os.clock() - t0 < timeout do
+        _pokePlayerTools()
+        local f = findTool("Grapple Hook")
+        if f then
+            take(f)
+            break
+        end
+        RunService.Heartbeat:Wait()
+    end
+    for _, c in ipairs(conns) do
+        pcall(function() c:Disconnect() end)
+    end
+    return tool or findTool("Grapple Hook")
+end
+
+local function _equipGrappleNow()
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local g = findTool("Grapple Hook")
+    if not (char and hum and g) then return false end
+    if g.Parent ~= char then
+        pcall(function() hum:EquipTool(g) end)
+    end
+    return char:FindFirstChild("Grapple Hook") ~= nil
+end
+
+local function equipCarpet()
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil end
+    for _, n in ipairs(CARPET_NAMES) do
+        local t = findTool(n)
+        if t and t:IsA("Tool") then
+            if t.Parent ~= char then pcall(function() hum:EquipTool(t) end) end
+            return n
+        end
+    end
+    return nil
+end
+local function setCarpetTool(name)
+    if type(name) ~= "string" or name == "" then return end
+    _G.SabcomCarpetTool = name
+    for i = #CARPET_NAMES, 1, -1 do
+        if CARPET_NAMES[i] == name then table.remove(CARPET_NAMES, i) end
+    end
+    table.insert(CARPET_NAMES, 1, name)
+end
+local function currentCarpetTool()
+    if type(_G.SabcomCarpetTool) == "string" and _G.SabcomCarpetTool ~= "" then
+        return _G.SabcomCarpetTool
+    end
+    return CARPET_NAMES[1] or "Flying Carpet"
+end
+local function cycleCarpetTool()
+    local cur = currentCarpetTool()
+    local idx = 1
+    for i, n in ipairs(TP_ITEM_NAMES) do
+        if n == cur then idx = i; break end
+    end
+    local nxt = TP_ITEM_NAMES[(idx % #TP_ITEM_NAMES) + 1]
+    setCarpetTool(nxt)
+    return nxt
+end
+_G.SabcomSetCarpetTool = setCarpetTool
+_G.SabcomCurrentCarpetTool = currentCarpetTool
+_G.SabcomCycleCarpetTool = cycleCarpetTool
+if type(_G.SabcomCarpetTool) == "string" and _G.SabcomCarpetTool ~= "" then
+    setCarpetTool(_G.SabcomCarpetTool)
+end
+
+do
+    local floatOn, floatConn = false, nil
+    local floatPad = nil
+    local function removeFloat()
+        if floatConn then floatConn:Disconnect(); floatConn = nil end
+        if floatPad then pcall(function() floatPad:Destroy() end); floatPad = nil end
+        local e = workspace:FindFirstChild("SabcomFloatPad")
+        if e then pcall(function() e:Destroy() end) end
+    end
+    local function createFloat()
+        removeFloat()
+        local c = LP.Character
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local p = Instance.new("Part")
+        p.Name = "SabcomFloatPad"
+        p.Size = Vector3.new(7, 1, 7)
+        p.Anchored = true
+        p.CanCollide = true
+        p.CanTouch = false
+        p.CanQuery = false
+        p.Transparency = 1
+        p.CastShadow = false
+        p.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 3.35, 0))
+        p.Parent = workspace
+        floatPad = p
+        floatConn = RunService.Heartbeat:Connect(function()
+            if not floatOn then return end
+            local ch = LP.Character
+            local h = ch and ch:FindFirstChild("HumanoidRootPart")
+            if h and floatPad and floatPad.Parent then
+                floatPad.CFrame = CFrame.new(h.Position - Vector3.new(0, 3.35, 0))
+            end
+        end)
+    end
+    local function setFloat(on)
+        floatOn = on and true or false
+        _G.SabcomFloat = floatOn
+        if floatOn then createFloat() else removeFloat() end
+        if type(_G.SabcomPaintFloat) == "function" then pcall(_G.SabcomPaintFloat) end
+    end
+    _G.SabcomSetFloat = setFloat
+    _G.toggleFloat = function() setFloat(not floatOn) end
+    pcall(function()
+        LP.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if floatOn then removeFloat(); createFloat() end
+        end)
+    end)
+
+    local infOn, infConn, lastJump = false, nil, 0
+    local function setInfJump(on)
+        infOn = on and true or false
+        _G.SabcomInfJump = infOn
+        if infConn then infConn:Disconnect(); infConn = nil end
+        if type(_G.SabcomPaintInfJump) == "function" then pcall(_G.SabcomPaintInfJump) end
+        if not infOn then return end
+        infConn = RunService.Heartbeat:Connect(function()
+            if not UIS:IsKeyDown(Enum.KeyCode.Space) then return end
+            local now = tick()
+            if now - lastJump < 0.1 then return end
+            local c = LP.Character
+            if not c then return end
+            local hrp = c:FindFirstChild("HumanoidRootPart")
+            local hum = c:FindFirstChildOfClass("Humanoid")
+            if not hrp or not hum or hum.Health <= 0 then return end
+            lastJump = now
+            hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 55, hrp.AssemblyLinearVelocity.Z)
+        end)
+    end
+    _G.SabcomSetInfJump = setInfJump
+    _G.toggleInfJump = function() setInfJump(not infOn) end
+    if _G.SabcomInfJump == true then
+        task.defer(function() setInfJump(true) end)
+    end
+
+    local carpetOn, carpetConn = false, nil
+    local function setCarpetSpeed(on)
+        carpetOn = on and true or false
+        _G.SabcomCarpetSpeed = carpetOn
+        if carpetConn then carpetConn:Disconnect(); carpetConn = nil end
+        if type(_G.SabcomPaintCarpetSpeed) == "function" then pcall(_G.SabcomPaintCarpetSpeed) end
+        if not carpetOn then return end
+        carpetConn = RunService.Heartbeat:Connect(function()
+            local c = LP.Character
+            if not c then return end
+            local hum = c:FindFirstChildOfClass("Humanoid")
+            local hrp = c:FindFirstChild("HumanoidRootPart")
+            if not hum or not hrp then return end
+            if LP:GetAttribute("Stealing") then
+                setCarpetSpeed(false)
+                return
+            end
+            local name = equipCarpet()
+            if name and c:FindFirstChild(name) then
+                local md = hum.MoveDirection
+                local spd = 140
+                if md.Magnitude > 0 then
+                    hrp.AssemblyLinearVelocity = Vector3.new(md.X * spd, hrp.AssemblyLinearVelocity.Y, md.Z * spd)
+                else
+                    hrp.AssemblyLinearVelocity = Vector3.new(0, hrp.AssemblyLinearVelocity.Y, 0)
+                end
+            end
+        end)
+    end
+    _G.SabcomSetCarpetSpeed = setCarpetSpeed
+    _G.toggleCarpetSpeed = function() setCarpetSpeed(not carpetOn) end
+
+    pcall(function()
+        LP:GetAttributeChangedSignal("Stealing"):Connect(function()
+            if LP:GetAttribute("Stealing") then
+                if floatOn then setFloat(false) end
+                if carpetOn then setCarpetSpeed(false) end
+            end
+        end)
+    end)
+end
+
+do
+    local autoBuyActive = false
+    local autoBuyRing = nil
+    local conveyorAnimals = {}
+    local DETECT_RADIUS = 17
+    local BUY_INTERVAL = 0.02
+    local BUY_BURST = 3
+    local HOVER_HEIGHT = 3
+    local RING_COLOR = Color3.fromRGB(125, 211, 252)
+    local lockedTarget, lockedPart, lockedModel = nil, nil, nil
+    local carpetLockConn, bodyPos = nil, nil
+    local purchaseRemote = nil
+
+    local function buyRange()
+        return tonumber(_G.SabcomAutoBuyRange) or DETECT_RADIUS
+    end
+    local function grabSpeed()
+        return math.clamp(tonumber(_G.SabcomAutoGrabSpeed) or 17, 5, 100)
+    end
+
+    local function createAutoBuyRing()
+        local existing = workspace:FindFirstChild("SabcomAutoBuyRing")
+        if existing then existing:Destroy() end
+        local r = Instance.new("Part")
+        r.Name = "SabcomAutoBuyRing"
+        r.Shape = Enum.PartType.Cylinder
+        r.Anchored = true
+        r.CanCollide = false
+        r.CanTouch = false
+        r.CanQuery = false
+        r.CastShadow = false
+        r.Material = Enum.Material.Neon
+        r.Transparency = 0.5
+        r.Color = RING_COLOR
+        local range = buyRange()
+        r.Size = Vector3.new(0.5, range * 2, range * 2)
+        r.Parent = workspace
+        autoBuyRing = r
+    end
+    local function destroyAutoBuyRing()
+        if autoBuyRing then pcall(function() autoBuyRing:Destroy() end); autoBuyRing = nil end
+        local e = workspace:FindFirstChild("SabcomAutoBuyRing")
+        if e then pcall(function() e:Destroy() end) end
+    end
+
+    local _abRingFrame = 0
+    RunService.Heartbeat:Connect(function()
+        if not autoBuyActive then return end
+        _abRingFrame = _abRingFrame + 1
+        if _abRingFrame < 3 then return end
+        _abRingFrame = 0
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp or not autoBuyRing then return end
+        local range = buyRange()
+        autoBuyRing.Size = Vector3.new(0.5, range * 2, range * 2)
+        autoBuyRing.CFrame = (hrp.CFrame * CFrame.Angles(0, 0, math.rad(90))) + Vector3.new(0, -2.5, 0)
+    end)
+
+    local function scanConveyor()
+        local results = {}
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if not (obj:IsA("ProximityPrompt") and obj.Enabled) then continue end
+            local txt = obj.ActionText or ""
+            if not (txt == "Purchase" or txt:lower():find("purchase") or txt:lower():find("comprar")) then continue end
+            local part = obj.Parent
+            if not part then continue end
+            local realPart = (part:IsA("Attachment") and part.Parent) or part
+            if not (realPart and realPart:IsA("BasePart")) then continue end
+            local model, cur = nil, realPart
+            for _ = 1, 8 do
+                if cur and cur:IsA("Model") then model = cur; break end
+                cur = cur and cur.Parent
+            end
+            results[#results + 1] = {
+                name = (model and model.Name ~= "" and model.Name) or "Brainrot",
+                prompt = obj,
+                part = realPart,
+                model = model,
+            }
+        end
+        return results
+    end
+    local function refreshConveyor()
+        local ok, found = pcall(scanConveyor)
+        if ok and found then conveyorAnimals = found end
+    end
+    _G.refreshConveyor = refreshConveyor
+
+    local function resolvePurchaseRemote()
+        if purchaseRemote and purchaseRemote.Parent then return purchaseRemote end
+        pcall(function()
+            if type(_G.SabcomGetRemote) == "function" then
+                local r = _G.SabcomGetRemote("BuyAnimal") or _G.SabcomGetRemote("Purchase")
+                if r then purchaseRemote = r; return end
+            end
+            local net = RS:FindFirstChild("Packages") and RS.Packages:FindFirstChild("Net")
+            if not net then return end
+            local kws = {"buy", "purchase", "animal", "shop", "acquire", "conveyor"}
+            for _, v in ipairs(net:GetChildren()) do
+                local nl = string.lower(v.Name or "")
+                for _, kw in ipairs(kws) do
+                    if nl:find(kw, 1, true) then
+                        purchaseRemote = v
+                        return
+                    end
+                end
+            end
+        end)
+        return purchaseRemote
+    end
+
+    local function firePurchaseNatural(prompt)
+        if not prompt or not prompt.Parent or not prompt.Enabled then return end
+        _G.__abLastFire = _G.__abLastFire or setmetatable({}, { __mode = "k" })
+        _G.__abInFlight = _G.__abInFlight or setmetatable({}, { __mode = "k" })
+        local now = os.clock()
+        local last = _G.__abLastFire[prompt]
+        if last and (now - last) < 0.03 then return end
+        _G.__abLastFire[prompt] = now
+        local fireFn = fireproximityprompt or _G.__SabcomFirePrompt
+        pcall(function()
+            if type(fireFn) == "function" then
+                fireFn(prompt)
+            else
+                prompt:InputHoldBegin()
+                prompt:InputHoldEnd()
+            end
+        end)
+        if _G.__abInFlight[prompt] then return end
+        _G.__abInFlight[prompt] = true
+        task.spawn(function()
+            local remote = resolvePurchaseRemote()
+            if remote then
+                pcall(function()
+                    if remote:IsA("RemoteFunction") then
+                        remote:InvokeServer(prompt.Parent)
+                    elseif remote:IsA("RemoteEvent") then
+                        remote:FireServer(prompt.Parent)
+                    end
+                end)
+            end
+            _G.__abInFlight[prompt] = nil
+        end)
+    end
+
+    local function startCarpetLock()
+        if carpetLockConn then carpetLockConn:Disconnect(); carpetLockConn = nil end
+        task.spawn(function()
+            for _ = 1, 15 do
+                if not autoBuyActive then break end
+                pcall(equipCarpet)
+                task.wait(0.3)
+                local char = LP.Character
+                if char then
+                    local have = false
+                    for _, n in ipairs(CARPET_NAMES) do
+                        if char:FindFirstChild(n) then have = true; break end
+                    end
+                    if have then break end
+                end
+            end
+        end)
+        carpetLockConn = RunService.Heartbeat:Connect(function()
+            if not autoBuyActive then return end
+            pcall(equipCarpet)
+        end)
+    end
+    local function stopCarpetLock()
+        if carpetLockConn then carpetLockConn:Disconnect(); carpetLockConn = nil end
+    end
+
+    local function partAlive()
+        return lockedPart and lockedPart.Parent and lockedModel and lockedModel.Parent
+    end
+    local function promptAlive()
+        return lockedTarget and lockedTarget.prompt and lockedTarget.prompt.Parent and lockedTarget.prompt.Enabled
+    end
+
+    local function ensureBodyPos(hrp)
+        local speed = grabSpeed()
+        if bodyPos and bodyPos.Parent == hrp then
+            bodyPos.P = speed * 8000
+            bodyPos.D = 2000
+            return bodyPos
+        end
+        if bodyPos then pcall(function() bodyPos:Destroy() end) end
+        local bp = Instance.new("BodyPosition")
+        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bp.P = speed * 8000
+        bp.D = 2000
+        bp.Position = hrp.Position
+        bp.Parent = hrp
+        bodyPos = bp
+        return bp
+    end
+    local function destroyBodyPos()
+        if bodyPos then pcall(function() bodyPos:Destroy() end); bodyPos = nil end
+    end
+
+    RunService.Heartbeat:Connect(function()
+        if not autoBuyActive or not partAlive() then
+            destroyBodyPos()
+            return
+        end
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then destroyBodyPos(); return end
+        local bp = ensureBodyPos(hrp)
+        bp.Position = lockedPart.Position + Vector3.new(0, HOVER_HEIGHT, 0)
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(BUY_INTERVAL)
+            if not autoBuyActive then continue end
+            if partAlive() and promptAlive() then
+                firePurchaseNatural(lockedTarget.prompt)
+            end
+            local char = LP.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local radius = buyRange() + 8
+                local hp = hrp.Position
+                local lockedPrompt = lockedTarget and lockedTarget.prompt
+                for _, entry in ipairs(conveyorAnimals) do
+                    local pr = entry.prompt
+                    if pr and pr ~= lockedPrompt and pr.Parent and pr.Enabled
+                        and entry.part and entry.part.Parent
+                        and (hp - entry.part.Position).Magnitude <= radius then
+                        firePurchaseNatural(pr)
+                    end
+                end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            task.wait(0.075)
+            if not autoBuyActive then
+                lockedTarget, lockedPart, lockedModel = nil, nil, nil
+                stopCarpetLock()
+                destroyBodyPos()
+                continue
+            end
+            if lockedPart or lockedModel then
+                if not partAlive() then
+                    pcall(refreshConveyor)
+                    lockedTarget, lockedPart, lockedModel = nil, nil, nil
+                end
+                continue
+            end
+            pcall(refreshConveyor)
+            local char = LP.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp then continue end
+            local radius = buyRange()
+            local best, bestDist = nil, math.huge
+            for _, entry in ipairs(conveyorAnimals) do
+                if entry.prompt and entry.prompt.Parent and entry.prompt.Enabled and entry.part and entry.part.Parent then
+                    local d = (hrp.Position - entry.part.Position).Magnitude
+                    if d <= radius and d < bestDist then
+                        bestDist = d
+                        best = entry
+                    end
+                end
+            end
+            if best then
+                lockedTarget = best
+                lockedPart = best.part
+                lockedModel = best.model or best.part.Parent
+                startCarpetLock()
+                task.spawn(function()
+                    for _ = 1, BUY_BURST do
+                        if not (best.prompt and best.prompt.Parent and best.prompt.Enabled) then break end
+                        firePurchaseNatural(best.prompt)
+                    end
+                end)
+            end
+        end
+    end)
+
+    local function setAutoBuy(on)
+        if on ~= nil then
+            autoBuyActive = on and true or false
+        else
+            autoBuyActive = not autoBuyActive
+        end
+        _G.SabcomAutoBuy = autoBuyActive
+        if autoBuyActive then
+            createAutoBuyRing()
+            pcall(refreshConveyor)
+            startCarpetLock()
+        else
+            destroyAutoBuyRing()
+            stopCarpetLock()
+            destroyBodyPos()
+            lockedTarget, lockedPart, lockedModel = nil, nil, nil
+        end
+        if type(_G.SabcomPaintAutoBuy) == "function" then pcall(_G.SabcomPaintAutoBuy) end
+    end
+    _G.SabcomSetAutoBuy = setAutoBuy
+    _G.toggleAutoBuy = function(v)
+        if v == nil then setAutoBuy(not autoBuyActive) else setAutoBuy(v) end
+    end
+end
+
+do
+    local wsOn, wsConn = false, nil
+    local DEFAULT_WS = 16
+    local function wantSpeed()
+        return math.clamp(tonumber(_G.SabcomWalkSpeed) or DEFAULT_WS, 16, 100)
+    end
+    local function restoreDefault()
+        pcall(function()
+            local c = LP.Character
+            local hum = c and c:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = DEFAULT_WS end
+        end)
+    end
+    local function setWalkSpeedOn(on)
+        wsOn = on and true or false
+        _G.SabcomWalkSpeedOn = wsOn
+        if wsConn then wsConn:Disconnect(); wsConn = nil end
+        if type(_G.SabcomPaintWalkSpeed) == "function" then pcall(_G.SabcomPaintWalkSpeed) end
+        if not wsOn then
+            restoreDefault()
+            return
+        end
+        wsConn = RunService.Heartbeat:Connect(function(dt)
+            local c = LP.Character
+            if not c then return end
+            local hum = c:FindFirstChildOfClass("Humanoid")
+            local hrp = c:FindFirstChild("HumanoidRootPart")
+            if not hum or not hrp or hum.Health <= 0 then return end
+            local want = wantSpeed()
+            if hum.MoveDirection.Magnitude > 0 and want > hum.WalkSpeed then
+                hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (want - hum.WalkSpeed) * dt)
+            end
+        end)
+    end
+    _G.SabcomSetWalkSpeed = setWalkSpeedOn
+    _G.toggleWalkSpeed = function() setWalkSpeedOn(not wsOn) end
+    pcall(function()
+        LP.CharacterAdded:Connect(function()
+            task.wait(0.4)
+            if wsOn then setWalkSpeedOn(true) end
+        end)
+    end)
+    if _G.SabcomWalkSpeedOn == true then
+        task.defer(function() setWalkSpeedOn(true) end)
+    end
+end
+
+do
+    local fovOn, fovConn = false, nil
+    local MIN_FOV, MAX_FOV, DEFAULT_FOV = 70, 120, 70
+    local function wantFov()
+        return math.clamp(tonumber(_G.SabcomFov) or DEFAULT_FOV, MIN_FOV, MAX_FOV)
+    end
+    local function applyFov()
+        local cam = workspace.CurrentCamera
+        if cam then cam.FieldOfView = wantFov() end
+    end
+    local function restoreDefault()
+        local cam = workspace.CurrentCamera
+        if cam then cam.FieldOfView = DEFAULT_FOV end
+    end
+    local function setFovOn(on)
+        fovOn = on and true or false
+        _G.SabcomFovOn = fovOn
+        if fovConn then fovConn:Disconnect(); fovConn = nil end
+        if type(_G.SabcomPaintFov) == "function" then pcall(_G.SabcomPaintFov) end
+        if not fovOn then
+            restoreDefault()
+            return
+        end
+        applyFov()
+        fovConn = RunService.Heartbeat:Connect(applyFov)
+    end
+    _G.SabcomSetFov = setFovOn
+    _G.toggleFov = function() setFovOn(not fovOn) end
+    pcall(function()
+        workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+            task.wait(0.05)
+            if fovOn then applyFov() end
+        end)
+    end)
+    if _G.SabcomFovOn == true then
+        task.defer(function() setFovOn(true) end)
+    end
+end
+
+do
+    local dropBusy, flinging = false, false
+    local function dropRoot(char)
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        return hum and hum.RootPart
+    end
+    local function flingBurst(duration)
+        if flinging then return end
+        flinging = true
+        local t0 = os.clock()
+        while flinging and (os.clock() - t0) < duration do
+            RunService.Heartbeat:Wait()
+            local char = LP.Character
+            local root = dropRoot(char)
+            if not (char and char.Parent and root and root.Parent) then break end
+            local vel = root.AssemblyLinearVelocity
+            if vel.Magnitude < 0.1 then vel = root.CFrame.LookVector * 80 end
+            local boom = vel * 10000 + Vector3.new(0, 10000, 0)
+            pcall(function()
+                root.Velocity = boom
+                root.AssemblyLinearVelocity = boom
+            end)
+            RunService.RenderStepped:Wait()
+            if char and char.Parent and root and root.Parent then
+                pcall(function()
+                    root.Velocity = vel
+                    root.AssemblyLinearVelocity = vel
+                end)
+            end
+            RunService.Stepped:Wait()
+            if char and char.Parent and root and root.Parent then
+                local nudge = vel + Vector3.new(0, 0.1, 0)
+                pcall(function()
+                    root.Velocity = nudge
+                    root.AssemblyLinearVelocity = nudge
+                end)
+            end
+        end
+        flinging = false
+        local root = dropRoot(LP.Character)
+        if root and root.Parent then
+            pcall(function()
+                root.Velocity = Vector3.zero
+                root.AssemblyLinearVelocity = Vector3.zero
+            end)
+        end
+    end
+    _G.SabcomDropBrainrot = function()
+        if dropBusy then return end
+        dropBusy = true
+        if _G.invisibleStealEnabled == true and type(_G.toggleInvisibleSteal) == "function" then
+            pcall(_G.toggleInvisibleSteal)
+            task.wait(0.2)
+        end
+        pcall(flingBurst, 0.3)
+        task.wait(0.2)
+        dropBusy = false
+    end
+    pcall(function()
+        LP.CharacterAdded:Connect(function()
+            flinging = false
+            dropBusy = false
+        end)
+    end)
+end
+
+do
+    local espOn = false
+    local espConns = {}
+    local espHolders = {}
+    local lineConn
+
+    local function guiParent()
+        local pg = LP:FindFirstChild("PlayerGui")
+        if pg then return pg end
+        if gethui then
+            local h = gethui()
+            if h then return h end
+        end
+        local ok, cg = pcall(function() return game:GetService("CoreGui") end)
+        return ok and cg or nil
+    end
+
+    local function clearHolder(plr)
+        local h = espHolders[plr]
+        if h then pcall(function() h:Destroy() end) end
+        espHolders[plr] = nil
+    end
+
+    local function bestPetForOwner(ownerName)
+        local list = _G.SabcomStealPetList
+        if type(list) ~= "table" or not ownerName then return nil end
+        local best
+        for _, pet in ipairs(list) do
+            if pet and tostring(pet.owner or "") == ownerName then
+                if not best or (tonumber(pet.mps) or 0) > (tonumber(best.mps) or 0) then
+                    best = pet
+                end
+            end
+        end
+        return best
+    end
+
+    local function makeEsp(plr)
+        if not espOn or plr == LP then return end
+        local char = plr.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        clearHolder(plr)
+        local parent = guiParent()
+        if not parent then return end
+        local holder = Instance.new("ScreenGui")
+        holder.Name = "SabcomEspHL_" .. plr.Name
+        holder.ResetOnSpawn = false
+        holder.IgnoreGuiInset = true
+        holder.Parent = parent
+        local hl = Instance.new("Highlight")
+        hl.Adornee = char
+        hl.FillColor = Color3.fromRGB(255, 80, 80)
+        hl.FillTransparency = 0.6
+        hl.OutlineColor = Color3.fromRGB(255, 180, 180)
+        hl.OutlineTransparency = 0
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Parent = holder
+        local bb = Instance.new("BillboardGui")
+        bb.Adornee = hrp
+        bb.AlwaysOnTop = true
+        bb.Size = UDim2.new(0, 180, 0, 44)
+        bb.StudsOffset = Vector3.new(0, 3.2, 0)
+        bb.Parent = holder
+        local nameLbl = Instance.new("TextLabel")
+        nameLbl.Size = UDim2.new(1, 0, 0.5, 0)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.Text = plr.Name
+        nameLbl.Font = Enum.Font.GothamBold
+        nameLbl.TextSize = 14
+        nameLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameLbl.TextStrokeTransparency = 0.3
+        nameLbl.Parent = bb
+        local petLbl = Instance.new("TextLabel")
+        petLbl.Size = UDim2.new(1, 0, 0.5, 0)
+        petLbl.Position = UDim2.new(0, 0, 0.5, 0)
+        petLbl.BackgroundTransparency = 1
+        petLbl.Text = ""
+        petLbl.Font = Enum.Font.Gotham
+        petLbl.TextSize = 11
+        petLbl.TextColor3 = Color3.fromRGB(200, 255, 180)
+        petLbl.TextStrokeTransparency = 0.4
+        petLbl.Parent = bb
+        espHolders[plr] = holder
+        local last = 0
+        local hb = RunService.Heartbeat:Connect(function()
+            if not espOn or not plr.Parent then return end
+            local now = os.clock()
+            if now - last < 0.5 then return end
+            last = now
+            local pet = bestPetForOwner(plr.Name)
+            petLbl.Text = pet and ((pet.name or "?") .. " " .. (pet.genText or "")) or ""
+            if plr.Character then
+                local nh = plr.Character:FindFirstChild("HumanoidRootPart")
+                if nh then
+                    bb.Adornee = nh
+                    hl.Adornee = plr.Character
+                end
+            end
+        end)
+        espConns[#espConns + 1] = hb
+        local ca = plr.CharacterAdded:Connect(function(newChar)
+            if not espOn then return end
+            clearHolder(plr)
+            newChar:WaitForChild("HumanoidRootPart", 5)
+            if espOn then pcall(makeEsp, plr) end
+        end)
+        espConns[#espConns + 1] = ca
+    end
+
+    local function setEspPlayer(on)
+        on = on and true or false
+        _G.SabcomEspPlayer = on
+        if on == espOn then return end
+        if not on then
+            espOn = false
+            for _, c in ipairs(espConns) do
+                pcall(function() c:Disconnect() end)
+            end
+            espConns = {}
+            for plr in pairs(espHolders) do clearHolder(plr) end
+            return
+        end
+        espOn = true
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LP then pcall(makeEsp, plr) end
+        end
+        espConns[#espConns + 1] = Players.PlayerAdded:Connect(function(plr)
+            if not espOn then return end
+            task.wait(1)
+            pcall(makeEsp, plr)
+        end)
+        espConns[#espConns + 1] = Players.PlayerRemoving:Connect(function(plr)
+            clearHolder(plr)
+        end)
+    end
+    _G.SabcomSetEspPlayer = setEspPlayer
+
+    local ATT0_BASE, ATT1_BASE = "SabcomLineBase_A0", "SabcomLineBase_A1"
+    local ATT0_BR, ATT1_BR = "SabcomLineBr_A0", "SabcomLineBr_A1"
+
+    local function getDummy(name)
+        local d = workspace:FindFirstChild(name)
+        if d and d:IsA("BasePart") then return d end
+        d = Instance.new("Part")
+        d.Name = name
+        d.Anchored = true
+        d.CanCollide = false
+        d.CanQuery = false
+        d.CanTouch = false
+        d.CastShadow = false
+        d.Transparency = 1
+        d.Size = Vector3.new(0.2, 0.2, 0.2)
+        d.Parent = workspace
+        return d
+    end
+
+    local function getAtt(part, name, offset)
+        if not part then return nil end
+        local a = part:FindFirstChild(name)
+        if not (a and a:IsA("Attachment")) then
+            a = Instance.new("Attachment")
+            a.Name = name
+            a.Parent = part
+        end
+        a.Position = offset or Vector3.zero
+        return a
+    end
+
+    local function makeBeam(parent, name, color)
+        local old = parent and parent:FindFirstChild(name)
+        if old then pcall(function() old:Destroy() end) end
+        local b = Instance.new("Beam")
+        b.Name = name
+        b.FaceCamera = true
+        b.LightEmission = 1
+        b.LightInfluence = 0
+        b.Color = ColorSequence.new(color)
+        b.Transparency = NumberSequence.new(0)
+        b.Width0 = 0.28
+        b.Width1 = 0.28
+        b.Segments = 6
+        b.Enabled = false
+        b.Parent = parent
+        return b
+    end
+
+    local function hideBeam(b)
+        if b then b.Enabled = false end
+    end
+
+    local function drawBodyLine(hrp, worldPos, livePart, pack)
+        if not hrp or not worldPos then
+            hideBeam(pack.beam)
+            return
+        end
+        pack.att0 = getAtt(hrp, pack.att0Name, Vector3.zero)
+        local target = livePart
+        if not (target and target.Parent) then
+            pack.dummy = getDummy(pack.dummyName)
+            pack.dummy.CFrame = CFrame.new(worldPos)
+            target = pack.dummy
+        end
+        pack.att1 = getAtt(target, pack.att1Name, pack.att1Off or Vector3.new(0, 2, 0))
+        if not pack.beam or pack.beam.Parent ~= hrp then
+            pack.beam = makeBeam(hrp, pack.beamName, pack.color)
+        end
+        pack.beam.Attachment0 = pack.att0
+        pack.beam.Attachment1 = pack.att1
+        pack.beam.Enabled = true
+    end
+
+    local packBase = {
+        att0Name = ATT0_BASE, att1Name = ATT1_BASE, dummyName = "SabcomLineToBaseAnchor",
+        beamName = "SabcomLineToBase", color = Color3.fromRGB(255, 255, 255),
+        att1Off = Vector3.zero,
+    }
+    local packBr = {
+        att0Name = ATT0_BR, att1Name = ATT1_BR, dummyName = "SabcomLineToBrainrotAnchor",
+        beamName = "SabcomLineToBrainrot", color = Color3.fromRGB(125, 211, 252),
+        att1Off = Vector3.new(0, 2.5, 0),
+    }
+    pcall(function()
+        for _, n in ipairs({ "SabcomLineToBase", "SabcomLineToBrainrot" }) do
+            local o = workspace:FindFirstChild(n)
+            if o and o:IsA("BasePart") then o:Destroy() end
+        end
+    end)
+
+    local function myBasePos()
+        local plots = workspace:FindFirstChild("Plots")
+        if not plots then return nil end
+        for _, plot in ipairs(plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local yours = sign and sign:FindFirstChild("YourBase")
+            if yours and yours.Enabled then
+                local base = plot:FindFirstChild("Base") or plot:FindFirstChildWhichIsA("BasePart", true)
+                if base then return base.Position end
+                local ok, cf = pcall(function() return plot:GetPivot() end)
+                if ok and cf then return cf.Position end
+            end
+        end
+        return nil
+    end
+
+    local function petWorldPos(pet)
+        if type(pet) ~= "table" then return nil, nil end
+        if pet.model and pet.model.Parent then
+            local part = pet.model.PrimaryPart
+                or pet.model:FindFirstChild("HumanoidRootPart")
+                or pet.model:FindFirstChildWhichIsA("BasePart")
+            if part then return part.Position, part end
+            local ok, cf = pcall(function() return pet.model:GetPivot() end)
+            if ok and cf and cf.Position.Magnitude > 1 then return cf.Position, nil end
+        end
+        if typeof(pet.position) == "Vector3" and pet.position.Magnitude > 1 then
+            return pet.position, nil
+        end
+        return nil, nil
+    end
+
+    local function petIsPriority(p)
+        if type(p) ~= "table" then return false end
+        local function norm(s)
+            return tostring(s or ""):lower():gsub("[%s%-_'%.]", "")
+        end
+        local a, b = norm(p.name), norm(p.index)
+        local lists = { _G.SHARED_PRIORITY_ITEMS, _G._stp_priorityCfg }
+        for _, list in ipairs(lists) do
+            if type(list) == "table" then
+                for _, n in ipairs(list) do
+                    local nn = norm(n)
+                    if nn ~= "" and (nn == a or nn == b) then return true end
+                end
+            end
+        end
+        return false
+    end
+
+    local function priorityPet()
+        local list = _G.SabcomStealPetList
+        local uid = _G.SabcomManualStealUID or _G.SabcomStealTargetUID
+        if type(list) == "table" and uid then
+            for _, p in ipairs(list) do
+                if p and p.uid == uid then return p end
+            end
+        end
+        local tgt = _G.SabcomStealTarget
+        if type(tgt) == "table" then return tgt end
+        if type(list) ~= "table" then return nil end
+        for _, p in ipairs(list) do
+            if p and not p.mine and petIsPriority(p) then
+                return p
+            end
+        end
+        return nil
+    end
+
+    local function setLineToBase(on)
+        _G.SabcomLineToBase = on and true or false
+        if not on then hideBeam(packBase.beam) end
+    end
+    local function setLineToBrainrot(on)
+        _G.SabcomLineToBrainrot = on and true or false
+        if not on then hideBeam(packBr.beam) end
+    end
+    _G.SabcomSetLineToBase = setLineToBase
+    _G.SabcomSetLineToBrainrot = setLineToBrainrot
+
+    lineConn = RunService.RenderStepped:Connect(function()
+        local wantBase = _G.SabcomLineToBase == true
+        local wantBr = _G.SabcomLineToBrainrot == true
+        local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            hideBeam(packBase.beam)
+            hideBeam(packBr.beam)
+            return
+        end
+        if wantBase then
+            drawBodyLine(hrp, myBasePos(), nil, packBase)
+        else
+            hideBeam(packBase.beam)
+        end
+        if wantBr then
+            local pos, part = petWorldPos(priorityPet())
+            drawBodyLine(hrp, pos, part, packBr)
+        else
+            hideBeam(packBr.beam)
+        end
+    end)
+
+    local BR_ESP_MIN = 10000000
+    local brEspOn = false
+    local brEspEntries = {}
+    local brEspConn
+    local brEspAnchors
+
+    local function clearBrEspEntry(uid)
+        local e = brEspEntries[uid]
+        if e then
+            pcall(function() if e.folder then e.folder:Destroy() end end)
+            brEspEntries[uid] = nil
+        end
+    end
+
+    local function clearAllBrEsp()
+        for uid in pairs(brEspEntries) do clearBrEspEntry(uid) end
+        if brEspAnchors then
+            pcall(function() brEspAnchors:Destroy() end)
+            brEspAnchors = nil
+        end
+    end
+
+    local function _brPetMps(pet)
+        local m = tonumber(pet.mps) or tonumber(pet.genValue) or 0
+        if m < BR_ESP_MIN then
+            local ensureGen = _G.SabcomEnsurePetGen
+            if type(ensureGen) == "function" then
+                local ok, gm = pcall(ensureGen, pet)
+                if ok then m = tonumber(gm) or m end
+            end
+        end
+        return m
+    end
+
+    local function _getOrCreateBrAnchor(uid, pos)
+        if typeof(pos) ~= "Vector3" or pos.Magnitude <= 1 then return nil end
+        if not brEspAnchors or not brEspAnchors.Parent then
+            brEspAnchors = workspace:FindFirstChild("SabcomBrEspAnchors")
+            if not brEspAnchors then
+                brEspAnchors = Instance.new("Folder")
+                brEspAnchors.Name = "SabcomBrEspAnchors"
+                brEspAnchors.Parent = workspace
+            end
+        end
+        local part = brEspAnchors:FindFirstChild(uid)
+        if not part then
+            part = Instance.new("Part")
+            part.Name = uid
+            part.Anchored = true
+            part.CanCollide = false
+            part.CanQuery = false
+            part.CanTouch = false
+            part.Transparency = 1
+            part.Size = Vector3.new(0.4, 0.4, 0.4)
+            part.Parent = brEspAnchors
+        end
+        part.CFrame = CFrame.new(pos + Vector3.new(0, 2.5, 0))
+        return part
+    end
+
+    local function resolvePetModel(pet)
+        if type(pet) ~= "table" then return nil, nil end
+        local uid = pet.uid or (pet.plot and pet.slot and (tostring(pet.plot) .. "_" .. tostring(pet.slot)))
+        local model = pet.model
+        if not (model and model.Parent) and pet.plot and pet.slot then
+            local plots = workspace:FindFirstChild("Plots")
+            local plot = plots and plots:FindFirstChild(tostring(pet.plot))
+            if plot then
+                local findPodium = _findPodiumModel
+                if type(findPodium) ~= "function" then
+                    local podiums = plot:FindFirstChild("AnimalPodiums")
+                    local podium = podiums and podiums:FindFirstChild(tostring(pet.slot))
+                    if podium then
+                        for _, child in ipairs(podium:GetChildren()) do
+                            if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
+                                if not Players:GetPlayerFromCharacter(child) then
+                                    model = child
+                                    break
+                                end
+                            end
+                        end
+                    end
+                else
+                    model = select(1, findPodium(plot, tostring(pet.slot)))
+                end
+                if model then pet.model = model end
+            end
+        end
+        if model and model.Parent then
+            local part = model.PrimaryPart
+                or model:FindFirstChild("HumanoidRootPart")
+                or model:FindFirstChildWhichIsA("BasePart")
+            if not part then
+                part = model:FindFirstChildWhichIsA("BasePart", true)
+            end
+            if part then return model, part end
+        end
+        local pos = typeof(pet.position) == "Vector3" and pet.position
+        if pos and pos.Magnitude > 1 and uid then
+            local anchor = _getOrCreateBrAnchor(uid, pos)
+            if anchor then return anchor, anchor end
+        end
+        return nil, nil
+    end
+
+    local function applyBrEsp(pet, isPri, isTop)
+        local uid = pet.uid or (pet.plot and pet.slot and (tostring(pet.plot) .. "_" .. tostring(pet.slot)))
+        if not uid then return end
+        local model, part = resolvePetModel(pet)
+        if not model or not part then return end
+
+        local e = brEspEntries[uid]
+        if e and e.model ~= model then
+            clearBrEspEntry(uid)
+            e = nil
+        end
+
+        if not e then
+            local folder = Instance.new("Folder")
+            folder.Name = "SabcomBrEsp"
+            folder.Parent = model
+
+            local hl = Instance.new("Highlight")
+            hl.Name = "BrEspHL"
+            hl.Adornee = model
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = folder
+
+            local bb = Instance.new("BillboardGui")
+            bb.Name = "BrEspBB"
+            bb.Adornee = part
+            bb.AlwaysOnTop = true
+            bb.Size = UDim2.new(0, 210, 0, 58)
+            bb.StudsOffset = Vector3.new(0, 4.8, 0)
+            bb.Parent = folder
+
+            local nameLbl = Instance.new("TextLabel")
+            nameLbl.Name = "Name"
+            nameLbl.Size = UDim2.new(1, 0, 0.48, 0)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.Font = Enum.Font.GothamBlack
+            nameLbl.TextSize = 15
+            nameLbl.TextStrokeTransparency = 0.15
+            nameLbl.Parent = bb
+
+            local genLbl = Instance.new("TextLabel")
+            genLbl.Name = "Gen"
+            genLbl.Size = UDim2.new(1, 0, 0.52, 0)
+            genLbl.Position = UDim2.new(0, 0, 0.48, 0)
+            genLbl.BackgroundTransparency = 1
+            genLbl.Font = Enum.Font.GothamBold
+            genLbl.TextSize = 14
+            genLbl.TextColor3 = Color3.fromRGB(255, 220, 60)
+            genLbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            genLbl.TextStrokeTransparency = 0.2
+            genLbl.Parent = bb
+
+            e = { folder = folder, hl = hl, bb = bb, nameLbl = nameLbl, genLbl = genLbl, model = model }
+            brEspEntries[uid] = e
+        end
+
+        local m = _brPetMps(pet)
+        local txt = pet.genText
+        if type(_G.SabcomEnsurePetGen) == "function" then
+            local ok, gm, gt = pcall(_G.SabcomEnsurePetGen, pet)
+            if ok then
+                m = tonumber(gm) or m
+                txt = gt or txt
+            end
+        end
+        e.nameLbl.Text = pet.name or pet.index or "?"
+        e.genLbl.Text = txt or ("$" .. tostring(math.floor(m + 0.5)) .. "/s")
+
+        if isTop then
+            e.hl.FillColor = Color3.fromRGB(255, 215, 0)
+            e.hl.OutlineColor = Color3.fromRGB(255, 245, 120)
+            e.hl.FillTransparency = 0.28
+            e.hl.OutlineTransparency = 0
+            e.nameLbl.TextColor3 = Color3.fromRGB(255, 230, 80)
+        elseif isPri then
+            e.hl.FillColor = Color3.fromRGB(255, 45, 210)
+            e.hl.OutlineColor = Color3.fromRGB(255, 170, 240)
+            e.hl.FillTransparency = 0.32
+            e.hl.OutlineTransparency = 0
+            e.nameLbl.TextColor3 = Color3.fromRGB(255, 70, 255)
+        else
+            e.hl.FillColor = Color3.fromRGB(0, 210, 255)
+            e.hl.OutlineColor = Color3.fromRGB(160, 235, 255)
+            e.hl.FillTransparency = 0.42
+            e.hl.OutlineTransparency = 0.05
+            e.nameLbl.TextColor3 = Color3.fromRGB(210, 245, 255)
+        end
+        e.bb.Adornee = part
+        e.hl.Adornee = model
+    end
+
+    local function _collectBrEspPets()
+        local byUid = {}
+        local function add(pet)
+            if type(pet) ~= "table" or pet.mine or not pet.plot or not pet.slot then return end
+            local uid = pet.uid or (tostring(pet.plot) .. "_" .. tostring(pet.slot))
+            pet.uid = uid
+            if not byUid[uid] then byUid[uid] = pet end
+        end
+        local scanFn = _G.Sabcom_ScanAllPets
+        if type(scanFn) == "function" then
+            local ok, pets = pcall(scanFn, true)
+            if ok and type(pets) == "table" then
+                for _, pet in ipairs(pets) do add(pet) end
+            end
+        end
+        local list = _G.SabcomStealPetList
+        if type(list) == "table" then
+            for _, pet in ipairs(list) do add(pet) end
+        end
+        local out = {}
+        for _, pet in pairs(byUid) do out[#out + 1] = pet end
+        return out
+    end
+
+    local function refreshBrEsp()
+        if not brEspOn then return end
+        local pets = _collectBrEspPets()
+        if #pets == 0 then return end
+
+        local topUid, topMps = nil, -1
+        for _, pet in ipairs(pets) do
+            local m = _brPetMps(pet)
+            if m > topMps then
+                topMps = m
+                topUid = pet.uid
+            end
+        end
+
+        local seen = {}
+        for _, pet in ipairs(pets) do
+            local m = _brPetMps(pet)
+            local isPri = petIsPriority(pet)
+            local isTop = topUid ~= nil and pet.uid == topUid and topMps > 0
+            if isTop or m >= BR_ESP_MIN or isPri then
+                local uid = pet.uid
+                seen[uid] = true
+                applyBrEsp(pet, isPri, isTop)
+            end
+        end
+        for uid in pairs(brEspEntries) do
+            if not seen[uid] then clearBrEspEntry(uid) end
+        end
+    end
+
+    local function setBrainrotEsp(on)
+        on = on and true or false
+        _G.SabcomBrainrotEsp = on
+        if on == brEspOn then return end
+        brEspOn = on
+        if not on then
+            if brEspConn then
+                pcall(function() brEspConn:Disconnect() end)
+                brEspConn = nil
+            end
+            clearAllBrEsp()
+            return
+        end
+        local last = 0
+        brEspConn = RunService.Heartbeat:Connect(function()
+            local now = os.clock()
+            if now - last < 0.35 then return end
+            last = now
+            refreshBrEsp()
+        end)
+        task.defer(refreshBrEsp)
+    end
+    _G.SabcomSetBrainrotEsp = setBrainrotEsp
+
+    if _G.SabcomEspPlayer == true then
+        task.defer(function() setEspPlayer(true) end)
+    end
+    if _G.SabcomBrainrotEsp == true then
+        task.defer(function() setBrainrotEsp(true) end)
+    end
+end
+
+local _carpetEngaging = false
+
+
+local _carpetBoostUntil = 0
+_G.sabcomBoostWindow = tonumber(_G.sabcomBoostWindow) or 20
+
+local function carpetEngage(force)
+    _G.Sabcom_Step("carpetEngage: appel", force and "force=true" or "force=false")
+    if not force and os.clock() < _carpetBoostUntil then
+        local c = LP.Character
+        if c then
+            for _, n in ipairs(CARPET_NAMES) do
+                local t = c:FindFirstChild(n)
+                if t and t:IsA("Tool") then
+                    return n
+                end
+            end
+        end
+    end
+    if _carpetEngaging then
+        local _tw = os.clock()
+        repeat RunService.Heartbeat:Wait() until (not _carpetEngaging) or os.clock() - _tw > 6
+        local c = LP.Character
+        if c then
+            for _, n in ipairs(CARPET_NAMES) do
+                local t = c:FindFirstChild(n)
+                if t and t:IsA("Tool") then return n end
+            end
+        end
+    end
+    _carpetEngaging = true
+    _waitGrapple(5)
+
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not char or not hum then _carpetEngaging = false; return nil end
+
+
+    local _justEquipped = false
+    if not char:FindFirstChild("Grapple Hook") then
+        local g = findTool("Grapple Hook")
+        if g then
+            pcall(function() hum:EquipTool(g) end)
+            _justEquipped = true
+        end
+    end
+
+
+    do
+        local _gw = (tonumber(_G.sabcomGrappleWaitMs) or 200) / 1000
+        local _gt = os.clock()
+        while os.clock() - _gt < _gw do
+            local _c = LP.Character
+            if _c and _c:FindFirstChild("Grapple Hook") then break end
+
+            if _c and _c ~= char then
+                char = _c
+                hum = _c:FindFirstChildOfClass("Humanoid")
+                local g = findTool("Grapple Hook")
+                if g and hum then
+                    pcall(function() hum:EquipTool(g) end)
+                    _justEquipped = true
+                end
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+
+    if _justEquipped then
+        task.wait((tonumber(_G.sabcomGrappleSettleMs) or 60) / 1000)
+    end
+
+
+    local _fired = 0
+    do
+        local _c = LP.Character
+        local _tool = _c and _c:FindFirstChild("Grapple Hook")
+        local _r, _errMsg = nil, nil
+        local _cause = nil
+
+        if not _c then
+            _cause = "pas de personnage"
+        elseif not _tool then
+
+            _cause = (findTool("Grapple Hook") and "outil en inventaire mais PAS EN MAIN")
+                     or "outil introuvable (ni main ni sac)"
+        else
+            local ok, result = pcall(function()
+                if type(_G.SabcomFireGrapple2) ~= "function" then
+                    error("SabcomFireGrapple2 indisponible")
+                end
+                return _G.SabcomFireGrapple2()
+            end)
+            if ok and result then
+                _fired = 1
+            else
+                if not ok then
+                    _cause, _errMsg = "SabcomFireGrapple2 a leve une erreur", tostring(result)
+                elseif type(_G.SabcomFireGrapple2) ~= "function" then
+                    _cause = "SabcomFireGrapple2 indisponible"
+                else
+                    _cause = "SabcomFireGrapple2 a renvoye false (pas de point 10-50 studs)"
+                end
+            end
+            _G.Sabcom_Step("grapple: tir", ((_fired == 1) and "ENVOYE via SabcomFireGrapple2" or ("ECHEC: " .. tostring(_cause)))
+                .. (_justEquipped and "  (equipe a l'instant)" or "  (deja en main)"))
+        end
+
+
+        _G.Sabcom_GrappleLog = _G.Sabcom_GrappleLog or {}
+        if _fired == 1 then
+            _G.Sabcom_GrappleOk = (_G.Sabcom_GrappleOk or 0) + 1
+        else
+            _G.Sabcom_GrappleFail = (_G.Sabcom_GrappleFail or 0) + 1
+
+
+            if not _G.sabcomGrappleQuiet then
+                local _o = (getgenv and getgenv().print) or print
+                _o(string.rep("=", 56))
+                _o(string.format("GRAPPLE ECHEC #%d  (apres %dms d'attente)",
+                    _G.Sabcom_GrappleFail, math.floor((os.clock() - _t0) * 1000)))
+                _o("  CAUSE : " .. tostring(_cause or "inconnue"))
+                if _errMsg then _o("  erreur: " .. tostring(_errMsg)) end
+                _o(string.format("  en main=%s  en sac=%s  remote=%s  perso=%s  tp=%s",
+                    tostring(_tool ~= nil), tostring(findTool("Grapple Hook") ~= nil),
+                    tostring(_r ~= nil), tostring(_c ~= nil), tostring(_G.__TP_T0 ~= nil)))
+                _o(string.format("  cumul: %d envoyes / %d tentatives",
+                    _G.Sabcom_GrappleOk or 0, (_G.Sabcom_GrappleOk or 0) + _G.Sabcom_GrappleFail))
+                _o(string.rep("=", 56))
+            end
+
+            if #_G.Sabcom_GrappleLog < 40 then
+                _G.Sabcom_GrappleLog[#_G.Sabcom_GrappleLog + 1] = {
+                    t      = math.floor(os.clock() * 10) / 10,
+                    cause  = _cause or "inconnue",
+                    err    = _errMsg,
+                    inHand = _tool ~= nil,
+                    inBag  = findTool("Grapple Hook") ~= nil,
+                    remote = _r ~= nil,
+                    char   = _c ~= nil,
+                    tp     = _G.__TP_T0 ~= nil,
+                    waitMs = math.floor(((os.clock() - _t0) * 1000)),
+                }
+            end
+        end
+    end
+
+    task.wait(0.06)
+
+
+    task.wait(0.06)
+
+    local cn
+    local _tc = os.clock()
+    repeat
+        cn = equipCarpet()
+        local c = LP.Character
+        if cn and c and c:FindFirstChild(cn) then break end
+        RunService.Heartbeat:Wait()
+    until os.clock() - _tc > 0.4
+
+
+    if cn and _fired > 0 then
+        _carpetBoostUntil = os.clock() + (_G.sabcomBoostWindow or 20)
+    elseif cn then
+        _carpetBoostUntil = 0
+
+    end
+    _carpetEngaging = false
+    return cn
+end
+local _normCache = {}
+local function _normName(s)
+    local k = tostring(s)
+    local hit = _normCache[k]
+    if hit then return hit end
+
+    local v = (k:lower():gsub("[%s%-_'%.]", ""))
+    _normCache[k] = v
+    return v
+end
+
+local _priMap, _priMapSrc = nil, nil
+local function _invalidatePriMap()
+    _priMap = nil
+    _priMapSrc = nil
+end
+_G.SabcomInvalidatePriMap = _invalidatePriMap
+local function _priIndexOf(name)
+    local list = _G.SHARED_PRIORITY_ITEMS
+    if type(list) ~= "table" or not name then return nil end
+    if _priMapSrc ~= list or _priMap == nil then
+        _priMap, _priMapSrc = {}, list
+        for i = #list, 1, -1 do _priMap[_normName(list[i])] = i end
+    end
+    return _priMap[_normName(name)]
+end
+
+local _chCache = {}
+local function getPlotChannel(plotRef)
+    local chave = (typeof(plotRef) == "Instance") and plotRef.Name or tostring(plotRef or "")
+    local guardado = _chCache[chave]
+    if type(guardado) == "table" then return guardado end
+    if type(_G.sabcomGetPlotChannel) == "function" then
+        local plotCh = _G.sabcomGetPlotChannel(plotRef)
+        if type(plotCh) == "table" then
+            _chCache[chave] = plotCh
+            return plotCh
+        end
+    end
+    local keys = {}
+    if typeof(plotRef) == "Instance" then
+        local ord
+        pcall(function() ord = plotRef:GetAttribute("Order") end)
+        if ord ~= nil then keys[#keys + 1] = "Plot" .. tostring(ord) end
+        keys[#keys + 1] = plotRef.Name
+    elseif type(plotRef) == "string" and plotRef ~= "" then
+        local plotsFolder = workspace:FindFirstChild("Plots")
+        local plotInst = plotsFolder and plotsFolder:FindFirstChild(plotRef)
+        if plotInst then
+            local ord
+            pcall(function() ord = plotInst:GetAttribute("Order") end)
+            if ord ~= nil then keys[#keys + 1] = "Plot" .. tostring(ord) end
+        end
+        keys[#keys + 1] = plotRef
+    end
+    for _, key in ipairs(keys) do
+        local ch = getSyncChannel(key)
+        if type(ch) == "table" then
+            _chCache[chave] = ch
+            _chCache[key] = ch
+            return ch
+        end
+    end
+    if _G.Sabcom_GetPlotChannel then
+        local ch = _G.Sabcom_GetPlotChannel(plotRef)
+        if type(ch) == "table" then
+            _chCache[chave] = ch
+            return ch
+        end
+    end
+    return nil
+end
+
+local function channelGet(channel, key)
+    if not channel or not key then return nil end
+    if type(_G.sabcomChannelGet) == "function" then
+        return _G.sabcomChannelGet(channel, key)
+    end
+    if type(_G.sProp) == "function" then
+        return _G.sProp(channel, key)
+    end
+    if _G.Sabcom_ChannelGet then
+        return _G.Sabcom_ChannelGet(channel, key)
+    end
+    return nil
+end
+
+local _podiumPos = setmetatable({}, { __mode = "k" })
+
+local _slotStr = {}
+local function _slotKey(slot)
+    local s = _slotStr[slot]
+    if s == nil then s = tostring(slot); _slotStr[slot] = s end
+    return s
+end
+
+local getPetPosition = function(plot, slot)
+    local sub = _podiumPos[plot]
+    if sub == nil then sub = {}; _podiumPos[plot] = sub end
+    local hit = sub[slot]
+    if hit then return hit end
+
+    local podiums = plot:FindFirstChild("AnimalPodiums")
+    if not podiums then return nil end
+    local podium = podiums:FindFirstChild(_slotKey(slot))
+    if not podium then return nil end
+
+    local pos
+    local ok, cf = pcall(function() return podium:GetPivot() end)
+    if ok and cf and cf.Position.Magnitude > 1 then
+        pos = cf.Position
+    end
+    if not pos and podium.Position and podium.Position.Magnitude > 1 then
+        pos = podium.Position
+    end
+    if not pos then return nil end
+    sub[slot] = pos
+    return pos
+end
+
+local _mpsAnimals, _mpsMut, _mpsTrait
+local _mpsNextTry = 0
+local function _mpsData()
+    if _mpsAnimals and _mpsMut and _mpsTrait then return _mpsAnimals end
+
+    if os.clock() < _mpsNextTry then return _mpsAnimals end
+    _mpsNextTry = os.clock() + 0.025
+
+    if not _mpsAnimals then
+        local ok, m = pcall(function() return require(RS.Datas.Animals) end)
+        if ok and type(m) == "table" then _mpsAnimals = m end
+        if not _mpsAnimals and type(AnimalsData) == "table" then _mpsAnimals = AnimalsData end
+    end
+    if not _mpsMut then
+        local ok, m = pcall(function() return require(RS.Datas.Mutations) end)
+        if ok and type(m) == "table" then _mpsMut = m end
+    end
+    if not _mpsTrait then
+        local ok, m = pcall(function() return require(RS.Datas.Traits) end)
+        if ok and type(m) == "table" then _mpsTrait = m end
+    end
+    return _mpsAnimals
+end
+
+local function _up9Mps(entry, AD)
+
+    AD = AD or _mpsData()
+    if not AD then return 0 end
+    local data = AD[entry.Index]
+    if not data then return 0 end
+    local base = data.Generation or 0
+    local mult = 1
+    if entry.Mutation and _mpsMut then
+        local mut = _mpsMut[entry.Mutation]
+        if mut then mult = mult + (mut.Modifier or 0) end
+    end
+    if type(entry.Traits) == "table" and _mpsTrait then
+        for _, t in pairs(entry.Traits) do
+            local tr = _mpsTrait[t]
+            if tr then mult = mult + (tr.MultiplierModifier or 0) end
+        end
+    end
+    return base * mult
+end
+
+local function _chanRegistry()
+    if type(_G.SabcomSyncAll) ~= "function" then return nil end
+    local ok, reg = pcall(_G.SabcomSyncAll)
+    if ok and type(reg) == "table" then return reg end
+    return nil
+end
+_G.Sabcom_ChanRegistry = _chanRegistry
+
+_G.Sabcom_SnippetChannels = _chanRegistry
+
+local _petSeenT = {}
+
+local displayNameToIndex = {}
+local function rebuildDisplayIndex()
+    displayNameToIndex = {}
+    local AD = AnimalsData
+    if type(AD) ~= "table" then AD = _mpsData() end
+    if type(AD) ~= "table" then return end
+    for idx, info in pairs(AD) do
+        if type(info) == "table" and info.DisplayName then
+            displayNameToIndex[info.DisplayName] = idx
+        end
+        displayNameToIndex[idx] = idx
+    end
+end
+
+local function _ensureSyncMod()
+    if type(SyncMod) == "table" then
+        _G.SabcomSynchronizerReady = true
+        return true
+    end
+    local pre = _G.SabcomPreloadedSynchronizer
+    if type(pre) == "table" then
+        SyncMod = pre
+        _G.SabcomSyncMod = pre
+        _G.SabcomSynchronizerReady = true
+        return true
+    end
+    local pkg = RS:FindFirstChild("Packages")
+    local m = pkg and pkg:FindFirstChild("Synchronizer")
+    if not m then return false end
+    local ok, mod = pcall(function()
+        if setthreadidentity then pcall(setthreadidentity, 8) end
+        return require(m)
+    end)
+    if ok and type(mod) == "table" then
+        SyncMod = mod
+        _G.SabcomPreloadedSynchronizer = mod
+        _G.SabcomSynchronizerReady = true
+        _G.SabcomSyncMod = mod
+        return true
+    end
+    return false
+end
+
+local function ensureSyncData()
+    if type(AnimalsData) == "table" and next(displayNameToIndex) then return true end
+    local pkg = RS:FindFirstChild("Packages")
+    local datas = RS:FindFirstChild("Datas")
+    local utils = RS:FindFirstChild("Utils")
+    _ensureSyncMod()
+    if not SyncMod then
+        SyncMod = safeRequire(pkg and pkg:FindFirstChild("Synchronizer"))
+        _G.SabcomSyncMod = SyncMod
+    end
+    if type(AnimalsData) ~= "table" then
+        AnimalsData = safeRequire(datas and datas:FindFirstChild("Animals"))
+    end
+    if type(MutationsData) ~= "table" then
+        MutationsData = safeRequire(datas and datas:FindFirstChild("Mutations"))
+    end
+    if type(TraitsData) ~= "table" then
+        TraitsData = safeRequire(datas and datas:FindFirstChild("Traits"))
+    end
+    if type(NumberUtils) ~= "table" then
+        NumberUtils = safeRequire(utils and utils:FindFirstChild("NumberUtils"))
+    end
+    rebuildDisplayIndex()
+    return type(AnimalsData) == "table"
+end
+
+
+local _nomVersIndex = nil
+local function _tableNoms()
+    if _nomVersIndex then return _nomVersIndex end
+    local AD = _mpsData()
+    if type(AD) ~= "table" then return {} end
+    _nomVersIndex = {}
+    pcall(function()
+        for idx, info in next, AD do
+            _nomVersIndex[idx] = idx
+            if type(info) == "table" then
+                local dn = rawget(info, "DisplayName")
+                if dn then _nomVersIndex[dn] = idx end
+            end
+        end
+    end)
+    return _nomVersIndex
+end
+
+
+local _MutD, _TraD, _dataOk = nil, nil, false
+local function _chargerModifs()
+    if _dataOk then return end
+    pcall(function()
+        local D = game:GetService("ReplicatedStorage"):FindFirstChild("Datas")
+        if not D then return end
+        local m = D:FindFirstChild("Mutations")
+        local t = D:FindFirstChild("Traits")
+        if m then local ok, r = pcall(require, m); if ok then _MutD = r end end
+        if t then local ok, r = pcall(require, t); if ok then _TraD = r end end
+        if _MutD or _TraD then _dataOk = true end
+    end)
+end
+
+local function calculateGeneration(index, mutation, traits)
+    ensureSyncData()
+    if type(AnimalsData) ~= "table" then return 0 end
+    local info = AnimalsData[index]
+    if type(info) ~= "table" or not rawget(info, "Generation") then return 0 end
+    local base = rawget(info, "Generation")
+    local mult = 1
+    if mutation and mutation ~= "None" and mutation ~= "" and type(MutationsData) == "table" then
+        local mInfo = MutationsData[mutation]
+        if type(mInfo) == "table" and rawget(mInfo, "Modifier") then
+            mult = mult + rawget(mInfo, "Modifier")
+        end
+    end
+    if type(traits) == "table" and type(TraitsData) == "table" then
+        for _, tr in ipairs(traits) do
+            local tInfo = TraitsData[tr]
+            if type(tInfo) == "table" and rawget(tInfo, "MultiplierModifier") then
+                mult = mult + rawget(tInfo, "MultiplierModifier")
+            end
+        end
+    end
+    return math.floor(base * mult)
+end
+
+
+local function _generation(index, mutation, traits)
+    local AD = _mpsData()
+    if type(AD) ~= "table" then return 0 end
+    local info = AD[index]
+    if type(info) ~= "table" then return 0 end
+    local base = rawget(info, "Generation")
+    if not base then return 0 end
+    _chargerModifs()
+    local mult = 1
+    if mutation and mutation ~= "None" and mutation ~= "" and type(_MutD) == "table" then
+        local mi = _MutD[mutation]
+        if type(mi) == "table" and rawget(mi, "Modifier") then
+            mult = mult + rawget(mi, "Modifier")
+        end
+    end
+    if type(traits) == "table" and type(_TraD) == "table" then
+        for _, tr in ipairs(traits) do
+            local ti = _TraD[tr]
+            if type(ti) == "table" and rawget(ti, "MultiplierModifier") then
+                mult = mult + rawget(ti, "MultiplierModifier")
+            end
+        end
+    end
+    return math.floor(base * mult)
+end
+
+local function getPlotOwner(plot)
+    local sign = plot:FindFirstChild("PlotSign")
+    if not sign then return nil end
+    local gui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+    if not gui then return nil end
+    local label = gui:FindFirstChildWhichIsA("TextLabel", true)
+    if not label then return nil end
+    local text = label.Text
+    if not text or text == "" or text:lower():find("empty") then return nil end
+    local owner = text:match("^(.+)'s Base$")
+    return owner or text
+end
+
+
+local function _proprietaire(plot)
+    local sign = plot:FindFirstChild("PlotSign")
+    if not sign then return nil end
+    local ok, res = pcall(function()
+        local gui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+        if not gui then return nil end
+        local lab = gui:FindFirstChildWhichIsA("TextLabel", true)
+        if not lab then return nil end
+        local txt = lab.Text
+        if not txt or txt == "" or txt:lower():find("empty") then return nil end
+        return txt:match("^(.+)'s Base$") or txt
+    end)
+    return ok and res or nil
+end
+
+local function _fmtGenText(genVal)
+    genVal = tonumber(genVal) or 0
+    local s
+    if NumberUtils and NumberUtils.ToString then
+        local ok, txt = pcall(function() return NumberUtils:ToString(genVal) end)
+        if ok and type(txt) == "string" and txt ~= "" then
+            s = txt
+        end
+    end
+    if not s then s = tostring(genVal) end
+    return "$" .. s .. "/s"
+end
+
+local _BLOCKING_MACHINE_TYPES = { Fuse = true, Duel = true, Trade = true, Crafting = true }
+
+local function _syncOwnerName(owner)
+    if owner == nil then return nil end
+    if typeof(owner) == "Instance" and owner:IsA("Player") then return owner.Name end
+    if typeof(owner) == "Instance" and owner.Name then return owner.Name end
+    if type(owner) == "string" then return owner end
+    if type(owner) == "table" and owner.Name then return tostring(owner.Name) end
+    if type(owner) == "table" and owner.UserId then
+        local plr = Players:GetPlayerByUserId(owner.UserId)
+        return plr and plr.Name or nil
+    end
+    if type(owner) == "number" then
+        local plr = Players:GetPlayerByUserId(owner)
+        return plr and plr.Name or nil
+    end
+    return tostring(owner)
+end
+
+local function _isMineOwner(ownerName)
+    if type(ownerName) ~= "string" or ownerName == "" then return false end
+    local low = ownerName:lower()
+    local me = LP.Name:lower()
+    local disp = LP.DisplayName:lower()
+    if low == me or low == disp then return true end
+    local fromSign = low:match("^(.+)'s base$")
+    if fromSign and (fromSign == me or fromSign == disp) then return true end
+    return false
+end
+
+local STEAL_NAME_BLACKLIST = {
+    octopubase = true,
+    octopusbase = true,
+}
+
+local function _isBlacklistedPet(p)
+    if not p then return true end
+    local n = _normName(p.name)
+    local i = _normName(p.index)
+    return (n ~= "" and STEAL_NAME_BLACKLIST[n] == true) or (i ~= "" and STEAL_NAME_BLACKLIST[i] == true)
+end
+
+local function _plotIsMine(plotRef)
+    if plotRef == nil then return false end
+    local plot = plotRef
+    if type(plotRef) ~= "userdata" then
+        local plots = workspace:FindFirstChild("Plots")
+        plot = plots and plots:FindFirstChild(tostring(plotRef))
+    end
+    if not plot then return false end
+    return _isMineOwner(getPlotOwner(plot) or "")
+end
+
+local function _isOwnPet(p)
+    if not p then return true end
+    if p.mine == true then return true end
+    if _isMineOwner(tostring(p.owner or "")) then return true end
+    if p.plot and _plotIsMine(p.plot) then return true end
+    return false
+end
+
+local _petAllowed = function(p)
+    if not p or p.conveyor then return false end
+    if _isOwnPet(p) then return false end
+    if _isBlacklistedPet(p) then return false end
+    return true
+end
+
+local function _isFusingAnimal(animalData)
+    if type(animalData) ~= "table" then return false end
+    local m = animalData.Machine
+    if type(m) ~= "table" then return false end
+    return _BLOCKING_MACHINE_TYPES[m.Type] == true and m.Active == true
+end
+
+local function _extractAnimalList(plotData)
+    if type(plotData) ~= "table" then return nil end
+    local animalList = rawget(plotData, "AnimalList") or plotData.AnimalList
+    if type(animalList) ~= "table" then
+        animalList = channelGet(plotData, "AnimalList")
+    end
+    if type(animalList) ~= "table" then
+        local ct = rawget(plotData, "CacheTable") or plotData.CacheTable
+        if type(ct) == "table" then
+            animalList = rawget(ct, "AnimalList") or ct.AnimalList or ct.Animals
+        end
+    end
+    if type(animalList) ~= "table" then
+        animalList = rawget(plotData, "Animals") or plotData.Animals
+    end
+    if type(animalList) ~= "table" then return nil end
+    return animalList
+end
+
+local _RequestData
+local _plotDataCache, _plotDataCacheT = {}, {}
+
+local function getRequestData()
+    if _RequestData then return _RequestData end
+    pcall(function()
+        local pkg = RS:FindFirstChild("Packages")
+        local sync = pkg and pkg:FindFirstChild("Synchronizer")
+        _RequestData = sync and sync:FindFirstChild("RequestData")
+    end)
+    return _RequestData
+end
+
+local function readPlotDataServer(plot)
+    if not plot then return nil end
+    local nome = plot.Name
+    local now = os.clock()
+    if _plotDataCache[nome] and (now - (_plotDataCacheT[nome] or 0)) < 0.75 then
+        return _plotDataCache[nome]
+    end
+    local rd = getRequestData()
+    if not rd then return nil end
+    local ok, data = pcall(function() return rd:InvokeServer(nome) end)
+    if not ok or type(data) ~= "table" then return nil end
+    _plotDataCache[nome] = data
+    _plotDataCacheT[nome] = now
+    return data
+end
+_G.SabcomReadPlotDataServer = readPlotDataServer
+
+local function _plotChannelKeys(plot)
+    local keys, out = {}, {}
+    local function add(k)
+        k = type(k) == "string" and k or (k ~= nil and tostring(k) or "")
+        if k ~= "" and not keys[k] then
+            keys[k] = true
+            out[#out + 1] = k
+        end
+    end
+    if type(plot) == "string" then
+        add(plot)
+    elseif plot then
+        local ord = plot:GetAttribute("Order")
+        if ord ~= nil then add("Plot" .. tostring(ord)) end
+        add(plot.Name)
+    end
+    return out
+end
+
+local function _warmPlotChannel(ch)
+    if not ch then return end
+    pcall(function()
+        if type(ch.Get) == "function" then
+            ch:Get("AnimalList")
+            ch:Get("Owner")
+        end
+    end)
+end
+
+local function _readPlotSync(plot)
+    ensureSyncData()
+
+    local ch = getPlotChannel(plot)
+    if not ch then
+        for _, key in ipairs(_plotChannelKeys(plot)) do
+            ch = getPlotChannel(key)
+            if ch then break end
+        end
+    end
+    if ch then
+        local animalList = (_G.sProp and _G.sProp(ch, "AnimalList")) or _extractAnimalList(ch)
+        local owner = (_G.sProp and _G.sProp(ch, "Owner")) or channelGet(ch, "Owner") or rawget(ch, "Owner") or ch.Owner
+        if type(animalList) == "table" and next(animalList) ~= nil then
+            return animalList, owner
+        end
+    end
+
+    return nil, nil
+end
+
+local function _findPodiumModel(plot, slotName)
+    local podiums = plot:FindFirstChild("AnimalPodiums")
+    local podium = podiums and podiums:FindFirstChild(slotName)
+    if not podium then return nil, nil end
+    for _, child in ipairs(podium:GetChildren()) do
+        if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
+            if not Players:GetPlayerFromCharacter(child) then
+                return child, podium
+            end
+        end
+    end
+    return nil, podium
+end
+
+local _appendPetFromSync = function(plot, owner, moi, now, pets, slot, entry)
+    if type(entry) == "string" then
+        entry = { Index = entry }
+    end
+    if type(entry) ~= "table" then return end
+    local index = entry.Index or entry.AnimalIndex or entry.Animal or entry.Name
+    if type(index) ~= "string" or index == "" then return end
+    ensureSyncData()
+    local info = AnimalsData and AnimalsData[index]
+    if type(info) ~= "table" then return end
+    if info.Egg == true or info.LuckyBlock == true then return end
+    if _isFusingAnimal(entry) then return end
+
+    local mutation = entry.Mutation or "None"
+    if mutation == "Yin Yang" then mutation = "YinYang" end
+    local traits = entry.Traits
+    local genVal = calculateGeneration(index, mutation, traits)
+    if genVal <= 0 then
+        genVal = tonumber(_up9Mps({ Index = index, Mutation = mutation, Traits = traits })) or 0
+    end
+    if genVal <= 0 and type(_G.SabcomGen) == "function" then
+        genVal = tonumber(_G.SabcomGen(index, mutation, traits)) or 0
+    end
+
+    local slotName = tostring(slot)
+    local displayName = (type(info) == "table" and info.DisplayName) or index
+    if _isBlacklistedPet({ name = displayName, index = index }) then return end
+    local pos = getPetPosition(plot, slotName)
+    local model, podium = _findPodiumModel(plot, slotName)
+    if not pos and model then
+        local okp, cf = pcall(function() return model:GetPivot() end)
+        if okp and cf and cf.Position.Magnitude > 1 then pos = cf.Position end
+    end
+    if pos and pos.Magnitude <= 1 then pos = nil end
+    local prompt
+    local podiumInst = podium
+    if not podiumInst then
+        local podiums = plot:FindFirstChild("AnimalPodiums")
+        podiumInst = podiums and podiums:FindFirstChild(slotName)
+    end
+    if podiumInst then
+        local base = podiumInst:FindFirstChild("Base")
+        local spawn = base and base:FindFirstChild("Spawn")
+        local att = spawn and spawn:FindFirstChild("PromptAttachment")
+        local found = att and att:FindFirstChildWhichIsA("ProximityPrompt")
+        if found then
+            local txt = string.lower(tostring(found.ActionText or ""))
+            if txt:find("steal", 1, true) or txt == "" then
+                prompt = found
+            end
+        end
+    end
+    if not pos then return end
+
+    local sp = _petSeenT[plot.Name]
+    if not sp then sp = {}; _petSeenT[plot.Name] = sp end
+    local seen = sp[slotName]
+    if not seen or seen.i ~= index then
+        seen = { t = now, i = index }
+        sp[slotName] = seen
+    end
+
+    pets[#pets + 1] = {
+        plot      = plot.Name,
+        owner     = owner,
+        slot      = slotName,
+        name      = displayName,
+        index     = index,
+        genValue  = genVal,
+        genText   = _fmtGenText(genVal),
+        mps       = genVal,
+        mutation  = mutation,
+        traits    = traits,
+        position  = pos,
+        uid       = plot.Name .. "_" .. slotName,
+        model     = model,
+        podium    = podium,
+        prompt    = prompt,
+        firstSeen = seen.t,
+        mine      = _isMineOwner(owner),
+        sync      = true,
+    }
+end
+
+local function _scanPlotFromSync(plot, moi, now, pets)
+    local ch = getPlotChannel(plot)
+    if ch then
+        local ownerCh = (_G.sProp and _G.sProp(ch, "Owner")) or channelGet(ch, "Owner")
+        if _isMineOwner(_syncOwnerName(ownerCh) or "") then return true end
+    end
+    local animalList, ownerRaw = _readPlotSync(plot)
+    if type(animalList) ~= "table" then return false end
+    local owner = _syncOwnerName(ownerRaw) or getPlotOwner(plot)
+    if _isMineOwner(owner or "") then return true end
+    for slot, entry in pairs(animalList) do
+        _appendPetFromSync(plot, owner, moi, now, pets, slot, entry)
+    end
+    return true
+end
+
+local function _petStillLive(pet)
+    if type(pet) ~= "table" or not pet.plot or pet.slot == nil then return false end
+    local plotName = tostring(pet.plot)
+    local slotName = tostring(pet.slot)
+    local plots = workspace:FindFirstChild("Plots")
+    local plot = plots and plots:FindFirstChild(plotName)
+    if not plot then return false end
+    if pet.model and pet.model.Parent then return true end
+    local ch = getPlotChannel(plotName)
+    if ch then
+        local al = _extractAnimalList(ch)
+        if type(al) == "table" then
+            local entry = al[slotName] or al[tonumber(slotName)]
+            if type(entry) ~= "table" then return false end
+            local idx = entry.Index or entry.AnimalIndex or entry.Animal or entry.Name
+            if type(idx) ~= "string" or idx == "" then return false end
+            if pet.index and idx ~= pet.index then return false end
+            return true
+        end
+    end
+    local podiums = plot:FindFirstChild("AnimalPodiums")
+    local podium = podiums and podiums:FindFirstChild(slotName)
+    if not podium then return false end
+    for _, child in ipairs(podium:GetChildren()) do
+        if child:IsA("Model") and child:FindFirstChildOfClass("Humanoid") then
+            if not Players:GetPlayerFromCharacter(child) then return true end
+        end
+    end
+    return false
+end
+_G.SabcomPetStillLive = _petStillLive
+
+local _podListCache = {}
+local _scanCatalogo
+local _SUF = { K = 1e3, M = 1e6, B = 1e9, T = 1e12, Q = 1e15, Qi = 1e18, Sx = 1e21, Sp = 1e24, Oc = 1e27 }
+
+local function _montarCatalogo()
+    if _scanCatalogo and next(_scanCatalogo) then return _scanCatalogo end
+    _scanCatalogo = {}
+    ensureSyncData()
+    local AD = AnimalsData or _mpsData()
+    if type(AD) ~= "table" then return _scanCatalogo end
+    for idx, info in pairs(AD) do
+        if type(idx) == "string" then
+            _scanCatalogo[idx:lower()] = idx
+            if type(info) == "table" and type(info.DisplayName) == "string" then
+                _scanCatalogo[info.DisplayName:lower()] = idx
+            end
+        end
+    end
+    return _scanCatalogo
+end
+
+local function _mpsDoTexto(model)
+    if not model then return nil end
+    local achado
+    local gui = model:FindFirstChildWhichIsA("BillboardGui", true) or model:FindFirstChildWhichIsA("SurfaceGui", true)
+    local labels = gui and gui:GetDescendants() or nil
+    if not labels then return nil end
+    for _, d in ipairs(labels) do
+        if d:IsA("TextLabel") and type(d.Text) == "string" then
+            local num, suf = d.Text:match("%$%s*([%d%.]+)%s*(%a*)%s*/s")
+            if num then
+                local v = tonumber(num)
+                if v then
+                    if suf and suf ~= "" then
+                        local m = _SUF[suf] or _SUF[suf:sub(1, 1):upper() .. (suf:sub(2) or "")]
+                        if m then v = v * m end
+                    end
+                    achado = v
+                    break
+                end
+            end
+        end
+    end
+    return achado
+end
+
+local _podiumsDe = function(plot)
+    local c = _podListCache[plot.Name]
+    if c then return c end
+    local podiums = plot:FindFirstChild("AnimalPodiums")
+    if not podiums then return nil end
+    local lista = {}
+    local filhos = podiums:GetChildren()
+    local numericos = 0
+    for _, pod in ipairs(filhos) do
+        if tonumber(pod.Name) then
+            numericos = numericos + 1
+            local ok, pp = pcall(function() return pod:GetPivot().Position end)
+            if ok then lista[#lista + 1] = { nome = pod.Name, pos = pp } end
+        end
+    end
+    if #lista == 0 then return nil end
+    if #lista == numericos and numericos > 0 then
+        _podListCache[plot.Name] = lista
+    end
+    return lista
+end
+
+local _slotDoModel = function(plot, model)
+    local lista = _podiumsDe(plot)
+    if not lista then return nil end
+    local ok, pivo = pcall(function() return model:GetPivot().Position end)
+    if not ok then return nil end
+    local melhor, melhorD
+    for _, pod in ipairs(lista) do
+        local d = (pod.pos - pivo).Magnitude
+        if not melhorD or d < melhorD then melhorD, melhor = d, pod.nome end
+    end
+    if melhor and melhorD and melhorD <= 8 then return melhor end
+    return nil
+end
+
+local function _stealPromptForSlot(plot, slot)
+    local podiums = plot and plot:FindFirstChild("AnimalPodiums")
+    local podium = podiums and podiums:FindFirstChild(tostring(slot))
+    local base = podium and podium:FindFirstChild("Base")
+    local spawnp = base and base:FindFirstChild("Spawn")
+    local att = spawnp and spawnp:FindFirstChild("PromptAttachment")
+    local prompt = att and att:FindFirstChildWhichIsA("ProximityPrompt")
+    if prompt then
+        local txt = string.lower(tostring(prompt.ActionText or ""))
+        if txt:find("steal", 1, true) or txt == "" then
+            return prompt, podium
+        end
+    end
+    return nil, podium
+end
+
+local _scanPlotRendered = function(plot, owner, now, pets, seen)
+    seen = seen or {}
+    local cat = _montarCatalogo()
+    for _, m in ipairs(plot:GetChildren()) do
+        if m:IsA("Model") then
+            local index = cat[m.Name:lower()]
+            if type(index) == "string" then
+                local slot = _slotDoModel(plot, m)
+                local slotName = slot and tostring(slot)
+                if slotName and not seen[slotName] then
+                    local info = AnimalsData and AnimalsData[index]
+                    if type(info) == "table" and info.Egg ~= true and info.LuckyBlock ~= true then
+                        local mutation = m:GetAttribute("Mutation") or m:GetAttribute("__mutation") or "None"
+                        if mutation == "Yin Yang" then mutation = "YinYang" end
+                        local genVal = calculateGeneration(index, mutation, nil)
+                        if genVal <= 0 then
+                            genVal = tonumber(_generation(index, mutation, nil)) or 0
+                        end
+                        if genVal <= 0 and type(_G.SabcomGen) == "function" then
+                            genVal = tonumber(_G.SabcomGen(index, mutation, nil)) or 0
+                        end
+                        if type(genVal) ~= "number" or genVal <= 0 then
+                            genVal = _mpsDoTexto(m)
+                        end
+                        if type(genVal) == "number" then
+                            local pos = getPetPosition(plot, slotName)
+                            local displayName = info.DisplayName or index
+                            if pos and not _isBlacklistedPet({ name = displayName, index = index }) then
+                                local prompt, podium = _stealPromptForSlot(plot, slotName)
+                                local sp = _petSeenT[plot.Name]
+                                if not sp then sp = {}; _petSeenT[plot.Name] = sp end
+                                local seenT = sp[slotName]
+                                if not seenT or seenT.i ~= index then
+                                    seenT = { t = now, i = index }
+                                    sp[slotName] = seenT
+                                end
+                                seen[slotName] = true
+                                pets[#pets + 1] = {
+                                    plot      = plot.Name,
+                                    owner     = owner,
+                                    slot      = slotName,
+                                    name      = displayName,
+                                    index     = index,
+                                    genValue  = genVal,
+                                    genText   = _fmtGenText(genVal),
+                                    mps       = genVal,
+                                    mutation  = mutation,
+                                    traits    = nil,
+                                    position  = pos,
+                                    uid       = plot.Name .. "_" .. slotName,
+                                    model     = m,
+                                    podium    = podium,
+                                    prompt    = prompt,
+                                    firstSeen = seenT.t,
+                                    mine      = _isMineOwner(owner),
+                                    sync      = false,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local _genTentado = false
+local function _fixGen()
+    if _genTentado then return end
+    _genTentado = true
+    pcall(function()
+        local f = AnimalsShared and AnimalsShared.GetGeneration
+        if not f then return end
+        local esperado = debug.getupvalue(f, 2)
+        if esperado ~= nil then
+            debug.setupvalue(f, 1, function() return esperado end)
+        end
+    end)
+end
+
+local function _ownerDoPlot(plot)
+    local ch = getPlotChannel(plot)
+    if ch then
+        local o = (_G.sProp and _G.sProp(ch, "Owner")) or channelGet(ch, "Owner")
+        local name = _syncOwnerName(o)
+        if type(name) == "string" and name ~= "" then
+            return name, ch
+        end
+    end
+    local txt = getPlotOwner(plot) or _proprietaire(plot)
+    if type(txt) == "string" and txt ~= "" then
+        local low = txt:lower()
+        if not (low:find("sua base", 1, true) or low:find("your base", 1, true) or low:find("^empty")) then
+            return txt, ch
+        end
+    end
+    return nil, ch
+end
+
+local scanAllPets = function(_light)
+    local now = os.clock()
+    ensureSyncData()
+    _fixGen()
+    local pets = {}
+    local Plots = workspace:FindFirstChild("Plots")
+    if not Plots then return pets end
+    local pending = 0
+
+    for _, plot in ipairs(Plots:GetChildren()) do
+        local owner, ch = _ownerDoPlot(plot)
+        if owner == nil then
+            pending = pending + 1
+        end
+        if not _isMineOwner(owner or "") then
+            local seen = {}
+            local animalList
+            if ch then
+                animalList = (_G.sProp and _G.sProp(ch, "AnimalList")) or _extractAnimalList(ch)
+            end
+            if type(animalList) ~= "table" then
+                animalList = select(1, _readPlotSync(plot))
+            end
+            if type(animalList) == "table" then
+                for slot, entry in pairs(animalList) do
+                    local n = #pets
+                    _appendPetFromSync(plot, owner, LP.Name, now, pets, slot, entry)
+                    if #pets > n then
+                        seen[tostring(slot)] = true
+                    end
+                end
+            end
+            _scanPlotRendered(plot, owner, now, pets, seen)
+            if _G.__sabcomTEntry == nil and #pets > 0 then
+                _G.__sabcomTEntry = now
+            end
+        end
+    end
+
+    _G.__sabcomScanPending  = pending
+    _G.__sabcomScanComplete = (pending == 0)
+    if #pets > 0 then
+        _G.__sabcomEarlyReady = true
+        _G.__sabcomEarlyFrames = (_G.__sabcomEarlyFrames or 0) + 1
+    end
+    if _G.__sabcomScanComplete and _G.__sabcomTComplete == nil then
+        _G.__sabcomTComplete = now
+    end
+    if #pets > 0 and _G.__sabcomTAnimList == nil then _G.__sabcomTAnimList = now end
+
+    if _light then
+        return pets
+    end
+    for _, p in ipairs(pets) do
+        p._pri = _priIndexOf(p.name) or (p.index and _priIndexOf(p.index)) or nil
+    end
+    if _G.sabcomStealMode == "highest" then
+        table.sort(pets, function(a, b) return (a.mps or 0) > (b.mps or 0) end)
+    else
+        table.sort(pets, function(a, b)
+            local pa, pb = a._pri, b._pri
+            if pa and pb then return pa < pb end
+            if pa then return true end
+            if pb then return false end
+            return (a.mps or 0) > (b.mps or 0)
+        end)
+    end
+    return pets
+end
+
+_G.Sabcom_ScanAllPets = scanAllPets
+_G.Sabcom_ScanAllPets = scanAllPets
+
+local function _bustScanCache()
+    _plotDataCache = {}
+    _plotDataCacheT = {}
+    _chCache = {}
+    _podListCache = {}
+    _podiumPos = setmetatable({}, { __mode = "k" })
+    _scanCatalogo = nil
+end
+local function _bustPlotCache(plotName)
+    if not plotName then return end
+    local key = tostring(plotName)
+    _chCache[key] = nil
+    _plotDataCache[key] = nil
+    _plotDataCacheT[key] = nil
+    _podListCache[key] = nil
+end
+_G.SabcomBustPlotCache = _bustPlotCache
+_G.SabcomBustScanCache = _bustScanCache
+
+_G.__sabcomEarlyFrames = 0
+_G.__sabcomEarlyReady  = false
+_G.__sabcomRadarOff    = false
+
+local function scanForTP()
+    return scanAllPets()
+end
+
+local function _petMeetsMinGen(p)
+    local minG = tonumber(_G.SabcomMinGen) or 0
+    if minG <= 0 or not p then return true end
+    local m = tonumber(p.mps) or 0
+    if m <= 0 and p.index then
+        m = _up9Mps({ Index = p.index, Mutation = p.mutation, Traits = p.traits }) or 0
+        p.mps = m
+    end
+    return m >= minG
+end
+
+local function _petBaseGen(p)
+    if not p then return 0 end
+    local AD = _mpsData()
+    local info = type(AD) == "table" and AD[p.index]
+    if type(info) == "table" then
+        return tonumber(rawget(info, "Generation")) or tonumber(p.mps) or 0
+    end
+    return tonumber(p.mps) or 0
+end
+
+local function _fmtMps(n)
+    n = tonumber(n) or 0
+    if n >= 1000000 then return string.format("$%.1fM/s", n / 1000000) end
+    if n >= 1000 then return string.format("$%.1fk/s", n / 1000) end
+    return "$" .. tostring(math.floor(n + 0.5)) .. "/s"
+end
+
+local function _ensurePetGen(p)
+    if not p then return 0, "$0/s" end
+    local m = tonumber(p.mps) or 0
+    if m <= 0 then m = tonumber(p.genValue) or 0 end
+    if m <= 0 and p.index then
+        m = tonumber(_up9Mps({ Index = p.index, Mutation = p.mutation, Traits = p.traits })) or 0
+    end
+    if m <= 0 and p.index then
+        m = tonumber(calculateGeneration(p.index, p.mutation, p.traits)) or 0
+    end
+    if m > 0 then
+        p.mps = m
+        p.genValue = m
+        p.genText = _fmtGenText(m)
+    end
+    local txt = p.genText
+    if (not txt or txt == "$0/s") and m > 0 then
+        txt = _fmtGenText(m)
+        p.genText = txt
+    end
+    return m, txt or _fmtMps(m)
+end
+_G.SabcomEnsurePetGen = _ensurePetGen
+
+local function _buildStealPetList(pets, mode)
+    if type(pets) ~= "table" then return {} end
+    mode = tostring(mode or _G.SabcomStealMode or "priority"):lower()
+    if mode == "highest" then mode = "value" end
+    local list = {}
+    for _, p in ipairs(pets) do
+        if p and _petAllowed(p) and _petMeetsMinGen(p) then
+            if (not p.mps or p.mps <= 0) and p.index then
+                p.mps = _up9Mps({ Index = p.index, Mutation = p.mutation, Traits = p.traits }) or 0
+            end
+            if p.plot and p.slot then
+                p.uid = tostring(p.plot) .. "_" .. tostring(p.slot)
+            end
+            list[#list + 1] = p
+        end
+    end
+    local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    local myPos = hrp and hrp.Position
+    if mode == "nearest" and myPos then
+        table.sort(list, function(a, b)
+            local da = a.position and (a.position - myPos).Magnitude or math.huge
+            local db = b.position and (b.position - myPos).Magnitude or math.huge
+            return da < db
+        end)
+    elseif mode == "gen" then
+        table.sort(list, function(a, b) return _petBaseGen(a) > _petBaseGen(b) end)
+    elseif mode == "value" then
+        table.sort(list, function(a, b) return (tonumber(a.mps) or 0) > (tonumber(b.mps) or 0) end)
+    else
+        table.sort(list, function(a, b)
+            local pa = _priIndexOf(a.index) or _priIndexOf(a.name)
+            local pb = _priIndexOf(b.index) or _priIndexOf(b.name)
+            if pa and pb then
+                if pa ~= pb then return pa < pb end
+            elseif pa then
+                return true
+            elseif pb then
+                return false
+            end
+            local ma, mb = tonumber(a.mps) or 0, tonumber(b.mps) or 0
+            if ma ~= mb then return ma > mb end
+            local fa, fb = tonumber(a.firstSeen) or 0, tonumber(b.firstSeen) or 0
+            if fa ~= fb and fa > 0 and fb > 0 then return fa < fb end
+            local ua = tostring(a.plot or "") .. "_" .. tostring(a.slot or "")
+            local ub = tostring(b.plot or "") .. "_" .. tostring(b.slot or "")
+            return ua < ub
+        end)
+    end
+    return list
+end
+_G.SabcomBuildStealPetList = _buildStealPetList
+
+local function _pickPetByMode(pets, mode)
+    if type(pets) ~= "table" or #pets == 0 then return nil end
+    local list = _buildStealPetList(pets, mode)
+    return list[1]
+end
+
+local function _petUid(p)
+    if not p then return nil end
+    if p.plot and p.slot then
+        return tostring(p.plot) .. "_" .. tostring(p.slot)
+    end
+    if p.uid then
+        return tostring(p.uid)
+    end
+    return nil
+end
+
+local function _stealListSig(list, mode)
+    mode = tostring(mode or _G.SabcomStealMode or "priority"):lower()
+    if mode == "highest" then mode = "value" end
+    if type(list) ~= "table" then return mode .. "|" end
+    local parts = { mode }
+    for _, p in ipairs(list) do
+        parts[#parts + 1] = tostring(_petUid(p) or "")
+    end
+    return table.concat(parts, "|")
+end
+
+local function _mergeStealPetList(existing, scanned, mode)
+    mode = tostring(mode or _G.SabcomStealMode or "priority"):lower()
+    if mode == "highest" then mode = "value" end
+    if type(scanned) ~= "table" or #scanned == 0 then
+        if type(existing) ~= "table" or #existing == 0 then return {} end
+        local kept = {}
+        for _, p in ipairs(existing) do
+            if _petStillLive(p) then kept[#kept + 1] = p end
+        end
+        return _buildStealPetList(kept, mode)
+    end
+    if type(existing) ~= "table" or #existing == 0 then
+        return _buildStealPetList(scanned, mode)
+    end
+
+    local byUid, order = {}, {}
+    for _, p in ipairs(existing) do
+        local uid = _petUid(p)
+        if uid then
+            byUid[uid] = p
+            order[#order + 1] = uid
+        end
+    end
+
+    local scanSet, added, removed = {}, false, false
+    for _, p in ipairs(scanned) do
+        if p and _petAllowed(p) and _petMeetsMinGen(p) and _petStillLive(p) then
+            if p.plot and p.slot then
+                p.uid = tostring(p.plot) .. "_" .. tostring(p.slot)
+            end
+            local uid = _petUid(p)
+            if uid then
+                scanSet[uid] = true
+                local old = byUid[uid]
+                if old then
+                    local fs = old.firstSeen
+                    for k, v in pairs(p) do old[k] = v end
+                    if fs then old.firstSeen = fs end
+                else
+                    byUid[uid] = p
+                    order[#order + 1] = uid
+                    added = true
+                end
+            end
+        end
+    end
+
+    local newOrder = {}
+    for _, uid in ipairs(order) do
+        if scanSet[uid] and byUid[uid] then
+            newOrder[#newOrder + 1] = uid
+        elseif byUid[uid] and _petStillLive(byUid[uid]) then
+            newOrder[#newOrder + 1] = uid
+        elseif byUid[uid] then
+            byUid[uid] = nil
+            removed = true
+        end
+    end
+
+    local merged = {}
+    for _, uid in ipairs(newOrder) do
+        merged[#merged + 1] = byUid[uid]
+    end
+    return _buildStealPetList(merged, mode)
+end
+_G.SabcomMergeStealPetList = _mergeStealPetList
+
+local function get_all_pets()
+    local out = {}
+    local cache = _G.SabcomStealPetList
+    local minGen = tonumber(_G.SabcomMinGen) or 0
+    local myName = LP.Name
+    local myDisplay = LP.DisplayName
+    local pri = _G._stp_priorityCfg
+    if type(pri) ~= "table" or #pri == 0 then
+        pri = _G.SHARED_PRIORITY_ITEMS
+    end
+    local prioSet = {}
+    if type(pri) == "table" then
+        for _, p in ipairs(pri) do
+            if type(p) == "string" then
+                prioSet[string.lower(p)] = true
+                prioSet[_normName(p)] = true
+            end
+        end
+    end
+    if type(cache) == "table" then
+        for _, a in ipairs(cache) do
+            if a and (tonumber(a.mps) or tonumber(a.genValue) or 0) >= 1 then
+                local owner = tostring(a.owner or "")
+                if _petAllowed(a) then
+                    local gen = tonumber(a.mps) or tonumber(a.genValue) or 0
+                    local isBrainrot = gen >= 10000000
+                    local isPriority = (a.name and prioSet[string.lower(tostring(a.name))])
+                        or (a.index and prioSet[string.lower(tostring(a.index))])
+                        or prioSet[_normName(a.name)]
+                        or prioSet[_normName(a.index)]
+                    if minGen > 0 and gen < minGen and not isBrainrot and not isPriority then
+                        continue
+                    end
+                    out[#out + 1] = {
+                        name = a.name,
+                        petName = a.name,
+                        index = a.index,
+                        mpsText = a.genText or a.mpsText,
+                        mpsValue = gen,
+                        mps = gen,
+                        genValue = gen,
+                        owner = a.owner,
+                        plot = a.plot,
+                        slot = a.slot,
+                        uid = a.uid or (a.plot and a.slot and (tostring(a.plot) .. "_" .. tostring(a.slot))),
+                        mutation = a.mutation,
+                        position = a.position,
+                        model = a.model,
+                        animalData = a,
+                    }
+                end
+            end
+        end
+    end
+    table.sort(out, function(a, b) return (a.mpsValue or 0) > (b.mpsValue or 0) end)
+    return out
+end
+_G.SabcomGetAllPets = get_all_pets
+_G.SabcomGetAllPets = get_all_pets
+
+local function _priDbg(key, ...)
+    if tostring(_G.SabcomStealMode or ""):lower() ~= "priority" then
+        return
+    end
+    local now = os.clock()
+    local last = _G.__SabcomPriDbgTimes
+    if type(last) ~= "table" then
+        last = {}
+        _G.__SabcomPriDbgTimes = last
+    end
+    if (now - (tonumber(last[key]) or 0)) < 2 then
+        return
+    end
+    last[key] = now
+    print("[DEBUG]", ...)
+end
+
+local function _promptPetUid(prompt)
+    if not prompt or not prompt.Parent then return nil end
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+    local plotModel = prompt:FindFirstAncestorWhichIsA("Model")
+    while plotModel and plotModel.Parent and plotModel.Parent ~= plots do
+        plotModel = plotModel.Parent
+    end
+    if not plotModel or plotModel.Parent ~= plots then return nil end
+    local podiums = plotModel:FindFirstChild("AnimalPodiums")
+    if not podiums then return nil end
+    local node = prompt
+    while node and node ~= podiums do
+        if node.Parent == podiums then
+            return plotModel.Name .. "_" .. tostring(node.Name), plotModel.Name, tostring(node.Name)
+        end
+        node = node.Parent
+    end
+    return nil
+end
+
+local function _findPetByUid(pets, uid)
+    if type(pets) ~= "table" or type(uid) ~= "string" or uid == "" then return nil end
+    uid = tostring(uid)
+    for _, p in ipairs(pets) do
+        local a = _petUid(p)
+        local b = (p.plot ~= nil and p.slot ~= nil) and (tostring(p.plot) .. "_" .. tostring(p.slot)) or nil
+        if a == uid or b == uid or tostring(p.uid or "") == uid then
+            return p
+        end
+    end
+    return nil
+end
+local function _findTPSyncedPet(pets)
+    local uid = _G.sabcomStealTargetUID
+    if type(uid) ~= "string" or uid == "" then return nil end
+    for _, p in ipairs(pets) do
+        if _petUid(p) == uid then return p end
+    end
+    return nil
+end
+local function _clearTPSync()
+    _G.SabcomTPSyncActive = false
+    _G.SabcomStealTargetUID = nil
+    _G.sabcomTPSyncActive = false
+    _G.sabcomStealTargetUID = nil
+end
+
+_G.SabcomClearTPSync = _clearTPSync
+
+local function _selectedStealUid()
+    local man = _G.SabcomManualStealUID
+    if type(man) == "string" and man ~= "" then return man end
+    local sel = _G.SabcomStealTarget or _G.SabcomSelectedPetData
+    local uid = sel and _petUid(sel)
+    if type(uid) == "string" and uid ~= "" then return uid end
+    uid = _G.SabcomStealTargetUID
+    if type(uid) == "string" and uid ~= "" then return uid end
+    return nil
+end
+
+local function _resolveTPPet(pets)
+    local pet = _findPetByUid(pets, _selectedStealUid())
+    if pet then return pet end
+    return _pickPetByMode(pets, _G.SabcomStealMode or "priority")
+end
+
+local function _stealPetReady(pet)
+    if type(pet) ~= "table" then return false end
+    if not _petAllowed(pet) then return false end
+    if not pet.position then return false end
+    if not _petUid(pet) then return false end
+    local n = pet.name or pet.index
+    return type(n) == "string" and n ~= ""
+end
+
+local function _findStealTarget(pets)
+    if not _G.sabcomTPSyncActive then return nil end
+    return _findTPSyncedPet(pets)
+end
+
+
+local UPPER = {
+    B = {{coord=Vector3.new(-487.921448,16.850713,-75.768013),facing="NORTH"},{coord=Vector3.new(-332.379730,16.850722,-75.762100),facing="NORTH"},{coord=Vector3.new(-487.134918,16.850713,-18.094154),facing="SOUTH"},{coord=Vector3.new(-316.300171,16.850713,-17.845898),facing="SOUTH"}},
+    C = {{coord=Vector3.new(-330.765381,16.850713,31.424425),facing="NORTH"},{coord=Vector3.new(-502.989349,16.850713,31.172430),facing="NORTH"},{coord=Vector3.new(-489.077087,16.850713,89.010147),facing="SOUTH"},{coord=Vector3.new(-330.908936,16.850713,88.930145),facing="SOUTH"}},
+    D = {{coord=Vector3.new(-331.264893,16.850713,138.209167),facing="NORTH"},{coord=Vector3.new(-487.935181,16.850713,138.026321),facing="NORTH"},{coord=Vector3.new(-487.774933,16.850713,195.882538),facing="SOUTH"},{coord=Vector3.new(-330.799133,16.850575,196.022354),facing="SOUTH"}},
+}
+local LOWER = {
+    B = {{coord=Vector3.new(-335.725586,-3.048217,-74.984589),facing="NORTH"},{coord=Vector3.new(-503.214233,-3.048217,-75.043137),facing="NORTH"},{coord=Vector3.new(-483.619385,-3.718430,-18.844337),facing="SOUTH"},{coord=Vector3.new(-316.147095,-3.048218,-18.818844),facing="SOUTH"}},
+    C = {{coord=Vector3.new(-335.985413,-3.048218,32.051426),facing="NORTH"},{coord=Vector3.new(-503.277008,-3.048217,31.956175),facing="NORTH"},{coord=Vector3.new(-483.749390,-3.048218,88.147003),facing="SOUTH"},{coord=Vector3.new(-315.793823,-3.048217,88.163979),facing="SOUTH"}},
+    D = {{coord=Vector3.new(-335.476654,-3.048218,139.001083),facing="NORTH"},{coord=Vector3.new(-503.710083,-3.048218,138.989883),facing="NORTH"},{coord=Vector3.new(-315.654938,-3.048218,195.302444),facing="SOUTH"},{coord=Vector3.new(-483.859253,-3.048218,195.269043),facing="SOUTH"}},
+}
+local UPPER_Y_THRESHOLD = 7
+local TALL_PETS = { ["La Secret Combinasion"]=true, ["La Jolly Grande"]=true }
+local TALL_OFFSET = 3
+
+local BASES_LOW = {
+    [1] = Vector3.new(-476.52, -2, 220.94090270996094),
+    [2] = Vector3.new(-476.52, -2, 113.77315521240234),
+    [3] = Vector3.new(-476.52, -2, 6.178487777709961),
+    [4] = Vector3.new(-476.52, -2, -101.07275390625),
+    [5] = Vector3.new(-342.66, -2, 221.44737243652344),
+    [6] = Vector3.new(-342.66, -2, 113.41409301757812),
+    [7] = Vector3.new(-342.66, -2, 6.249461650848389),
+    [8] = Vector3.new(-342.66, -2, -99.73458862304688),
+}
+local BASES_HIGH = {
+    [1] = Vector3.new(-479.51, 18, 220.94090270996094),
+    [2] = Vector3.new(-479.51, 18, 113.77315521240234),
+    [3] = Vector3.new(-479.51, 18, 6.178487777709961),
+    [4] = Vector3.new(-479.51, 18, -101.07275390625),
+    [5] = Vector3.new(-339.48, 18, 221.44737243652344),
+    [6] = Vector3.new(-339.48, 18, 113.41409301757812),
+    [7] = Vector3.new(-339.48, 18, 6.249461650848389),
+    [8] = Vector3.new(-339.48, 18, -99.73458862304688),
+}
+local FRONT_Y_LOW   = -3.048217
+local FRONT_Y_HIGH  = 16.850713
+local COLUMN_SPLIT_X = -410
+local FRONT_Z_CLAMP  = 18
+local SIDE_NEAR_Z    = 45
+
+local function getClosestBaseIdx(pos)
+    local closest, dist = 1, math.huge
+    for i = 1, 8 do
+        local b = BASES_LOW[i]
+        local d = (pos.X - b.X)^2 + (pos.Z - b.Z)^2
+        if d < dist then dist = d; closest = i end
+    end
+    return closest
+end
+
+local function buildFrontCandidate(idx, isUpper, playerZ)
+    local base = isUpper and BASES_HIGH[idx] or BASES_LOW[idx]
+    local frontY = isUpper and FRONT_Y_HIGH or FRONT_Y_LOW
+    local frontZ = math.clamp(playerZ - base.Z, -FRONT_Z_CLAMP, FRONT_Z_CLAMP) + base.Z
+    local coord = Vector3.new(base.X, frontY, frontZ)
+    local faceDir = (idx <= 4) and Vector3.new(-1, 0, 0) or Vector3.new(1, 0, 0)
+    return coord, faceDir
+end
+
+local function plotSides(coordTable, idx)
+    local base = BASES_LOW[idx]
+    local isWest = idx <= 4
+    local out = {}
+    for _, coords in pairs(coordTable) do
+        for _, data in ipairs(coords) do
+            if ((data.coord.X < COLUMN_SPLIT_X) == isWest)
+               and math.abs(data.coord.Z - base.Z) < SIDE_NEAR_Z then
+                out[#out + 1] = data
+            end
+        end
+    end
+    return out
+end
+
+local function _floor1LaserSolid(plotName)
+    local solid = false
+    pcall(function()
+        local Plots = workspace:FindFirstChild("Plots")
+        local plot = Plots and Plots:FindFirstChild(plotName)
+        if not plot then return end
+        local folder = plot:FindFirstChild("Laser")
+        local parts = folder and folder:GetChildren() or plot:GetChildren()
+        for _, d in ipairs(parts) do
+            if d:IsA("BasePart") and (d.Name == "LaserHitbox" or d.Name == "Laser")
+                and d.CanCollide and d.Position.Y <= 9 then
+                solid = true
+                break
+            end
+        end
+    end)
+    return solid
+end
+
+local function isPlotUnlocked(plotName)
+    local ok, res = pcall(function()
+        local channel = getPlotChannel(plotName)
+        if not channel then return false end
+        if channelGet(channel, "BlockEndTimeFirstFloor") ~= nil then return false end
+        return not _floor1LaserSolid(plotName)
+    end)
+    return ok and (res == true)
+end
+
+local function findClosest(petPos, coordTable)
+    local best, bestKey, bestDist = nil, nil, math.huge
+    for skyKey, coords in pairs(coordTable) do
+        for _, data in ipairs(coords) do
+            local c = data.coord
+            local d = math.sqrt((petPos.X - c.X)^2 + (petPos.Z - c.Z)^2)
+            if d < bestDist then bestDist = d; best = data; bestKey = skyKey end
+        end
+    end
+    return best, bestKey
+end
+
+local SPEED = 125
+local ARRIVE = 3
+local _STRIP_OK = (type(getconnections) == "function")
+local function _climbCap()
+
+
+    local v = math.clamp(tonumber(_G.sabcomClimb) or 400, 100, 800)
+    if not _STRIP_OK then v = math.min(v, tonumber(_G.sabcomClimbSafe) or 250) end
+    return v
+end
+
+local function vZero(hrp)
+    if hrp then hrp.AssemblyLinearVelocity = Vector3.zero; hrp.AssemblyAngularVelocity = Vector3.zero end
+end
+
+local function velMoveThrough(hrp, waypoints, speedOverride, allowJump, quickStart)
+    if not hrp or not hrp.Parent or #waypoints == 0 then return end
+    local _runSpeed = speedOverride or (_G.TPVelocity and math.clamp(_G.TPVelocity, 200, 750)) or CARPET_SPEED
+
+
+    if _G.sabcomDirect ~= false and #waypoints > 1
+       and type(_G.Sabcom_ClearWide) == "function" then
+        local ok, court = pcall(function()
+            local res = {}
+            local from = hrp.Position
+            local i = 1
+            while i <= #waypoints do
+
+                local best = i
+                local voieLibre = _G.Sabcom_ClearWide
+                for j = #waypoints, i, -1 do
+                    if voieLibre(from, waypoints[j]) then best = j break end
+                end
+                res[#res + 1] = waypoints[best]
+                from = waypoints[best]
+                i = best + 1
+            end
+            return res
+        end)
+        if ok and court and #court > 0 then waypoints = court end
+    end
+
+
+    local _mcCap = _climbCap()
+    local function _boost(vers)
+        if not (hrp and hrp.Parent and vers) then return end
+        local d = vers - hrp.Position
+        if d.Magnitude < 0.1 then return end
+        local u = d.Unit
+        local s = _runSpeed
+
+
+        local vx, vy, vz = u.X * s, u.Y * s, u.Z * s
+        if vy > _mcCap then
+            if _G.sabcomClimbFull then
+                local k = _mcCap / vy
+                vx, vy, vz = vx * k, _mcCap, vz * k
+            else
+                vy = _mcCap
+            end
+        end
+        pcall(function()
+            local v = Vector3.new(vx, vy, vz)
+            hrp.Velocity = v
+            hrp.AssemblyLinearVelocity = v
+        end)
+    end
+
+
+    _boost(waypoints[1])
+
+    local wpIdx = 1
+    local done = false
+    local conn
+    local function finish()
+        if done then return end
+        done = true
+        if hrp and hrp.Parent then
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            local _, y = hrp.CFrame:ToEulerAnglesYXZ()
+            hrp.CFrame = CFrame.new(waypoints[#waypoints]) * CFrame.Angles(0, y, 0)
+        end
+        if conn then conn:Disconnect() end
+    end
+    local lastDist, stall = math.huge, 0
+    local _lastPos, _lastMoveT = nil, nil
+    local _jumpDone = false
+
+    local _stStart = os.clock()
+
+    local _ = quickStart
+
+    local _carpetInHand = nil
+
+
+    local _mcCached = _climbCap()
+    local _humCached = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+    conn = RunService.Heartbeat:Connect(function()
+        if not hrp or not hrp.Parent or done then
+            if conn then conn:Disconnect() end
+            return
+        end
+        if _G.sabcomTPStop then finish() return end
+        if _G._goBrVelGen and _goBrGen and _G._goBrVelGen ~= _goBrGen then finish() return end
+
+
+        if not (_carpetInHand and _carpetInHand.Parent == hrp.Parent) then
+            local _cn = equipCarpet()
+            local _ch = hrp.Parent
+            _carpetInHand = _cn and _ch and _ch:FindFirstChild(_cn) or nil
+        end
+        local target = waypoints[wpIdx]
+        local diff = target - hrp.Position
+        local mag = diff.Magnitude
+
+
+        local _arr = math.max(ARRIVE, _runSpeed / 60 * 1.25)
+        if mag < _arr then
+            wpIdx = wpIdx + 1
+            if wpIdx > #waypoints then finish() return end
+            lastDist, stall = math.huge, 0
+            _lastPos, _lastMoveT = nil, nil
+            target = waypoints[wpIdx]
+            diff = target - hrp.Position
+            mag = diff.Magnitude
+
+            _boost(target)
+            return
+        end
+
+
+        do
+            local _t = os.clock()
+            local _p = hrp.Position
+            if (not _lastPos) or (_p - _lastPos).Magnitude > 1.5 then
+                _lastPos, _lastMoveT = _p, _t
+            end
+            stall = ((_t - (_lastMoveT or _t)) >= (tonumber(_G.sabcomStallSec) or 0.6)) and 999 or 0
+        end
+        lastDist = mag
+        if stall >= 18 then
+
+
+            _lastPos, _lastMoveT = nil, nil
+            stall = 0
+            _boost(target)
+            return
+        end
+
+
+        do
+
+
+            local seuil = (tonumber(_G.sabcomRepushAt) or 0.9) * _runSpeed
+            if seuil > 0 and hrp.AssemblyLinearVelocity.Magnitude < seuil then
+                _boost(target)
+            end
+        end
+
+
+        if (not _jumpDone) and mag >= 0.1 and (allowJump or diff.Y > 10) and diff.Y > 5 then
+            if _G.sabcomJumpOnce ~= false then _jumpDone = true end
+
+
+            if not (_humCached and _humCached.Parent) then
+                _humCached = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+            end
+            local hum = _humCached
+            if hum then
+                local st = hum:GetState()
+                if st ~= Enum.HumanoidStateType.Jumping and st ~= Enum.HumanoidStateType.Freefall then
+                    pcall(function() hum:ChangeState(Enum.HumanoidStateType.Jumping) end)
+                    pcall(function() hum.Jump = true end)
+                end
+            end
+        end
+    end)
+    local totalDist = 0
+    local prev = hrp.Position
+    for _, wp in ipairs(waypoints) do
+        totalDist = totalDist + (prev - wp).Magnitude
+        prev = wp
+    end
+    local timeout = totalDist / math.min(SPEED, _runSpeed) + 2
+    local elapsed = 0
+    while not done and elapsed < timeout do
+        task.wait(0.05)
+        elapsed = elapsed + 0.05
+    end
+    finish()
+    vZero(hrp)
+end
+
+local _OTHER_CLONES = {}
+do
+    local _MY_CLONE = tostring(LP.UserId) .. "_Clone"
+    local _seen = {}
+    local function _isOtherClone(n)
+        return type(n) == "string" and n ~= _MY_CLONE and n:match("^%d+_Clone$") ~= nil
+    end
+    local function _neutralize(inst)
+        if not inst or _seen[inst] then return end
+        _seen[inst] = true
+        _OTHER_CLONES[#_OTHER_CLONES + 1] = inst
+        local function declaw(d)
+            if d:IsA("BasePart") and d.CanCollide then pcall(function() d.CanCollide = false end) end
+        end
+        for _, d in ipairs(inst:GetDescendants()) do declaw(d) end
+        inst.DescendantAdded:Connect(declaw)
+        inst.Destroying:Connect(function()
+            _seen[inst] = nil
+            for i = #_OTHER_CLONES, 1, -1 do
+                if _OTHER_CLONES[i] == inst then table.remove(_OTHER_CLONES, i); break end
+            end
+        end)
+    end
+    local function _scan(inst)
+        if _isOtherClone(inst.Name) then _neutralize(inst) end
+    end
+    for _, c in ipairs(workspace:GetChildren()) do _scan(c) end
+    workspace.ChildAdded:Connect(function(c)
+
+
+        if not c:IsA("Model") then return end
+        if _isOtherClone(c.Name) then _neutralize(c) return end
+
+
+        if c.Name == "Model" then
+            task.defer(function() if c and c.Parent == workspace then _scan(c) end end)
+        end
+    end)
+end
+
+
+local computeRoute, _len
+do
+local _DIRS = { Vector3.new(1,0,0), Vector3.new(-1,0,0), Vector3.new(0,0,1), Vector3.new(0,0,-1) }
+local _STRUCT = { ["structure base home"] = true, ["Wall"] = true, ["Floor"] = true, ["Roof"] = true, ["Laser"] = true, ["LaserHitbox"] = true }
+local _SKIP_NAME = { ["DeliveryHitbox"]=true, ["StealHitbox"]=true,
+    ["AnimalTarget"]=true, ["Multiplier"]=true, ["Hitbox"]=true,
+    ["Spawn"]=true, ["MainRoot"]=true, ["SecondFloor"]=true, ["ThirdFloor"]=true, ["Slope"]=true }
+local function _blocks(inst)
+    if not inst then return false end
+    if _SKIP_NAME[inst.Name] then return false end
+    if inst.CanCollide then return true end
+    if _STRUCT[inst.Name] then return true end
+    local s = inst.Size
+    if s and math.max(s.X * s.Y, s.X * s.Z, s.Y * s.Z) > 150 then return true end
+    return false
+end
+local function _blocksWide(inst)
+    if not inst then return false end
+    if _SKIP_NAME[inst.Name] then return false end
+    if inst.CanCollide then return true end
+    if _STRUCT[inst.Name] then return true end
+    local s = inst.Size
+    if s and math.max(s.X * s.Y, s.X * s.Z, s.Y * s.Z) > 30 then return true end
+    return false
+end
+local function _block(origin, target, blockFn)
+    blockFn = blockFn or _blocks
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.IgnoreWater = true
+    local skip = {}
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl.Character then skip[#skip + 1] = pl.Character end
+    end
+    for _, cl in ipairs(_OTHER_CLONES) do skip[#skip + 1] = cl end
+    local o = origin
+    for _ = 1, 16 do
+        rp.FilterDescendantsInstances = skip
+        local d = target - o
+        if d.Magnitude < 0.05 then return nil end
+        local res = workspace:Raycast(o, d, rp)
+        if not res then return nil end
+        if blockFn(res.Instance) then return res end
+        skip[#skip + 1] = res.Instance
+        o = res.Position + d.Unit * 0.3
+    end
+    return nil
+end
+local function _clear(a, b) return _block(a, b) == nil end
+function _len(pts)
+    local s, prev = 0, pts[1]
+    for k = 2, #pts do s = s + (pts[k] - prev).Magnitude; prev = pts[k] end
+    return s
+end
+
+
+local PathfindingService = game:GetService("PathfindingService")
+local _CLEARANCE = 16
+local function _clearWideRay(a, b)
+    return _block(a, b, _blocksWide) == nil
+end
+
+local _SWEEP_R = 4
+local _ENDPOINT_SLACK = 6
+local _canSphere = nil
+local function _sweepBlockFn(inst)
+    if _G.sabcomStrictSweep == false then return _blocks(inst) end
+    return _blocksWide(inst)
+end
+local function _sweepDir(a, b)
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.IgnoreWater = true
+    local skip = {}
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl.Character then skip[#skip + 1] = pl.Character end
+    end
+    for _, cl in ipairs(_OTHER_CLONES) do skip[#skip + 1] = cl end
+    local o = a
+    for _ = 1, 24 do
+        rp.FilterDescendantsInstances = skip
+        local d = b - o
+        if d.Magnitude < 0.05 then return false end
+        local res
+        local ok = pcall(function() res = workspace:Spherecast(o, _SWEEP_R, d, rp) end)
+        if not ok then _canSphere = false; return nil end
+        if not res then return false end
+        if _sweepBlockFn(res.Instance) then return true end
+        skip[#skip + 1] = res.Instance
+        local adv = (res.Distance or 0) - 0.05
+        if adv > 0 then o = o + d.Unit * math.min(adv, d.Magnitude) end
+    end
+    return true
+end
+local function _sweepBlocked(a, b, slackA, slackB)
+    if _canSphere == nil then
+        _canSphere = pcall(function()
+            workspace:Spherecast(Vector3.new(0, 10000, 0), 1, Vector3.new(0, -1, 0), RaycastParams.new())
+        end)
+    end
+    if not _canSphere then return nil end
+    local d = b - a
+    local len = d.Magnitude
+    if len < 0.1 then return false end
+    local u = d / len
+    local a2 = a + u * math.min(slackA or _ENDPOINT_SLACK, len * 0.4)
+    local b2 = b - u * math.min(slackB or _ENDPOINT_SLACK, len * 0.4)
+    local fwd = _sweepDir(a2, b2)
+    if fwd == nil then return nil end
+    if fwd then return true end
+    local rev = _sweepDir(b2, a2)
+    if rev == nil then return nil end
+    return rev
+end
+
+
+local _clearWide
+_G.Sabcom_ClearWide = function(a, b, sa, sb) return _clearWide(a, b, sa, sb) end
+function _clearWide(a, b, slackA, slackB)
+    if not _clear(a, b) then return false end
+    local sw = _sweepBlocked(a, b, slackA, slackB)
+    if sw ~= nil then return not sw end
+    local d = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+    if d.Magnitude < 0.1 then
+        local ox = Vector3.new(_CLEARANCE, 0, 0)
+        local oz = Vector3.new(0, 0, _CLEARANCE)
+        return _clearWideRay(a + ox, b + ox) and _clearWideRay(a - ox, b - ox)
+            and _clearWideRay(a + oz, b + oz) and _clearWideRay(a - oz, b - oz)
+    end
+    local perp = Vector3.new(-d.Z, 0, d.X).Unit * _CLEARANCE
+    local up = Vector3.new(0, _CLEARANCE, 0)
+    return _clearWideRay(a + perp, b + perp)
+        and _clearWideRay(a - perp, b - perp)
+        and _clearWideRay(a + up, b + up)
+        and _clearWideRay(a - up, b - up)
+end
+
+local function _pullWide(pts)
+    if #pts <= 2 then return pts end
+    local out = { pts[1] }
+    local i = 1
+    local n = #pts
+    while i < n do
+        local j = n
+        while j > i + 1 do
+            local a, b = out[#out], pts[j]
+            local sA = (i == 1) and _ENDPOINT_SLACK or 0
+            local sB = (j == n) and _ENDPOINT_SLACK or 0
+            if _clearWide(a, b, sA, sB) then break end
+            j = j - 1
+        end
+        out[#out + 1] = pts[j]
+        i = j
+    end
+    return out
+end
+
+local function _pushOffWalls(pts)
+    if #pts <= 2 then return pts end
+    local MARGIN = 8
+    local MAX_PUSH = 12
+    local out = { pts[1] }
+    for i = 2, #pts - 1 do
+        local p = pts[i]
+        local shift = Vector3.zero
+        for _, dr in ipairs(_DIRS) do
+            local res = _block(p, p + dr * MARGIN, _blocks)
+            if res then
+                local dist = (res.Position - p).Magnitude
+                if dist < MARGIN then
+                    shift = shift - dr * (MARGIN - dist)
+                end
+            end
+        end
+        do
+            local resUp = _block(p, p + Vector3.new(0, MARGIN, 0), _blocks)
+            if resUp then
+                local dist = (resUp.Position - p).Magnitude
+                if dist < 4 then shift = shift + Vector3.new(0, -(4 - dist), 0) end
+            end
+        end
+        if shift.Magnitude > 0.1 then
+            if shift.Magnitude > MAX_PUSH then shift = shift.Unit * MAX_PUSH end
+            local moved = p + shift
+            if _clear(out[#out], moved) then
+                out[#out + 1] = moved
+            else
+                out[#out + 1] = p
+            end
+        else
+            out[#out + 1] = p
+        end
+    end
+    out[#out + 1] = pts[#pts]
+    return out
+end
+
+local voxelRoute = (function()
+local _vxFloor, _vxSqrt = math.floor, math.sqrt
+local _vxMin, _vxMax = math.min, math.max
+local function _vxAbs(n) return n < 0 and -n or n end
+
+local _vxOverlap = OverlapParams.new()
+_vxOverlap.FilterType = Enum.RaycastFilterType.Exclude
+_vxOverlap.RespectCanCollide = true
+
+local _vxCast = RaycastParams.new()
+_vxCast.FilterType = Enum.RaycastFilterType.Exclude
+_vxCast.RespectCanCollide = true
+_vxCast.IgnoreWater = true
+
+local _vxOrigin
+local _vxDimX, _vxDimY, _vxDimZ = 0, 0, 0
+local _vxSz, _vxInflate = 4, 3.0
+local _vxSolid = {}
+local _vxHeight = 5.5
+
+local function _vxWorld(sz, x, y, z)
+    local h = sz * 0.5
+    return Vector3.new(_vxOrigin.X + x * sz + h, _vxOrigin.Y + y * sz + h, _vxOrigin.Z + z * sz + h)
+end
+local function _vxKey(x, y, z) return x + y * 1024 + z * 1048576 end
+
+local function _vxIsSolid(x, y, z)
+    if x < 0 or y < 0 or z < 0 or x >= _vxDimX or y >= _vxDimY or z >= _vxDimZ then return true end
+    local k = _vxKey(x, y, z)
+    local c = _vxSolid[k]
+    if c ~= nil then return c end
+    local h = _vxSz * 0.5
+    local cx = _vxOrigin.X + x * _vxSz + h
+    local cy = _vxOrigin.Y + y * _vxSz + h
+    local cz = _vxOrigin.Z + z * _vxSz + h
+    local sxz = _vxSz + _vxInflate
+    local vy = _vxHeight > _vxSz and _vxHeight or _vxSz
+    local vcy = cy - h + vy * 0.5
+    local parts = workspace:GetPartBoundsInBox(CFrame.new(cx, vcy, cz), Vector3.new(sxz, vy, sxz), _vxOverlap)
+    local solid = #parts > 0
+    _vxSolid[k] = solid
+    return solid
+end
+
+local function _vxSegClear(from, to, radius, height, sample)
+    local dir = to - from
+    local mag = dir.Magnitude
+    if mag < 0.05 then return true end
+    if workspace:Raycast(from, dir, _vxCast) then return false end
+    local r = radius > 1 and radius or 1
+    if workspace:Blockcast(CFrame.new(from), Vector3.new(r * 2, height, r * 2), dir, _vxCast) ~= nil then return false end
+    local n = _vxFloor(mag)
+    if sample ~= false and n >= 2 then
+        local step = dir / n
+        local torso = Vector3.new(r * 2, 3, r * 2)
+        for i = 1, n - 1 do
+            local pt = from + step * i
+            if #workspace:GetPartBoundsInBox(CFrame.new(pt), torso, _vxOverlap) > 0 then return false end
+        end
+    end
+    return true
+end
+
+local _vxNeigh = {}
+do
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            for dz = -1, 1 do
+                if dx ~= 0 or dy ~= 0 or dz ~= 0 then
+                    local nz = (dx ~= 0 and 1 or 0) + (dy ~= 0 and 1 or 0) + (dz ~= 0 and 1 or 0)
+                    local kd = dx + dy * 1024 + dz * 1048576
+                    _vxNeigh[#_vxNeigh + 1] = { dx, dy, dz, _vxSqrt(dx * dx + dy * dy + dz * dz), nz, kd }
+                end
+            end
+        end
+    end
+end
+
+local function _vxNoCorner(cx, cy, cz, off)
+    if off[5] < 2 then return true end
+    if off[1] ~= 0 and _vxIsSolid(cx + off[1], cy, cz) then return false end
+    if off[2] ~= 0 and _vxIsSolid(cx, cy + off[2], cz) then return false end
+    if off[3] ~= 0 and _vxIsSolid(cx, cy, cz + off[3]) then return false end
+    return true
+end
+
+local function _vxSnapGoal(goalPos, x, y, z)
+    if not _vxIsSolid(x, y, z) then return x, y, z end
+    for r = 1, 16 do
+        for dx = -r, r do
+            for dy = -r, r do
+                for dz = -r, r do
+                    if _vxMax(_vxAbs(dx), _vxAbs(dy), _vxAbs(dz)) == r then
+                        local nx, ny, nz = x + dx, y + dy, z + dz
+                        if not _vxIsSolid(nx, ny, nz) and (_vxWorld(_vxSz, nx, ny, nz) - goalPos).Magnitude <= 8 then
+                            return nx, ny, nz
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return x, y, z
+end
+local function _vxSnapStart(pos, x, y, z)
+    if not _vxIsSolid(x, y, z) then return x, y, z end
+    for r = 1, 16 do
+        for dx = -r, r do
+            for dy = -r, r do
+                for dz = -r, r do
+                    if _vxMax(_vxAbs(dx), _vxAbs(dy), _vxAbs(dz)) == r then
+                        local nx, ny, nz = x + dx, y + dy, z + dz
+                        if not _vxIsSolid(nx, ny, nz) and not workspace:Raycast(pos, _vxWorld(_vxSz, nx, ny, nz) - pos, _vxCast) then
+                            return nx, ny, nz
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return x, y, z
+end
+
+local function _vxPush(h, f, key)
+    local i = #h + 1
+    h[i] = { f, key }
+    while i > 1 do
+        local p = _vxFloor(i * 0.5)
+        if h[p][1] <= h[i][1] then break end
+        h[p], h[i] = h[i], h[p]
+        i = p
+    end
+end
+local function _vxPop(h)
+    local n = #h
+    if n == 0 then return nil end
+    local top = h[1]
+    h[1] = h[n]
+    h[n] = nil
+    n -= 1
+    local i = 1
+    while true do
+        local l, r, s = i + i, i + i + 1, i
+        if l <= n and h[l][1] < h[s][1] then s = l end
+        if r <= n and h[r][1] < h[s][1] then s = r end
+        if s == i then break end
+        h[i], h[s] = h[s], h[i]
+        i = s
+    end
+    return top[2]
+end
+
+local _vxHeurW = 2
+local function _vxAStar(sz, startCell, goalCell, startPos, goalPos)
+    local sx, sy, sz2 = _vxSnapStart(startPos, startCell.x, startCell.y, startCell.z)
+    local gx, gy, gz = _vxSnapGoal(goalPos, goalCell.x, goalCell.y, goalCell.z)
+    local goalKey = _vxKey(gx, gy, gz)
+    local startKey = _vxKey(sx, sy, sz2)
+
+    local nodes = { [startKey] = { x = sx, y = sy, z = sz2, g = 0, parent = nil } }
+    local closed = {}
+    local heap = {}
+    _vxPush(heap, 0, startKey)
+
+    local function Heur(x, y, z)
+        local ax, ay, az = x - gx, y - gy, z - gz
+        return _vxSqrt(ax * ax + ay * ay + az * az)
+    end
+
+    local pops = 0
+    while #heap > 0 do
+        local curKey = _vxPop(heap)
+        if closed[curKey] then continue end
+        closed[curKey] = true
+        pops += 1
+        if pops > 300000 then break end
+
+        local cur = nodes[curKey]
+        if curKey == goalKey then
+            local path = {}
+            local n = cur
+            while n do
+                path[#path + 1] = _vxWorld(sz, n.x, n.y, n.z)
+                n = n.parent and nodes[n.parent]
+            end
+            local rev = {}
+            for i = #path, 1, -1 do rev[#rev + 1] = path[i] end
+            return rev
+        end
+
+        local cx, cy, cz = cur.x, cur.y, cur.z
+        local cg = cur.g
+        for _, off in _vxNeigh do
+            local nk = curKey + off[6]
+            if closed[nk] then continue end
+            local nx, ny, nz = cx + off[1], cy + off[2], cz + off[3]
+            if _vxIsSolid(nx, ny, nz) then continue end
+            if not _vxNoCorner(cx, cy, cz, off) then continue end
+            local tg = cg + off[4]
+            local ex = nodes[nk]
+            if not ex or tg < ex.g then
+                if ex then
+                    ex.g, ex.parent, ex.x, ex.y, ex.z = tg, curKey, nx, ny, nz
+                else
+                    nodes[nk] = { x = nx, y = ny, z = nz, g = tg, parent = curKey }
+                end
+                _vxPush(heap, tg + _vxHeurW * Heur(nx, ny, nz), nk)
+            end
+        end
+    end
+    return nil
+end
+
+local function _vxSimplify(path, radius, height)
+    if not path or #path < 3 then return path end
+    local out = { path[1] }
+    local anchor = 1
+    local i = 2
+    while i <= #path do
+        if not _vxSegClear(path[anchor], path[i + 1] or path[i], radius, height, false) then
+            out[#out + 1] = path[i]
+            anchor = i
+        end
+        i += 1
+    end
+    out[#out + 1] = path[#path]
+    return out
+end
+
+    return function(fromPos, toPos)
+    local char = LP.Character
+    local _flt = char and { char } or {}
+    for _, cl in ipairs(_OTHER_CLONES) do _flt[#_flt + 1] = cl end
+    _vxOverlap.FilterDescendantsInstances = _flt
+    _vxCast.FilterDescendantsInstances = _flt
+
+    local sz      = tonumber(_G.sabcomPathCell)   or 4
+    local inflate = tonumber(_G.sabcomPathRadius) or 2.5
+    local height  = tonumber(_G.sabcomPathHeight) or 5
+    local pad     = tonumber(_G.sabcomPathPad)    or 40
+
+    _vxSz, _vxInflate, _vxHeight = sz, inflate, height
+    table.clear(_vxSolid)
+
+    local mn = Vector3.new(_vxMin(fromPos.X, toPos.X), _vxMin(fromPos.Y, toPos.Y), _vxMin(fromPos.Z, toPos.Z)) - Vector3.new(pad, pad, pad)
+    local mx = Vector3.new(_vxMax(fromPos.X, toPos.X), _vxMax(fromPos.Y, toPos.Y), _vxMax(fromPos.Z, toPos.Z)) + Vector3.new(pad, pad, pad)
+    _vxOrigin = mn
+    local size = mx - mn
+    _vxDimX = _vxFloor(size.X / sz) + 1
+    _vxDimY = _vxFloor(size.Y / sz) + 1
+    _vxDimZ = _vxFloor(size.Z / sz) + 1
+    if _vxDimX * _vxDimY * _vxDimZ > 200000 then return nil end
+
+    local startCell = {
+        x = _vxFloor((fromPos.X - _vxOrigin.X) / sz),
+        y = _vxFloor((fromPos.Y - _vxOrigin.Y) / sz),
+        z = _vxFloor((fromPos.Z - _vxOrigin.Z) / sz),
+    }
+    local goalCell = {
+        x = _vxFloor((toPos.X - _vxOrigin.X) / sz),
+        y = _vxFloor((toPos.Y - _vxOrigin.Y) / sz),
+        z = _vxFloor((toPos.Z - _vxOrigin.Z) / sz),
+    }
+
+    local path = _vxAStar(sz, startCell, goalCell, fromPos, toPos)
+    if not path then return nil end
+    path = _vxSimplify(path, inflate, height)
+    if not path or #path == 0 then return nil end
+
+    local route = {}
+    for idx = 2, #path do route[#route + 1] = path[idx] end
+    if #route == 0 or (route[#route] - toPos).Magnitude > 0.5 then
+        route[#route + 1] = toPos
+    end
+    return route
+end
+end)()
+
+_G.sabcomVoxelRoute = voxelRoute
+
+
+local _MAP_CENTER = { minX = -458, maxX = -362, minZ = -40, maxZ = 185 }
+local _BYPASS_Z_NORTH, _BYPASS_Z_SOUTH = 205, -95
+local _BYPASS_X_WEST,  _BYPASS_X_EAST  = -525, -295
+
+local function _inCenterZone(x, z)
+    return x >= _MAP_CENTER.minX and x <= _MAP_CENTER.maxX
+       and z >= _MAP_CENTER.minZ and z <= _MAP_CENTER.maxZ
+end
+
+
+local function _segmentCrossesCenter(a, b)
+    if _inCenterZone(a.X, a.Z) or _inCenterZone(b.X, b.Z) then return true end
+    for i = 1, 10 do
+        local t = i / 11
+        if _inCenterZone(a.X + (b.X - a.X) * t, a.Z + (b.Z - a.Z) * t) then return true end
+    end
+    return false
+end
+
+
+local function _findBestCenterDetour(fromPos, toPos, y)
+    local candidates = {
+        { Vector3.new(fromPos.X, y, _BYPASS_Z_NORTH), Vector3.new(toPos.X, y, _BYPASS_Z_NORTH) },
+        { Vector3.new(fromPos.X, y, _BYPASS_Z_SOUTH), Vector3.new(toPos.X, y, _BYPASS_Z_SOUTH) },
+        { Vector3.new(_BYPASS_X_WEST, y, fromPos.Z), Vector3.new(_BYPASS_X_WEST, y, toPos.Z) },
+        { Vector3.new(_BYPASS_X_EAST, y, fromPos.Z), Vector3.new(_BYPASS_X_EAST, y, toPos.Z) },
+    }
+    local best, bestLen = nil, math.huge
+    for _, pair in ipairs(candidates) do
+        local w1, w2 = pair[1], pair[2]
+        if _clearWide(fromPos, w1) and _clearWide(w1, w2) and _clearWide(w2, toPos) then
+            local len = (fromPos - w1).Magnitude + (w1 - w2).Magnitude + (w2 - toPos).Magnitude
+            if len < bestLen then bestLen = len; best = { w1, w2 } end
+        end
+    end
+    return best
+end
+_G.sabcomSegmentCrossesCenter = _segmentCrossesCenter
+_G.sabcomFindCenterDetour     = _findBestCenterDetour
+
+
+local function _rowBoxX() return tonumber(_G.sabcomRowBoxX) or 26 end
+local function _rowBoxZ() return tonumber(_G.sabcomRowBoxZ) or 30 end
+local function _rowLane() return tonumber(_G.sabcomRowLane) or 30 end
+
+
+local function _nearestBase(p)
+    local bi, bd = nil, math.huge
+    for i = 1, 8 do
+        local b = BASES_LOW[i]
+        local d = (p.X - b.X) ^ 2 + (p.Z - b.Z) ^ 2
+        if d < bd then bd = d; bi = i end
+    end
+    if bd > 70 * 70 then return nil end
+    return bi
+end
+
+
+local function _segmentHitsOtherBase(a, b, ignA, ignB)
+    local hx, hz = _rowBoxX(), _rowBoxZ()
+    for i = 0, 24 do
+        local t = i / 24
+        local px = a.X + (b.X - a.X) * t
+        local pz = a.Z + (b.Z - a.Z) * t
+        for k = 1, 8 do
+            if k ~= ignA and k ~= ignB then
+                local bs = BASES_LOW[k]
+                if math.abs(px - bs.X) <= hx and math.abs(pz - bs.Z) <= hz then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function _findRowDetour(fromPos, toPos, y)
+    local iFrom, iTo = _nearestBase(fromPos), _nearestBase(toPos)
+    if not _segmentHitsOtherBase(fromPos, toPos, iFrom, iTo) then return nil end
+
+
+    local colX = BASES_LOW[iTo or 1].X
+    local off  = _rowLane()
+    local lanes = {}
+
+
+    local outer = (colX < COLUMN_SPLIT_X) and (colX - off) or (colX + off)
+    lanes[#lanes + 1] = outer
+
+
+    local inner = (colX < COLUMN_SPLIT_X) and (colX + off) or (colX - off)
+    if not _inCenterZone(inner, (fromPos.Z + toPos.Z) * 0.5) then
+        lanes[#lanes + 1] = inner
+    end
+
+    local best, bestLen = nil, math.huge
+    for _, laneX in ipairs(lanes) do
+        local w1 = Vector3.new(laneX, y, fromPos.Z)
+        local w2 = Vector3.new(laneX, y, toPos.Z)
+        if _clearWide(fromPos, w1) and _clearWide(w1, w2) and _clearWide(w2, toPos)
+           and not _segmentHitsOtherBase(w1, w2, iFrom, iTo) then
+            local len = (fromPos - w1).Magnitude + (w1 - w2).Magnitude + (w2 - toPos).Magnitude
+            if len < bestLen then bestLen = len; best = { w1, w2 } end
+        end
+    end
+    return best
+end
+_G.sabcomFindRowDetour = _findRowDetour
+
+local _navPath = PathfindingService:CreatePath({
+    AgentRadius = 16, AgentHeight = 5, AgentCanJump = true, AgentJumpHeight = 10, AgentMaxSlope = 89,
+})
+
+local function _appendWp(out, p)
+    if not p then return end
+    if #out == 0 or (out[#out] - p).Magnitude > 1.5 then
+        out[#out + 1] = p
+    end
+end
+
+local function _pfsAround(a, b)
+    local ok = pcall(function()
+        _navPath:ComputeAsync(a, Vector3.new(b.X, a.Y, b.Z))
+    end)
+    if not ok or _navPath.Status ~= Enum.PathStatus.Success then return nil end
+    local out = {}
+    local last = a
+    for _, wp in ipairs(_navPath:GetWaypoints()) do
+        local p = wp.Position + Vector3.new(0, 5, 0)
+        if (p - last).Magnitude >= 6 then
+            out[#out + 1] = p
+            last = p
+        end
+    end
+    if #out == 0 then return nil end
+    return out
+end
+
+local function _highAround(a, b)
+    for _, extra in ipairs({ 18, 28, 40 }) do
+        local cruiseY = math.max(a.Y, b.Y, 26) + extra
+        local up = Vector3.new(a.X, cruiseY, a.Z)
+        local over = Vector3.new(b.X, cruiseY, b.Z)
+        if _clearWide(a, up) and _clearWide(up, over) and _clearWide(over, b) then
+            return { up, over, b }
+        end
+    end
+    return nil
+end
+
+local function _routeClear(pts)
+    if not pts or #pts < 2 then return false end
+    for i = 1, #pts - 1 do
+        local a, b = pts[i], pts[i + 1]
+        if (a - b).Magnitude > 0.5 and not _clearWide(a, b) then return false end
+    end
+    return true
+end
+
+local function _detourAround(a, b)
+    local vr = voxelRoute(a, b)
+    if vr and #vr > 0 and _routeClear(vr) then return vr end
+    local nav = _pfsAround(a, b)
+    if nav and #nav > 0 then
+        _appendWp(nav, b)
+        nav = _pushOffWalls(nav)
+        if _routeClear(nav) then return nav end
+    end
+    return _highAround(a, b)
+end
+
+local function _repairBlockedRoute(pts, dest)
+    if not pts or #pts == 0 then pts = { dest } end
+    if (pts[#pts] - dest).Magnitude > 0.5 then
+        local copy = {}
+        for i = 1, #pts do copy[i] = pts[i] end
+        copy[#copy + 1] = dest
+        pts = copy
+    end
+    local out = { pts[1] }
+    local n = #pts
+    for i = 2, n do
+        local a, b = out[#out], pts[i]
+        local sA = (#out == 1) and _ENDPOINT_SLACK or 0
+        local sB = (i == n) and _ENDPOINT_SLACK or 0
+        if (a - b).Magnitude < 1.5 or _clearWide(a, b, sA, sB) then
+            _appendWp(out, b)
+        else
+            local det = _detourAround(a, b)
+            if det then
+                for _, p in ipairs(det) do _appendWp(out, p) end
+            end
+            _appendWp(out, b)
+        end
+    end
+    return out
+end
+
+function computeRoute(fromPos, toPos, facingDir, maxLift, preferCrest)
+    local _ = maxLift
+
+
+    local centerPatch = nil
+    if _segmentCrossesCenter(fromPos, toPos) and not _clearWide(fromPos, toPos) then
+        centerPatch = _findBestCenterDetour(fromPos, toPos, fromPos.Y)
+        if centerPatch and #centerPatch > 0 then
+
+            fromPos = centerPatch[#centerPatch]
+        end
+    end
+
+
+    local rowPatch = _findRowDetour(fromPos, toPos, fromPos.Y)
+    if rowPatch and #rowPatch > 0 then
+        fromPos = rowPatch[#rowPatch]
+    end
+
+
+    local function _withPatch(route)
+        if (not centerPatch or #centerPatch == 0)
+           and (not rowPatch or #rowPatch == 0) then return route end
+        local merged = {}
+        if centerPatch then for _, p in ipairs(centerPatch) do merged[#merged + 1] = p end end
+        if rowPatch    then for _, p in ipairs(rowPatch)    do merged[#merged + 1] = p end end
+        for _, p in ipairs(route) do merged[#merged + 1] = p end
+        return merged
+    end
+    local function _finish(route)
+        return _repairBlockedRoute(_withPatch(route or { toPos }), toPos)
+    end
+
+    if _clearWide(fromPos, toPos) then return _finish({ toPos }) end
+
+    if preferCrest then
+        local cruiseY = math.max(fromPos.Y, toPos.Y, 26) + 12
+        local up   = Vector3.new(fromPos.X, cruiseY, fromPos.Z)
+        local over = Vector3.new(toPos.X,   cruiseY, toPos.Z)
+        local crest = { fromPos, up, over, toPos }
+        local ok = true
+        for i = 1, #crest - 1 do
+            local a, b = crest[i], crest[i + 1]
+            if (a - b).Magnitude > 0.5 then
+                local sA = (i == 1) and _ENDPOINT_SLACK or 0
+                local sB = (i == #crest - 1) and _ENDPOINT_SLACK or 0
+                if not _clearWide(a, b, sA, sB) then ok = false; break end
+            end
+        end
+        if ok then return _finish(crest) end
+    end
+
+    do
+        local vr = voxelRoute(fromPos, toPos)
+        if vr and #vr > 0 then return _finish(vr) end
+    end
+
+    local entry = facingDir and (toPos - facingDir * 14) or toPos
+
+    local best, bestLen = nil, math.huge
+    local function consider(pts)
+        if not pts or #pts < 2 then return end
+        local n = #pts
+        for i = 1, n - 1 do
+            local a, b = pts[i], pts[i + 1]
+            if (a - b).Magnitude > 0.5 then
+                local sA = (i == 1) and _ENDPOINT_SLACK or 0
+                local sB = (i == n - 1) and _ENDPOINT_SLACK or 0
+                if not _clearWide(a, b, sA, sB) then return end
+            end
+        end
+        local pulled = _pullWide(pts)
+        local L = _len(pulled)
+        if L < bestLen then best, bestLen = pulled, L end
+    end
+
+    do
+        local dirF = Vector3.new(entry.X - fromPos.X, 0, entry.Z - fromPos.Z)
+        if dirF.Magnitude > 0.1 then
+            dirF = dirF.Unit
+            local perp = Vector3.new(-dirF.Z, 0, dirF.X)
+            local midBase = (fromPos + entry) * 0.5
+            for _, off in ipairs({ 14, -14, 24, -24, 38, -38, 56, -56, 76, -76 }) do
+                consider({ fromPos, midBase + perp * off, entry })
+                consider({ fromPos, fromPos + perp * off, entry + perp * off, entry })
+            end
+        end
+    end
+
+    local navRaw
+    do
+        local nav = { fromPos }
+        local around = _pfsAround(fromPos, entry)
+        if around then
+            for _, p in ipairs(around) do nav[#nav + 1] = p end
+        end
+        nav[#nav + 1] = entry + Vector3.new(0, 5, 0)
+        nav = _pushOffWalls(nav)
+        navRaw = nav
+        consider(nav)
+    end
+
+    local route = best
+    if not route and navRaw then route = _pullWide(navRaw) end
+    if not route then
+        route = _detourAround(fromPos, toPos) or { toPos }
+    end
+    return _finish(route)
+end
+end
+local _Stats = game:GetService("Stats")
+local function _pingMs()
+    local ok, p = pcall(function() return LP:GetNetworkPing() * 1000 end)
+    if ok and type(p) == "number" and p > 0 then return p end
+    local ok2, p2 = pcall(function()
+        return _Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if ok2 and type(p2) == "number" and p2 > 0 then return p2 end
+    return 0
+end
+local function _pingAdjustSpeed(spd)
+    local thresh = tonumber(_G.sabcomPingThresh) or 170
+    local capped = tonumber(_G.sabcomHighPingSpeed) or 400
+    if _pingMs() >= thresh and spd > capped then return capped end
+    return spd
+end
+
+local function _inVoid(hrp)
+    if not hrp or not hrp.Parent then return true end
+    local voidY = tonumber(_G.sabcomVoidY) or -50
+    return hrp.Position.Y < voidY
+end
+local function _waitOutOfVoid(timeout)
+    local t0 = os.clock()
+    local good = 0
+    while os.clock() - t0 < (timeout or 12) do
+        if _G.sabcomTPStop then return false end
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp.Parent and not _inVoid(hrp) and math.abs(hrp.AssemblyLinearVelocity.Y) < 12 then
+            good += 1
+            if good >= 4 then return true end
+        else
+            good = 0
+        end
+        RunService.Heartbeat:Wait()
+    end
+    return false
+end
+
+
+local isTeleporting = false; _G.SabcomIsTeleporting = false
+local _goBrGen = 0
+
+
+local _cloneTP    = false
+local _cloneFired = false
+local _lastTPOk   = false
+
+local function endTP()
+    _G.Sabcom_Step("TP: termine")
+    isTeleporting = false; _G.SabcomIsTeleporting = false
+    _cloneTP = false
+    _cloneFired = false
+    _G.SabcomCloneTP = false
+    _G.SabcomCloneFired = false
+end
+
+local function _clearTpGoState()
+    isTeleporting = false
+    _G.SabcomIsTeleporting = false
+    _G.sabcomIsTeleporting = false
+    _G.sabcomTPStop = false
+    _G.SabcomTPStop = false
+    _cloneTP = false
+    _cloneFired = false
+    _G.SabcomCloneTP = false
+    _G.SabcomCloneFired = false
+    _G.sabcomStealHold = false
+    _goBrGen = _goBrGen + 1
+end
+_G.SabcomClearTpGoState = _clearTpGoState
+
+LP.CharacterAdded:Connect(function()
+    task.defer(_clearTpGoState)
+end)
+
+
+do
+    local function killAnimate(char)
+        if not char or _G.sabcomNoAnim == false then return end
+        task.spawn(function()
+            local a = char:FindFirstChild("Animate") or char:WaitForChild("Animate", 5)
+            if a then pcall(function() a.Disabled = true end) end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local anim = hum and hum:FindFirstChildOfClass("Animator")
+            if anim then
+                pcall(function()
+                    for _, t in ipairs(anim:GetPlayingAnimationTracks()) do t:Stop(0) end
+                end)
+            end
+        end)
+    end
+    if LP.Character then killAnimate(LP.Character) end
+    LP.CharacterAdded:Connect(killAnimate)
+end
+
+
+_G.SabcomInstantClone = function()
+    local player = LP
+    if not player then return end
+    local playerGui = player:FindFirstChildOfClass("PlayerGui") or player:FindFirstChild("PlayerGui")
+    if not playerGui then
+        playerGui = player:WaitForChild("PlayerGui", 3)
+    end
+    if not playerGui then return end
+    local c = player.Character
+    if not c then return end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if not h then return end
+    local bp = player:FindFirstChild("Backpack")
+    local cl = (bp and bp:FindFirstChild("Quantum Cloner")) or c:FindFirstChild("Quantum Cloner")
+    if not cl then return end
+    pcall(function() h:UnequipTools() end)
+    task.wait()
+    if cl.Parent ~= c then
+        h:EquipTool(cl)
+        task.wait()
+    end
+    local tf = playerGui:FindFirstChild("ToolsFrames")
+    local qc = tf and tf:FindFirstChild("QuantumCloner")
+    local tb = qc and qc:FindFirstChild("TeleportToClone")
+    if not tb then return end
+    _G.isCloning = true
+    cl:Activate()
+    task.wait(0.05)
+    tb.Visible = true
+    pcall(function() firesignal(tb.MouseButton1Click) end)
+    pcall(function() firesignal(tb.MouseButton1Up) end)
+    pcall(function() firesignal(tb.Activated) end)
+    task.delay(0.55, function() _G.isCloning = false end)
+end
+
+local function doClone()
+    _G.Sabcom_Step("clone: lance")
+    if type(_G.SabcomInstantClone) ~= "function" then
+        _G.Sabcom_Step("clone: echec", "SabcomInstantClone indisponible")
+        return false
+    end
+    local ok, err = pcall(_G.SabcomInstantClone)
+    if not ok then
+        _G.Sabcom_Step("clone: echec", tostring(err))
+        return false
+    end
+    _G.Sabcom_Step("clone: SabcomInstantClone")
+    return true
+end
+
+local function makeOneWay(plat)
+    if not plat then return end
+    local rsConn
+    local lastY = nil
+    local _platHrp = nil
+    rsConn = RunService.Stepped:Connect(function()
+        if not plat or not plat.Parent then
+            if rsConn then rsConn:Disconnect() end
+            return
+        end
+
+
+        if not (_platHrp and _platHrp.Parent) then
+            local char = LP.Character
+            _platHrp = char and char:FindFirstChild("HumanoidRootPart")
+        end
+        local hrp = _platHrp
+        if hrp then
+            local currentY = hrp.Position.Y
+            if not lastY then lastY = currentY end
+            local deltaY = currentY - lastY
+            local isMovingUp = (hrp.AssemblyLinearVelocity.Y > 1) or (deltaY > 0.01 and deltaY < 5)
+
+
+            local want = (not isMovingUp) and (currentY > plat.Position.Y + 0.1)
+            if plat.CanCollide ~= want then plat.CanCollide = want end
+            lastY = currentY
+        end
+    end)
+end
+
+
+local function goToBrainrot(petPos)
+    _goBrGen = _goBrGen + 1
+    local myGen = _goBrGen
+    local function dead() return myGen ~= _goBrGen or _G.sabcomTPStop end
+
+    _G.Sabcom_Step("goToBrainrot: debut", string.format("Y=%.1f", petPos and petPos.Y or -999))
+    if not petPos or dead() then return end
+    local char, hrp
+    local _t0 = os.clock()
+    repeat
+        char = LP.Character
+        hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then break end
+        if dead() then return end
+        RunService.Heartbeat:Wait()
+    until os.clock() - _t0 > 2
+    if not hrp or dead() then return end
+    pcall(function() hrp.Anchored = false end)
+    equipCarpet()
+
+    local h = petPos.Y
+    local targetY = hrp.Position.Y
+    local _isF2 = (h > 8.9 and h <= 23.15)
+    if h > 23.15 then
+        targetY = 21
+    elseif _isF2 then
+        targetY = -3.49 + 5 + 1.5
+    elseif h >= -6.9 and h <= 8.9 then
+        targetY = -3.49
+    end
+    local _to = Vector3.new(petPos.X, targetY, petPos.Z)
+    if _isF2 then
+        local idx = getClosestBaseIdx(petPos)
+        local face = (idx <= 4) and Vector3.new(-1, 0, 0) or Vector3.new(1, 0, 0)
+        local left = Vector3.new(0, 1, 0):Cross(face)
+        _to = _to + left * 1.5
+    end
+
+    if h > 8.9 then
+        local _plat = Instance.new("Part")
+        _plat.Name = "SabcomTempPlatform"
+        _plat.Size = Vector3.new(3, 1, 3)
+        _plat.Position = _to - Vector3.new(0, 5, 0)
+        _plat.Anchored = true
+        _plat.CanCollide = true
+        _plat.Transparency = 1
+        _plat.Material = Enum.Material.SmoothPlastic
+        _plat.Parent = workspace
+        task.spawn(function()
+            local _s = tick()
+            while tick() - _s < 20 do
+                if LP:GetAttribute("Stealing") or _G.sabcomTPStop or dead() then break end
+                task.wait(0.1)
+            end
+            if _plat and _plat.Parent then _plat:Destroy() end
+        end)
+    end
+
+    if dead() then return end
+    local _route = computeRoute(hrp.Position, _to, nil, 12)
+    if not _route or #_route == 0 then _route = { _to } end
+
+    _G._goBrVelGen = myGen
+    velMoveThrough(hrp, _route, math.clamp(tonumber(_G.sabcomBrainrotSpeed) or 250, 150, 800), nil, nil)
+    _G._goBrVelGen = nil
+
+    if dead() then return end
+
+    if hrp and hrp.Parent then
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        if h > 8.9 then
+            local _, y = hrp.CFrame:ToEulerAnglesYXZ()
+            hrp.CFrame = CFrame.new(_to) * CFrame.Angles(0, y, 0)
+        end
+    end
+end
+
+local AUTO_GO_SWITCH_RANGE = 75
+
+local function _promptWorldPos(prompt)
+    if not prompt or not prompt.Parent then return nil end
+    local p = prompt.Parent
+    if p:IsA("Attachment") and p.Parent and p.Parent:IsA("BasePart") then
+        return p.WorldPosition
+    end
+    if p:IsA("BasePart") then return p.Position end
+    if p.Parent and p.Parent:IsA("BasePart") then return p.Parent.Position end
+    if p:IsA("Model") then
+        local ok, cf = pcall(function() return p:GetPivot() end)
+        if ok and cf then return cf.Position end
+    end
+    return nil
+end
+
+local function _resolveSwitchPet(pet)
+    if type(pet) ~= "table" then return nil, nil end
+    local uid = pet.uid
+    if not uid and pet.plot and pet.slot then
+        uid = tostring(pet.plot) .. "_" .. tostring(pet.slot)
+        pet.uid = uid
+    end
+    if uid then
+        local ok, pets = pcall(scanAllPets, true)
+        if ok and type(pets) == "table" then
+            local live = _findPetByUid(pets, uid)
+            if live then pet = live end
+        end
+        if type(_G.SabcomStealPetList) == "table" then
+            local listed = _findPetByUid(_G.SabcomStealPetList, uid)
+            if listed then
+                for k, v in pairs(listed) do
+                    if pet[k] == nil then pet[k] = v end
+                end
+            end
+        end
+    end
+
+    if type(_G.SabcomFindStealPrompt) == "function" then
+        local prompt = _G.SabcomFindStealPrompt(pet)
+        local pp = _promptWorldPos(prompt)
+        if pp then
+            pet.position = pp
+            return pet, pp
+        end
+    end
+
+    if pet.model and pet.model.Parent then
+        local part = pet.model.PrimaryPart
+            or pet.model:FindFirstChild("HumanoidRootPart")
+            or pet.model:FindFirstChildWhichIsA("BasePart")
+        if part then
+            pet.position = part.Position
+            return pet, part.Position
+        end
+        local ok, cf = pcall(function() return pet.model:GetPivot() end)
+        if ok and cf and cf.Position then
+            pet.position = cf.Position
+            return pet, cf.Position
+        end
+    end
+
+    if pet.plot and pet.slot then
+        local plots = workspace:FindFirstChild("Plots")
+        local plot = plots and plots:FindFirstChild(tostring(pet.plot))
+        if plot then
+            local model = select(1, _findPodiumModel(plot, tostring(pet.slot)))
+            if model then
+                pet.model = model
+                local ok, cf = pcall(function() return model:GetPivot() end)
+                if ok and cf and cf.Position then
+                    pet.position = cf.Position
+                    return pet, cf.Position
+                end
+            end
+            if type(getPetPosition) == "function" then
+                local pos = getPetPosition(plot, tostring(pet.slot))
+                if pos then
+                    pet.position = pos
+                    return pet, pos
+                end
+            end
+        end
+    end
+
+    local pos = pet.position
+    if typeof(pos) == "Vector3" then
+        return pet, pos
+    end
+    return nil, nil
+end
+
+local function _petWithinGoRange(pet, range)
+    range = tonumber(range) or AUTO_GO_SWITCH_RANGE
+    local _, pos = _resolveSwitchPet(pet)
+    if not pos then return false end
+    local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    return (pos - hrp.Position).Magnitude <= range
+end
+
+local function _canAutoGoOnSwitch(pet)
+    if _G.SabcomAutoGoOnSwitch ~= true then return false end
+    if _G.sabcomTPStop == true or _G.SabcomTPStop == true then return false end
+    if isTeleporting and not (_cloneFired or _G.SabcomCloneFired == true) then return false end
+    return _petWithinGoRange(pet, AUTO_GO_SWITCH_RANGE)
+end
+
+local function goToBrainrotPet(pet)
+    local resolved, pos = _resolveSwitchPet(pet)
+    if not resolved or not pos then return false end
+    _G.__sabcomChosenPet = resolved
+    task.spawn(function()
+        pcall(goToBrainrot, pos)
+    end)
+    return true
+end
+_G.SabcomGoToBrainrotPet = goToBrainrotPet
+
+_G.SabcomTryGoOnTargetSwitch = function(pet)
+    if not _canAutoGoOnSwitch(pet) then return false end
+    return goToBrainrotPet(pet) == true
+end
+
+local _VIM_TP = game:GetService("VirtualInputManager")
+
+
+local function fireGrappleBeforeTP(destino)
+    if type(_G.SabcomFireGrapple2) ~= "function" then
+        _G.Sabcom_Step("TP: grapple avant TP", "SabcomFireGrapple2 indisponible")
+        return false
+    end
+    local g = _waitGrapple(5)
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not char or not hum then
+        _G.Sabcom_Step("TP: grapple avant TP", "pas de perso")
+        return false
+    end
+    local justEquipped = false
+    if not char:FindFirstChild("Grapple Hook") then
+        g = g or findTool("Grapple Hook")
+        if g then
+            pcall(function() hum:EquipTool(g) end)
+            justEquipped = true
+        end
+    end
+    if justEquipped or not char:FindFirstChild("Grapple Hook") then
+        pcall(function()
+            local waitS = math.max(0.05, (tonumber(_G.sabcomGrappleWaitMs) or 200) / 1000)
+            char:WaitForChild("Grapple Hook", waitS)
+        end)
+        local c = LP.Character
+        if c and c ~= char then
+            char = c
+            hum = c:FindFirstChildOfClass("Humanoid")
+            local g2 = findTool("Grapple Hook")
+            if g2 and hum and not char:FindFirstChild("Grapple Hook") then
+                pcall(function() hum:EquipTool(g2) end)
+                justEquipped = true
+                pcall(function() char:WaitForChild("Grapple Hook", 0.4) end)
+            end
+        end
+    end
+    if justEquipped then
+        task.wait((tonumber(_G.sabcomGrappleSettleMs) or 60) / 1000)
+    end
+    local c = LP.Character
+    if not (c and c:FindFirstChild("Grapple Hook")) then
+        _G.Sabcom_Step("TP: grapple avant TP", "hook pas en main")
+        return false
+    end
+    local ok, res = pcall(_G.SabcomFireGrapple2, destino)
+    _G.__sabcomGrapplePrimed = true
+    _G.Sabcom_Step("TP: grapple avant TP", (ok and res) and "OK" or ("echec " .. tostring(res)))
+    RunService.Heartbeat:Wait()
+    RunService.Heartbeat:Wait()
+    return ok and res and true or false
+end
+
+local function _avatarScale(char)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return 1 end
+    local scale = 1
+    pcall(function()
+        scale = math.max(scale,
+            tonumber(hum.BodyHeightScale) or 1,
+            tonumber(hum.BodyDepthScale) or 1,
+            tonumber(hum.BodyWidthScale) or 1,
+            (tonumber(hum.HipHeight) or 2) / 2)
+    end)
+    return math.clamp(scale, 1, 3)
+end
+
+local function _cloneStandPos(hrp, destPos, facingDir)
+    if not (hrp and hrp.Parent and facingDir and facingDir.Magnitude > 0.1) then
+        return destPos
+    end
+    local axis = facingDir.Unit
+    local char = hrp.Parent
+    local base = tonumber(_G.sabcomCloneBackoff) or 0.5
+    local scale = _avatarScale(char)
+    local toPlayer = hrp.Position - destPos
+    local sign = (axis:Dot(toPlayer) >= 0) and 1 or -1
+    local offset = base * scale
+    pcall(function()
+        if char then
+            local _, size = char:GetBoundingBox()
+            if size then
+                local hx = math.abs(axis.X) * size.X * 0.5
+                local hz = math.abs(axis.Z) * size.Z * 0.5
+                offset = math.max(offset, hx + hz + base * 0.5)
+            end
+        end
+    end)
+    return destPos + axis * sign * offset
+end
+
+local function _cloneStandCF(hrp, destPos, facingDir)
+    local stand = _cloneStandPos(hrp, destPos, facingDir)
+    local face = (facingDir and facingDir.Magnitude > 0.1) and facingDir.Unit or Vector3.new(0, 0, -1)
+    return CFrame.new(stand, stand + face)
+end
+
+local function doVelocityTP(forceGrapple, _preScanned)
+    _G.__TP_T0 = os.clock()
+    _G.Sabcom_Step("TP: depart", "pets connus=" .. tostring(_preScanned and #_preScanned or "?"))
+
+    if isTeleporting then return end
+    isTeleporting = true
+    _G.SabcomIsTeleporting = true
+    _cloneTP = false
+    _cloneFired = false
+    _G.SabcomCloneTP = false
+    _G.SabcomCloneFired = false
+    _G.sabcomTPStop = false
+    _G.SabcomPlotGoActive = false
+    if type(_G.SabcomSyncBabySharkTpGlobals) == "function" then pcall(_G.SabcomSyncBabySharkTpGlobals) end
+
+    local char = LP.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then isTeleporting = false; _G.SabcomIsTeleporting = false; return end
+
+    if _inVoid(hrp) or hrp.AssemblyLinearVelocity.Y < -40 then
+        _waitOutOfVoid(12)
+        if _G.sabcomTPStop then isTeleporting = false; _G.SabcomIsTeleporting = false; return end
+        char = LP.Character
+        hrp = char and char:FindFirstChild("HumanoidRootPart")
+        hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then isTeleporting = false; _G.SabcomIsTeleporting = false; return end
+    end
+
+
+    local allPets = _preScanned
+    if type(allPets) ~= "table" or #allPets == 0 then
+        allPets = scanForTP()
+    end
+    if type(allPets) ~= "table" or #allPets == 0 then isTeleporting = false; _G.SabcomIsTeleporting = false; return end
+
+    local function _sameChosen(a, b)
+        if not a or not b then return false end
+        local ua, ub = _petUid(a), _petUid(b)
+        if ua and ub then return ua == ub end
+        return tostring(a.plot) == tostring(b.plot) and tostring(a.slot) == tostring(b.slot)
+    end
+    local function _refreshLocked(lock, list)
+        if not lock then return nil end
+        if type(list) == "table" then
+            for _, p in ipairs(list) do
+                if _sameChosen(p, lock) then return p end
+            end
+        end
+        return lock
+    end
+
+    local pet
+    local _pre = _G.__sabcomChosenPet
+    if _pre and _petAllowed(_pre) then
+        pet = _refreshLocked(_pre, allPets)
+    elseif type(_G.sabcomStealTargetUID) == "string" and _G.sabcomStealTargetUID ~= "" then
+        pet = _findStealTarget(allPets)
+    end
+    if not pet then
+        local list = _buildStealPetList(allPets, _G.SabcomStealMode)
+        pet = list and list[1]
+        if not pet then
+            for _, p in ipairs(allPets) do
+                if _petAllowed(p) then pet = p; break end
+            end
+        end
+    end
+    if pet then
+        _G.__sabcomChosenPet = pet
+    end
+
+    if not pet or not pet.position then isTeleporting = false; _G.SabcomIsTeleporting = false; return end
+
+    local petPos = pet.position
+    local petName = pet.name
+
+
+    local grappled = fireGrappleBeforeTP(petPos)
+
+    _G.sabcomStealHold = true
+    task.delay(15, function() _G.sabcomStealHold = false end)
+
+    local petY = petPos.Y
+    if TALL_PETS[petName] then petY = petPos.Y - TALL_OFFSET end
+
+    local coordTable = (petY > 23.15) and UPPER or LOWER
+
+    local closestData, skyKey = findClosest(petPos, coordTable)
+    if not closestData or not skyKey then _G.sabcomStealHold = false; isTeleporting = false; _G.SabcomIsTeleporting = false; return end
+
+    local destPos = closestData.coord
+
+    local _carpet
+    do
+        local _c = LP.Character
+        local _have = false
+        if _c then
+            for _, n in ipairs(CARPET_NAMES) do
+                local t = _c:FindFirstChild(n)
+                if t and t:IsA("Tool") then _have = true; _carpet = n; break end
+            end
+        end
+        if grappled then
+            if not _have then
+                task.wait(0.06)
+                task.wait(0.06)
+                local _tc = os.clock()
+                repeat
+                    _carpet = equipCarpet()
+                    local c = LP.Character
+                    if _carpet and c and c:FindFirstChild(_carpet) then break end
+                    RunService.Heartbeat:Wait()
+                until os.clock() - _tc > 0.4
+            end
+        else
+            grappled = fireGrappleBeforeTP(petPos)
+            task.wait(0.06)
+            task.wait(0.06)
+            local _tc = os.clock()
+            repeat
+                _carpet = equipCarpet()
+                local c = LP.Character
+                if _carpet and c and c:FindFirstChild(_carpet) then break end
+                RunService.Heartbeat:Wait()
+            until os.clock() - _tc > 0.4
+        end
+    end
+    vZero(hrp)
+
+    local facingDir = closestData.facing == "NORTH" and Vector3.new(0, 0, -1) or Vector3.new(0, 0, 1)
+
+    local _frontApproach = false
+    do
+        local isUpper = (coordTable == UPPER)
+        local idx = getClosestBaseIdx(petPos)
+        local frontCoord, frontFace = buildFrontCandidate(idx, isUpper, hrp.Position.Z)
+        local bestCoord, bestFace = frontCoord, frontFace
+        local bestDist = (hrp.Position - frontCoord).Magnitude
+        local pickedFront = true
+
+
+        local _tb = BASES_LOW[idx]
+        local _isWest = idx <= 4
+        local _rowBlocked = false
+
+
+        local _dx, _dz = hrp.Position.X - _tb.X, hrp.Position.Z - _tb.Z
+        local _distToBase = math.sqrt(_dx * _dx + _dz * _dz)
+        local _sideRange = tonumber(_G.sabcomSideTPRange) or 100
+        if _G.sabcomPreferFrontOnRow ~= false and _distToBase > _sideRange then
+            for i = 1, 8 do
+                if i ~= idx and (i <= 4) == _isWest then
+                    local bz = BASES_LOW[i].Z
+                    if (bz - hrp.Position.Z) * (bz - _tb.Z) < 0 then _rowBlocked = true; break end
+                end
+            end
+        end
+
+        if not _rowBlocked then
+            for _, d in ipairs(plotSides(coordTable, idx)) do
+                local dd = (hrp.Position - d.coord).Magnitude
+                if dd < bestDist then
+                    bestDist = dd
+                    bestCoord = d.coord
+                    bestFace = d.facing == "NORTH" and Vector3.new(0, 0, -1) or Vector3.new(0, 0, 1)
+                    pickedFront = false
+                end
+            end
+        end
+        destPos = bestCoord
+        facingDir = bestFace
+        _frontApproach = pickedFront
+    end
+
+    if facingDir and facingDir.Magnitude > 0.1 and hrp and hrp.Parent then
+        destPos = _cloneStandPos(hrp, destPos, facingDir)
+    end
+
+    local _route = computeRoute(hrp.Position, destPos, facingDir, nil, true)
+    _G.Sabcom_Step("route calculee", "waypoints=" .. tostring(_route and #_route or 0))
+
+    local ASCEND_STEP = 10
+    local _stepped = {}
+    do
+        local prev = hrp.Position
+        for _, wp in ipairs(_route) do
+            local dy = wp.Y - prev.Y
+            if dy > ASCEND_STEP * 1.5 then
+                local n = math.ceil(dy / ASCEND_STEP)
+                for s = 1, n - 1 do
+                    local t = s / n
+                    _stepped[#_stepped + 1] = Vector3.new(
+                        prev.X + (wp.X - prev.X) * t,
+                        prev.Y + dy * t,
+                        prev.Z + (wp.Z - prev.Z) * t
+                    )
+                end
+            end
+            _stepped[#_stepped + 1] = wp
+            prev = wp
+        end
+    end
+    local _mainSpeed = math.clamp(tonumber(_G.TPVelocity) or 400, 200, 750)
+
+    _mainSpeed = _pingAdjustSpeed(_mainSpeed)
+
+
+    _G.Sabcom_Step("VELOCITY: demarre", "vitesse=" .. tostring(math.floor(_mainSpeed)))
+    velMoveThrough(hrp, _stepped, _mainSpeed, true, true)
+    if _G.sabcomTPStop then
+        if hrp and hrp.Parent then vZero(hrp) end
+        _G.sabcomStealHold = false
+        isTeleporting = false; _G.SabcomIsTeleporting = false
+        return
+    end
+
+    do
+        local above = destPos + Vector3.new(0, 16, 0)
+        local _t0 = os.clock()
+        while os.clock() - _t0 < 1.5 do
+            if not hrp or not hrp.Parent then break end
+            if LP:GetAttribute("Stealing") or _G.sabcomTPStop then break end
+            equipCarpet()
+            local d = above - hrp.Position
+            local flat = Vector3.new(d.X, 0, d.Z).Magnitude
+            if flat <= 3 and hrp.Position.Y >= destPos.Y then break end
+            if d.Y > 3 then
+                local _hum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+                if _hum then
+                    local st = _hum:GetState()
+                    if st ~= Enum.HumanoidStateType.Jumping and st ~= Enum.HumanoidStateType.Freefall then
+                        pcall(function() _hum:ChangeState(Enum.HumanoidStateType.Jumping) end)
+                        pcall(function() _hum.Jump = true end)
+                    end
+                end
+            end
+            hrp.Velocity = d.Unit * math.min(320, d.Magnitude * 8)
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    do
+        local _runCap = _frontApproach and (tonumber(_G.sabcomFrontRunIn) or 130) or 400
+        local _t0 = os.clock()
+        while os.clock() - _t0 < 4 do
+            if not hrp or not hrp.Parent then break end
+            if LP:GetAttribute("Stealing") or _G.sabcomTPStop then break end
+            equipCarpet()
+            local diff = destPos - hrp.Position
+            local mag = diff.Magnitude
+            if mag <= 3 then break end
+            if diff.Y > 3 then
+                local _hum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+                if _hum then
+                    local st = _hum:GetState()
+                    if st ~= Enum.HumanoidStateType.Jumping and st ~= Enum.HumanoidStateType.Freefall then
+                        pcall(function() _hum:ChangeState(Enum.HumanoidStateType.Jumping) end)
+                        pcall(function() _hum.Jump = true end)
+                    end
+                end
+            end
+            hrp.Velocity = diff.Unit * math.min(_runCap, mag * 8)
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    if hrp and hrp.Parent and not _G.sabcomTPStop then
+        local _flatOff = Vector3.new(destPos.X - hrp.Position.X, 0, destPos.Z - hrp.Position.Z).Magnitude
+        if _flatOff > 10 then
+            local CRUISE_Y = math.max(destPos.Y, hrp.Position.Y) + 40
+            local function _airborne()
+                local _hum = hrp.Parent and hrp.Parent:FindFirstChildOfClass("Humanoid")
+                if _hum then
+                    local st = _hum:GetState()
+                    if st ~= Enum.HumanoidStateType.Jumping and st ~= Enum.HumanoidStateType.Freefall then
+                        pcall(function() _hum:ChangeState(Enum.HumanoidStateType.Jumping) end)
+                        pcall(function() _hum.Jump = true end)
+                    end
+                end
+            end
+            local _t0 = os.clock()
+            while os.clock() - _t0 < 2 do
+                if not hrp or not hrp.Parent or _G.sabcomTPStop or LP:GetAttribute("Stealing") then break end
+                equipCarpet()
+                local dy = CRUISE_Y - hrp.Position.Y
+                if dy <= 2 then break end
+                _airborne()
+                hrp.Velocity = Vector3.new(0, math.min(240, dy * 8), 0)
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                RunService.Heartbeat:Wait()
+            end
+            _t0 = os.clock()
+            while os.clock() - _t0 < 3 do
+                if not hrp or not hrp.Parent or _G.sabcomTPStop or LP:GetAttribute("Stealing") then break end
+                equipCarpet()
+                local d = Vector3.new(destPos.X - hrp.Position.X, 0, destPos.Z - hrp.Position.Z)
+                if d.Magnitude <= 2.5 then break end
+                _airborne()
+                local lift = math.max(0, CRUISE_Y - hrp.Position.Y) * 4
+                hrp.Velocity = d.Unit * math.min(400, d.Magnitude * 8) + Vector3.new(0, lift, 0)
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                RunService.Heartbeat:Wait()
+            end
+            _t0 = os.clock()
+            while os.clock() - _t0 < 2.5 do
+                if not hrp or not hrp.Parent or _G.sabcomTPStop or LP:GetAttribute("Stealing") then break end
+                equipCarpet()
+                local d = destPos - hrp.Position
+                if d.Magnitude <= 3 then break end
+                hrp.Velocity = d.Unit * math.min(200, d.Magnitude * 6)
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                RunService.Heartbeat:Wait()
+            end
+        end
+    end
+
+
+    if hrp and hrp.Parent then
+        hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + facingDir)
+    end
+    vZero(hrp)
+
+    local syncFrames = 5
+    local syncConn
+    local syncCF = _cloneStandCF(hrp, destPos, facingDir)
+    syncConn = RunService.Heartbeat:Connect(function()
+        if not hrp or not hrp.Parent then syncConn:Disconnect(); return end
+        syncFrames = syncFrames - 1
+        hrp.CFrame = syncCF
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        if syncFrames <= 0 then syncConn:Disconnect() end
+    end)
+
+    for _ = 1, 5 do
+        task.wait(0.02)
+        local _hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") or hum
+        if _hum and _hum.Parent and _hum.FloorMaterial ~= Enum.Material.Air then break end
+        if _G.sabcomTPStop then break end
+    end
+
+    pcall(function() if healConn then healConn:Disconnect() end end)
+    _cloneTP = true
+    _cloneFired = true
+    _G.SabcomCloneTP = true
+    _G.SabcomCloneFired = true
+
+    if _G.sabcomTPStop then _G.sabcomStealHold = false; endTP(); return end
+
+
+    do
+        local stable = 0
+        for _ = 1, 18 do
+            if _G.sabcomTPStop then break end
+            local _hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+            if not _hrp or not _hrp.Parent then break end
+            local flat = (Vector3.new(_hrp.Position.X, 0, _hrp.Position.Z) - Vector3.new(destPos.X, 0, destPos.Z)).Magnitude
+            if flat <= 3.5 and math.abs(_hrp.Position.Y - destPos.Y) <= 4 then
+                stable = stable + 1
+                if stable >= 2 then break end
+            else
+                stable = 0
+                pcall(function() _hrp.CFrame = _cloneStandCF(_hrp, destPos, facingDir) end)
+                _hrp.AssemblyLinearVelocity = Vector3.zero
+                _hrp.AssemblyAngularVelocity = Vector3.zero
+            end
+            RunService.Heartbeat:Wait()
+        end
+    end
+    if _G.sabcomTPStop then _G.sabcomStealHold = false; endTP(); return end
+
+    local _ahrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    local _clonePos = (_ahrp and _ahrp.Parent and _ahrp.Position) or destPos
+
+    local _clonePlat = Instance.new("Part")
+    _clonePlat.Name = "SabcomClonePlatform"
+    _clonePlat.Size = Vector3.new(12, 1, 12)
+    _clonePlat.Position = Vector3.new(_clonePos.X, _clonePos.Y - 3, _clonePos.Z)
+    _clonePlat.Anchored = true
+    _clonePlat.CanCollide = true
+    _clonePlat.Transparency = 1
+    _clonePlat.Material = Enum.Material.SmoothPlastic
+    _clonePlat.Parent = workspace
+
+    if _ahrp and _ahrp.Parent then
+        _ahrp.AssemblyLinearVelocity = Vector3.zero
+        _ahrp.AssemblyAngularVelocity = Vector3.zero
+    end
+
+    local _preClonePos, _preCloneChar
+    do
+        _preCloneChar = LP.Character
+        local _h = _preCloneChar and _preCloneChar:FindFirstChild("HumanoidRootPart")
+        _preClonePos = _h and _h.Position or destPos
+    end
+    local _charAdded = false
+    local _caConn = LP.CharacterAdded:Connect(function() _charAdded = true end)
+    local _cloneHoldConn
+    local function _releaseCloneAnchor()
+        if _cloneHoldConn then
+            pcall(function() _cloneHoldConn:Disconnect() end)
+            _cloneHoldConn = nil
+        end
+        local char = LP.Character
+        local h = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if h then
+            h.Anchored = false
+            local bv = h:FindFirstChild("SabcomCarpetBV")
+            if bv then pcall(function() bv:Destroy() end) end
+        end
+        if hum then
+            pcall(function()
+                hum.PlatformStand = false
+                hum.AutoRotate = true
+            end)
+        end
+    end
+    local function _anchorForClone()
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local rh0 = char and char:FindFirstChild("HumanoidRootPart")
+        if not char or not hum or not rh0 then return end
+
+        if _cloneHoldConn then
+            pcall(function() _cloneHoldConn:Disconnect() end)
+            _cloneHoldConn = nil
+        end
+
+        local anchorCF = _cloneStandCF(rh0, destPos, facingDir)
+
+        _cloneHoldConn = RunService.Heartbeat:Connect(function()
+            local currentChar = LP.Character
+            local rh = currentChar and currentChar:FindFirstChild("HumanoidRootPart")
+            if not rh then return end
+
+            local bv = rh:FindFirstChild("SabcomCarpetBV")
+            if bv then pcall(function() bv:Destroy() end) end
+
+            rh.Anchored = true
+            rh.CFrame = anchorCF
+            rh.AssemblyLinearVelocity = Vector3.zero
+            rh.AssemblyAngularVelocity = Vector3.zero
+
+            local h = currentChar:FindFirstChildOfClass("Humanoid")
+            if h then
+                h.PlatformStand = true
+                h.AutoRotate = false
+            end
+        end)
+    end
+    _anchorForClone()
+
+    _G.sabcomStealHold = false
+
+    task.wait(0.3)
+
+    if not _G.sabcomTPStop then
+        doClone()
+    end
+    if _clonePlat then pcall(function() _clonePlat:Destroy() end); _clonePlat = nil end
+
+
+    do
+        local _t0 = os.clock()
+        repeat
+            if _G.sabcomTPStop then break end
+            if _charAdded then break end
+            if LP.Character ~= _preCloneChar then break end
+            local _h = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+            if _h then
+                local _dx = _h.Position.X - _preClonePos.X
+                local _dz = _h.Position.Z - _preClonePos.Z
+                if (_dx * _dx + _dz * _dz) > 4 then break end
+            end
+            RunService.Heartbeat:Wait()
+        until os.clock() - _t0 > 3
+    end
+    if _caConn then _caConn:Disconnect() end
+    _releaseCloneAnchor()
+
+    if _G.sabcomTPStop then endTP(); return end
+
+
+    do
+        _G.Sabcom_Step("clone: echange termine")
+        local _d = tonumber(_G.sabcomPostCloneDelay) or 0.1
+        if _d > 0 then task.wait(math.min(_d, 0.5)) end
+    end
+
+    _G._curStealSlot = tonumber(pet and pet.slot) or _G._curStealSlot
+
+    _G.SabcomPlotGoActive = true
+    _G.SabcomPlotGoUntil = os.clock() + 120
+
+    goToBrainrot(petPos)
+    pcall(function()
+        _VIM_TP:SendKeyEvent(true, Enum.KeyCode.C, false, game)
+        task.wait(0.05)
+        _VIM_TP:SendKeyEvent(false, Enum.KeyCode.C, false, game)
+    end)
+
+    pcall(function() if healConn then healConn:Disconnect() end end)
+    _lastTPOk = true
+    endTP()
+    return true
+end
+
+local function pickTPWinner(pets)
+    if type(pets) ~= "table" then return nil, false end
+    local man = _G.SabcomManualStealUID
+    if type(man) == "string" and man ~= "" then
+        local locked = _findPetByUid(pets, man)
+        if locked and _petAllowed(locked) then
+            return locked, true
+        end
+    end
+    local mode = tostring(_G.SabcomStealMode or "priority"):lower()
+    local list = _buildStealPetList(pets, mode)
+    local shown = _G.SabcomStealPetList
+    if type(shown) == "table" and shown[1] then
+        local uid = _petUid(shown[1])
+        local live = uid and (_findPetByUid(list, uid) or _findPetByUid(pets, uid))
+        if live and _petAllowed(live) then
+            local hasPriority = (_priIndexOf(live.index) or _priIndexOf(live.name)) ~= nil
+            return live, hasPriority
+        end
+    end
+    local winner = list[1]
+    if not winner or not _petAllowed(winner) then return nil, false end
+    local hasPriority = (_priIndexOf(winner.index) or _priIndexOf(winner.name)) ~= nil
+    return winner, hasPriority
+end
+
+local function launchSideTP(pets, winner)
+    if isTeleporting then return false end
+    if type(pets) ~= "table" or #pets == 0 then return false end
+    local c = LP.Character
+    if not (c and c:FindFirstChild("HumanoidRootPart")) then return false end
+    _G.__sabcomRadarOff = true
+    _G.sabcomFreezeUntil = os.clock() + 10
+    _G.__sabcomChosenPet = winner
+    if winner then
+        _G.Sabcom_Step("cible choisie", tostring(winner.name) .. "  " .. tostring(winner.mps) .. "/s")
+    end
+    _lastTPOk = false
+    local ok, res = pcall(doVelocityTP, false, pets)
+    return ok and res == true
+end
+
+local function runSideTPLaunch(maxWait, checkAuto)
+    local _t0 = os.clock()
+    local _gotOnce = false
+    local _tpDelay = tonumber(_G._stp_tpDelay) or tonumber(_G.TPDelay) or 0
+    local _delayed = false
+    local _readyT = nil
+    local _lastUid = nil
+    maxWait = tonumber(maxWait) or 45
+
+    while os.clock() - _t0 < maxWait do
+        if checkAuto and _G.sabcomAutoTP == false then return end
+        if not isTeleporting then
+            local ok, pets = pcall(scanAllPets, true)
+            if ok and pets and #pets > 0 then
+                if not _gotOnce then _G.Sabcom_Step("1er pet detecte", "#" .. tostring(#pets)) end
+                _gotOnce = true
+                local hasPriority = false
+                local _winner = nil
+                _winner, hasPriority = pickTPWinner(pets)
+                local uid = _winner and (_petUid(_winner) or tostring(_winner.uid or ""))
+                if not (uid and uid ~= "" and uid == _lastUid) then
+                    _lastUid = uid
+                    _readyT = nil
+                end
+                local _c = LP.Character
+                local _carpetOk = false
+                if _c then
+                    for _, n in ipairs(CARPET_NAMES) do
+                        local t = _c:FindFirstChild(n)
+                        if t and t:IsA("Tool") then
+                            _carpetOk = true
+                            if not _G.__seqCarpet then _G.__seqCarpet = true; _G.Sabcom_Step("carpet EN MAIN") end
+                            break
+                        end
+                    end
+                end
+                local _prioNow = hasPriority
+                if _winner and _readyT == nil then
+                    _readyT = os.clock()
+                end
+                local _carpetWait = (tonumber(_G.sabcomCarpetWaitMs) or 200) / 1000
+                if not _carpetOk then pcall(equipCarpet) end
+                local _carpetGate = _carpetOk
+                    or (_readyT ~= nil and (os.clock() - _readyT) >= _carpetWait)
+                local _engageBlock = _carpetEngaging and (os.clock() - _t0) < 6
+                if (not _engageBlock) and _c and _c:FindFirstChild("HumanoidRootPart") and _carpetGate then
+                    if _winner then
+                        if _tpDelay > 0 and not _delayed and not _prioNow then
+                            _delayed = true; task.wait(_tpDelay)
+                            local ok2, pets2 = pcall(scanAllPets, true)
+                            if ok2 and type(pets2) == "table" then
+                                local w2 = pickTPWinner(pets2)
+                                if _petUid(w2) ~= uid then
+                                    _lastUid = _petUid(w2)
+                                    _readyT = nil
+                                else
+                                    pets, _winner = pets2, w2 or _winner
+                                end
+                            end
+                        end
+                        if _winner and _petUid(_winner) == uid then
+                            if launchSideTP(pets, _winner) then
+                                return
+                            end
+                        end
+                        task.wait(0.35)
+                    end
+                end
+            end
+        end
+        RunService.Heartbeat:Wait()
+    end
+end
+
+local _manualTPBusy = false
+local function manualFullTP()
+    if _manualTPBusy then return end
+    _manualTPBusy = true
+    _G.__SabcomCancelAutoTP = true
+    _G.__sabcomChosenPet = nil
+    _G.__sabcomRadarOff = true
+    _G.sabcomTPStop = true
+    _G.SabcomTPStop = true
+    local tWait = os.clock()
+    while isTeleporting and os.clock() - tWait < 1.5 do
+        RunService.Heartbeat:Wait()
+    end
+    isTeleporting = false
+    _G.SabcomIsTeleporting = false
+    _G.sabcomTPStop = false
+    _G.SabcomTPStop = false
+    _G.__sabcomRadarOff = false
+    local tEng = os.clock()
+    while _carpetEngaging and os.clock() - tEng < 6 do
+        RunService.Heartbeat:Wait()
+    end
+    if type(_G.SabcomRefreshStealTarget) == "function" then
+        pcall(_G.SabcomRefreshStealTarget)
+    end
+    local pets
+    local okScan, scanned = pcall(scanAllPets)
+    if okScan then pets = scanned end
+    local winner = pickTPWinner(pets)
+    _G.__sabcomChosenPet = winner
+    pcall(doVelocityTP, false, pets)
+    _manualTPBusy = false
+end
+_G.sabcomStartSideTP = manualFullTP
+
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if _G.SabcomCapturingKey then return end
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    local want = _G._stp_tpKeyName
+    if type(want) ~= "string" or want == "" then want = "T" end
+    if input.KeyCode.Name == want then
+        task.spawn(function() pcall(manualFullTP) end)
+    end
+end)
+
+
+task.spawn(function() pcall(loadModules) end)
+
+
+task.spawn(function()
+    if _G.sabcomAutoTP == false then return end
+    runSideTPLaunch(45, true)
+end)
+
+_G.SabcomStartSideTP = manualFullTP
+
+;(function()
+local P = {
+    SelectedPetData = nil,
+    AllAnimalsCache = nil,
+    DisableStealSpeed = nil,
+    ListNeedsRedraw = true,
+    AdminButtonCache = {},
+    StealSpeedToggleFunc = nil,
+    _ssUpdateBtn = nil,
+    AdminProxBtn = nil,
+    BalloonedPlayers = {},
+    MobileScaleObjects = {},
+    RefreshMobileScale = nil,
+    MobileActionButtons = {},
+    RefreshMobileActionButtons = nil,
+}
+
+local _runSyncScannerTick = function(force)
+    _ensureSyncMod()
+    pcall(_G.SabcomSyncAll)
+    local ok, scanned = pcall(scanAllPets, true)
+    if not ok or type(scanned) ~= "table" then return end
+    if #scanned > 0 then
+        _G.__sabcomEarlyReady = true
+        _G.__sabcomEarlyFrames = (_G.__sabcomEarlyFrames or 0) + 1
+    end
+end
+_G.SabcomRunSyncScanner = _runSyncScannerTick
+_G.SabcomForceResortList = function()
+    local ok, scanned = pcall(scanAllPets, true)
+    if not ok or type(scanned) ~= "table" then return end
+    local list = _buildStealPetList(scanned, _G.SabcomStealMode)
+    _G.SabcomStealPetList = list
+    P.AllAnimalsCache = list
+    if type(_G.SabcomOnStealList) == "function" then
+        pcall(_G.SabcomOnStealList, list)
+    end
+end
+
+local _scanTickLast = 0
+RunService.Heartbeat:Connect(function()
+    if not _G.__sabcomRestReady then return end
+    local now = os.clock()
+    local interval = (_G.__sabcomEarlyReady and 0.2) or 0.15
+    if now - _scanTickLast < interval then return end
+    _scanTickLast = now
+    pcall(_runSyncScannerTick)
+end)
+
+local function _normalizeStealPet(pet)
+    if type(pet) ~= "table" then
+        return nil
+    end
+    if pet.plot ~= nil then
+        pet.plot = tostring(pet.plot)
+    end
+    if pet.slot ~= nil then
+        pet.slot = tostring(pet.slot)
+    end
+    if pet.plot and pet.slot then
+        pet.uid = tostring(pet.plot) .. "_" .. tostring(pet.slot)
+    end
+    return pet
+end
+
+local _intendedStealPet = function(pets)
+    pets = pets or _G.SabcomStealPetList
+    if type(pets) ~= "table" then
+        pets = {}
+    end
+    local man = _G.SabcomManualStealUID
+    if type(man) == "string" and man ~= "" then
+        local pet = _findPetByUid(pets, man)
+        if pet and _petAllowed(pet) then
+            return _normalizeStealPet(pet)
+        end
+        return nil
+    end
+    local mode = tostring(_G.SabcomStealMode or "priority"):lower()
+    if mode == "highest" then
+        mode = "value"
+    end
+    local picked = _pickPetByMode(pets, mode)
+    if picked and _petAllowed(picked) then
+        return _normalizeStealPet(picked)
+    end
+    return nil
+end
+
+local function _applyStealTarget(pet)
+    pet = _normalizeStealPet(pet)
+    if not pet then
+        return nil
+    end
+    if pet.plot and pet.slot then
+        pet.uid = tostring(pet.plot) .. "_" .. tostring(pet.slot)
+    elseif not pet.uid then
+        pet.uid = _petUid(pet)
+    end
+    _G.SabcomStealTarget = pet
+    _G.SabcomSelectedPetData = pet
+    P.SelectedPetData = pet
+    if pet.uid then
+        _G.SabcomStealTargetUID = pet.uid
+    end
+    return pet
+end
+_G.SabcomApplyStealTarget = _applyStealTarget
+
+local function _forceSetPriorityTarget(pets)
+    local best = _intendedStealPet(pets)
+    if not best then
+        _priDbg("noPriPet", "No steal-list pet found")
+        return nil
+    end
+    best = _applyStealTarget(best)
+    if best and _G.__SabcomPriTargetUid ~= best.uid then
+        _G.__SabcomPriTargetUid = best.uid
+        print("[DEBUG] Steal target SET to:", best.uid, best.name)
+        print("[DEBUG] SabcomStealTargetUID:", _G.SabcomStealTargetUID)
+    end
+    return best
+end
+
+local function _selectPriorityTarget(pets)
+    return _forceSetPriorityTarget(pets)
+end
+
+local function _readLoadedStealList()
+    _ensureSyncMod()
+    local list = _G.SabcomStealPetList
+    if type(list) == "table" and #list > 0 then
+        local pet = _intendedStealPet(list)
+        if _stealPetReady(pet) then
+            return list, pet
+        end
+    end
+    local ok, scanned = pcall(scanAllPets, true)
+    if not ok or type(scanned) ~= "table" then
+        return list, nil
+    end
+    list = _buildStealPetList(scanned, _G.SabcomStealMode)
+    _G.SabcomStealPetList = list
+    P.AllAnimalsCache = list
+    return list, _intendedStealPet(list)
+end
+
+local function _waitStealTargetReady(timeout)
+    timeout = tonumber(timeout) or 45
+    local t0 = os.clock()
+    local lastPet, lastPets
+    while os.clock() - t0 < timeout do
+        if _G.SabcomTPStop or _G.__SabcomCancelAutoTP then
+            return nil
+        end
+        local list, pet = _readLoadedStealList()
+        pcall(function()
+            if type(_G.SabcomOnStealList) == "function" then
+                _G.SabcomOnStealList(list or _G.SabcomStealPetList)
+            end
+        end)
+        if _stealPetReady(pet) then
+            return _applyStealTarget(pet), list
+        end
+        lastPet, lastPets = pet, list
+        RunService.Heartbeat:Wait()
+    end
+    if _stealPetReady(lastPet) then
+        return _applyStealTarget(lastPet), lastPets
+    end
+    return nil, lastPets or _G.SabcomStealPetList
+end
+
+local _syncStealFlags = function()
+    local auto = _G.SabcomAutoSteal == true
+    local mode = tostring(_G.SabcomStealMode or "priority"):lower()
+    if mode == "highest" then
+        mode = "value"
+    end
+    _G.NEAREST_INSTANT_MODE = auto and mode == "nearest"
+    local pet = _intendedStealPet(_G.SabcomStealPetList)
+    if pet then
+        _applyStealTarget(pet)
+    end
+    if auto then
+        if pet then
+            P.SelectedPetData = pet
+        elseif type(_G.SabcomManualStealUID) ~= "string" or _G.SabcomManualStealUID == "" then
+            P.SelectedPetData = nil
+        end
+    else
+        P.SelectedPetData = nil
+        _G.NEAREST_INSTANT_MODE = false
+    end
+end
+_G.SabcomSyncNearestInstant = _syncStealFlags
+_G.SabcomSetAutoStealRuntime = function(enabled)
+    _G.SabcomAutoSteal = enabled == true
+    _syncStealFlags()
+end
+_syncStealFlags()
+_G.SabcomAfterTpLoad(function()
+    while task.wait(0.05) do
+        _syncStealFlags()
+    end
+end)
+
+
+pcall(function()
+    if type(fireproximityprompt) ~= "function" then
+        local g = (getgenv and getgenv()) or (getfenv and getfenv())
+        if g then
+            fireproximityprompt = g.fireproximityprompt or g.fireProximityPrompt or g.fire_proximity_prompt
+        end
+    end
+end)
+_G.__SabcomFirePrompt = fireproximityprompt
+
+do
+    local CONFIG = {
+        AUTO_STEAL = false,
+        RADIUS = 75,
+    }
+    local boxes = {
+        {min = Vector3.new(-337.448303, -3.898971, -122.397758), max = Vector3.new(-328.004578, -3.898971, 242.625626)},
+        {min = Vector3.new(-327.257660, -3.899109, -122.228622), max = Vector3.new(-320.600891, -3.899109, 242.612259)},
+        {min = Vector3.new(-319.783386, -3.898970, -122.227089), max = Vector3.new(-312.908325, -3.898970, 242.585617)},
+        {min = Vector3.new(-312.445648, -3.899108, -122.389832), max = Vector3.new(-305.489899, -3.899108, 242.456818)},
+        {min = Vector3.new(-305.037048, -3.898970, -122.230743), max = Vector3.new(-293.957489, -3.898970, 242.606873)},
+        {min = Vector3.new(-491.448608, -3.898972, -122.253258), max = Vector3.new(-481.811737, -3.898972, 242.615005)},
+        {min = Vector3.new(-498.971069, -3.898970, -122.382767), max = Vector3.new(-491.748840, -3.898970, 242.612061)},
+        {min = Vector3.new(-506.436737, -3.898972, -122.411476), max = Vector3.new(-499.318542, -3.898972, 242.615982)},
+        {min = Vector3.new(-513.783569, -3.898972, -122.223297), max = Vector3.new(-506.801849, -3.898972, 242.627090)},
+        {min = Vector3.new(-525.236938, -3.898972, -122.409813), max = Vector3.new(-514.265015, -3.898972, 242.608932)},
+    }
+    local trackedPrompts = {}
+    local lastFire = {}
+    local lastEnableFire = {}
+    local SAFE_POLL_RATE = 0.05
+    local SAFE_POLL_OVERRIDE_UNTIL = 0
+    function _G.getSafePollRate()
+        if os.clock() < SAFE_POLL_OVERRIDE_UNTIL then
+            return 0.27
+        end
+        return SAFE_POLL_RATE
+    end
+    function _G.triggerSafePollBoost()
+        SAFE_POLL_OVERRIDE_UNTIL = os.clock() + 3
+    end
+    local FIRE_DEBOUNCE = 0.12
+    local FIRE_BURST = 4
+    local ENABLE_BURST = 35
+    local ENABLE_DEBOUNCE = 0.00
+    local ENABLE_COOLDOWN = 0.08
+
+    local function getHRP()
+        local char = LP.Character
+        return char and char:FindFirstChild("HumanoidRootPart")
+    end
+
+    local function getBoxIndex(pos)
+        for i, b in ipairs(boxes) do
+            if pos.X >= math.min(b.min.X, b.max.X) and pos.X <= math.max(b.min.X, b.max.X)
+                and pos.Z >= math.min(b.min.Z, b.max.Z) and pos.Z <= math.max(b.min.Z, b.max.Z) then
+                return i
+            end
+        end
+    end
+
+    local function getPromptPosition(prompt)
+        local p = prompt.Parent
+        if not p then return end
+        if p:IsA("Attachment") and p.Parent then p = p.Parent end
+        if p:IsA("BasePart") then return p.Position elseif p:IsA("Model") then return p:GetPivot().Position end
+    end
+
+    local promptMatchesSelectedPet = function(prompt)
+        local promptUid = _promptPetUid(prompt)
+        local man = _G.SabcomManualStealUID
+        if type(man) == "string" and man ~= "" then
+            return promptUid ~= nil and tostring(promptUid) == tostring(man)
+        end
+        local selected = (P and P.SelectedPetData) or _G.SabcomStealTarget or _G.SabcomSelectedPetData
+        if type(selected) ~= "table" then return false end
+        local targetUid = selected.uid or _petUid(selected)
+        if selected.plot and selected.slot then
+            targetUid = tostring(selected.plot) .. "_" .. tostring(selected.slot)
+        end
+        if promptUid and targetUid and tostring(promptUid) == tostring(targetUid) then
+            return true
+        end
+        return false
+    end
+
+    local isPromptAvailable = function(prompt, hrpPos)
+        if _G.SabcomAutoSteal ~= true then return false end
+        if not prompt or not prompt.Parent or not prompt.Enabled then return false end
+        local pos = getPromptPosition(prompt)
+        if not pos then return false end
+        local plots = workspace:FindFirstChild("Plots")
+        if plots then
+            local parentPlot = prompt:FindFirstAncestorWhichIsA("Model")
+            while parentPlot and parentPlot.Parent ~= plots do parentPlot = parentPlot.Parent end
+            if parentPlot then
+                local sign = parentPlot:FindFirstChild("PlotSign")
+                if sign then
+                    local gui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+                    local label = gui and gui:FindFirstChildWhichIsA("TextLabel", true)
+                    if label then
+                        local txt = label.Text:lower()
+                        if txt:find(LP.Name:lower(), 1, true) or txt:find(LP.DisplayName:lower(), 1, true) then
+                            return false
+                        end
+                    end
+                end
+            end
+        end
+        local manLocked = type(_G.SabcomManualStealUID) == "string" and _G.SabcomManualStealUID ~= ""
+        if manLocked or _G.NEAREST_INSTANT_MODE ~= true then
+            if not promptMatchesSelectedPet(prompt) then return false end
+        end
+        return (pos - hrpPos).Magnitude <= (CONFIG.RADIUS or 75)
+    end
+
+    local function canFire(prompt, debounce)
+        local t = os.clock()
+        local last = lastFire[prompt]
+        if last and (t - last) < debounce then return false end
+        lastFire[prompt] = t
+        return true
+    end
+
+    local function firePrompt(prompt, burst, debounce)
+        if not prompt or not prompt.Parent or not prompt.Enabled or not canFire(prompt, debounce) then return end
+        local fireFn = fireproximityprompt or _G.__SabcomFirePrompt
+        if type(fireFn) ~= "function" then return end
+        for _ = 1, burst do
+            pcall(function() fireFn(prompt, 0) end)
+        end
+    end
+
+    local function trackPrompt(prompt)
+        if trackedPrompts[prompt] then return end
+        trackedPrompts[prompt] = true
+        local function tryInstantEnableFire()
+            if _G.SabcomAutoSteal ~= true then return end
+            local hrp = getHRP()
+            if hrp and isPromptAvailable(prompt, hrp.Position) then
+                CONFIG.AUTO_STEAL = true
+                local now = os.clock()
+                local le = lastEnableFire[prompt]
+                if not le or (now - le) >= ENABLE_COOLDOWN then
+                    lastEnableFire[prompt] = now
+                    firePrompt(prompt, ENABLE_BURST, ENABLE_DEBOUNCE)
+                end
+            end
+        end
+        task.defer(tryInstantEnableFire)
+        pcall(function()
+            prompt:GetPropertyChangedSignal("Enabled"):Connect(function()
+                if prompt.Enabled then tryInstantEnableFire() end
+            end)
+        end)
+        prompt.AncestryChanged:Connect(function()
+            if not prompt:IsDescendantOf(workspace) then
+                trackedPrompts[prompt] = nil
+                lastFire[prompt] = nil
+                lastEnableFire[prompt] = nil
+            end
+        end)
+    end
+
+    local function scanBrainrotPrompts()
+        local plots = workspace:FindFirstChild("Plots")
+        if not plots then return end
+        for _, plot in ipairs(plots:GetChildren()) do
+            local podiums = plot:FindFirstChild("AnimalPodiums")
+            if podiums then
+                for _, podium in ipairs(podiums:GetChildren()) do
+                    local prompt = select(1, _stealPromptForSlot(plot, podium.Name))
+                    if prompt then trackPrompt(prompt) end
+                end
+            end
+        end
+    end
+
+    _G.SabcomAfterTpLoad(function()
+        pcall(scanBrainrotPrompts)
+        workspace.DescendantAdded:Connect(function(obj)
+            if obj.ClassName ~= "ProximityPrompt" then return end
+            if obj:FindFirstAncestor("AnimalPodiums") then
+                trackPrompt(obj)
+            end
+        end)
+        task.spawn(function()
+            while task.wait(2) do
+                pcall(scanBrainrotPrompts)
+            end
+        end)
+        task.spawn(function()
+            while task.wait(_G.getSafePollRate()) do
+                _G.NEAREST_INSTANT_MODE = (_G.SabcomAutoSteal == true and tostring(_G.SabcomStealMode or ""):lower() == "nearest")
+                if _G.SabcomAutoSteal == true then
+                    local hrp = getHRP()
+                    if not hrp then
+                        CONFIG.AUTO_STEAL = false
+                    else
+                    local myPos = hrp.Position
+                    local anyAvailable = false
+                    for prompt in pairs(trackedPrompts) do
+                        if isPromptAvailable(prompt, myPos) then
+                            anyAvailable = true
+                            if CONFIG.AUTO_STEAL then
+                                firePrompt(prompt, FIRE_BURST, FIRE_DEBOUNCE)
+                            end
+                        end
+                    end
+                    CONFIG.AUTO_STEAL = anyAvailable
+                    end
+                else
+                    CONFIG.AUTO_STEAL = false
+                end
+            end
+        end)
+    end)
+    _G.SabcomScanBrainrotPrompts = scanBrainrotPrompts
+    _G.SabcomGetBoxIndex = getBoxIndex
+end
+
+do
+    local guiParent
+    pcall(function() guiParent = game:GetService("CoreGui") end)
+    if guiParent then
+        pcall(function()
+            local existing = guiParent:FindFirstChild("AutoStealCurrentTargetHUD")
+            if existing then existing:Destroy() end
+            local pg = LP:FindFirstChild("PlayerGui")
+            local oldPg = pg and pg:FindFirstChild("AutoStealCurrentTargetHUD")
+            if oldPg then oldPg:Destroy() end
+            if gethui then
+                local h = gethui()
+                local oldH = h and h:FindFirstChild("AutoStealCurrentTargetHUD")
+                if oldH and oldH ~= existing then oldH:Destroy() end
+            end
+        end)
+        local hudGui = Instance.new("ScreenGui")
+        hudGui.Name = "AutoStealCurrentTargetHUD"
+        hudGui.ResetOnSpawn = false
+        hudGui.IgnoreGuiInset = true
+        hudGui.DisplayOrder = 998
+        hudGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        hudGui.Parent = guiParent
+        local SKY = Color3.fromRGB(125, 211, 252)
+        local SKY2 = Color3.fromRGB(186, 230, 253)
+        local WHITE = Color3.fromRGB(255, 255, 255)
+        local TRACK = Color3.fromRGB(16, 28, 20)
+        local mobileScale = UIS.TouchEnabled and 0.7 or 1
+        local targetHud = Instance.new("Frame")
+        targetHud.Name = "CurrentTargetHUD"
+        targetHud.AnchorPoint = Vector2.new(0.5, 1)
+        targetHud.Size = UDim2.new(0, 400 * mobileScale, 0, 34 * mobileScale)
+        targetHud.Position = UDim2.new(0.5, 0, 1, -78)
+        targetHud.BackgroundTransparency = 1
+        targetHud.BorderSizePixel = 0
+        targetHud.ZIndex = 70
+        targetHud.Parent = hudGui
+        local hudName = Instance.new("TextLabel", targetHud)
+        hudName.Name = "TargetName"
+        hudName.Size = UDim2.new(1, -56 * mobileScale, 0, 16 * mobileScale)
+        hudName.Position = UDim2.fromOffset(0, 0)
+        hudName.BackgroundTransparency = 1
+        hudName.Font = Enum.Font.GothamBold
+        hudName.TextSize = 14 * mobileScale
+        hudName.TextColor3 = WHITE
+        hudName.TextStrokeColor3 = Color3.new(0, 0, 0)
+        hudName.TextStrokeTransparency = 0.25
+        hudName.TextXAlignment = Enum.TextXAlignment.Left
+        hudName.TextTruncate = Enum.TextTruncate.AtEnd
+        hudName.ZIndex = 72
+        hudName.Text = "STEAL ..."
+        local hudPercent = Instance.new("TextLabel", targetHud)
+        hudPercent.Name = "Percent"
+        hudPercent.Size = UDim2.new(0, 52 * mobileScale, 0, 16 * mobileScale)
+        hudPercent.Position = UDim2.new(1, -52 * mobileScale, 0, 0)
+        hudPercent.BackgroundTransparency = 1
+        hudPercent.Font = Enum.Font.GothamBold
+        hudPercent.TextSize = 14 * mobileScale
+        hudPercent.TextColor3 = SKY
+        hudPercent.TextStrokeColor3 = Color3.new(0, 0, 0)
+        hudPercent.TextStrokeTransparency = 0.25
+        hudPercent.TextXAlignment = Enum.TextXAlignment.Right
+        hudPercent.ZIndex = 74
+        hudPercent.Text = "0%"
+        local hudProgressBg = Instance.new("Frame", targetHud)
+        hudProgressBg.Name = "ProgressBg"
+        hudProgressBg.Size = UDim2.new(1, 0, 0, 7 * mobileScale)
+        hudProgressBg.Position = UDim2.fromOffset(0, 20 * mobileScale)
+        hudProgressBg.BackgroundColor3 = TRACK
+        hudProgressBg.BackgroundTransparency = 0.12
+        hudProgressBg.BorderSizePixel = 0
+        hudProgressBg.ZIndex = 72
+        Instance.new("UICorner", hudProgressBg).CornerRadius = UDim.new(0, 2)
+        local hudProgressBgStroke = Instance.new("UIStroke", hudProgressBg)
+        hudProgressBgStroke.Color = Color3.fromRGB(8, 12, 10)
+        hudProgressBgStroke.Thickness = 1
+        hudProgressBgStroke.Transparency = 0.15
+        local hudProgressFill = Instance.new("Frame", hudProgressBg)
+        hudProgressFill.Name = "ProgressFill"
+        hudProgressFill.Size = UDim2.new(0, 0, 1, 0)
+        hudProgressFill.BackgroundColor3 = SKY
+        hudProgressFill.BorderSizePixel = 0
+        hudProgressFill.ZIndex = 73
+        Instance.new("UICorner", hudProgressFill).CornerRadius = UDim.new(0, 2)
+        local hudProgressFillGradient = Instance.new("UIGradient", hudProgressFill)
+        hudProgressFillGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, SKY),
+            ColorSequenceKeypoint.new(1, SKY2),
+        })
+        local function _stealHudName()
+            local status = _G.Sabcom_StealStatus or {}
+            if status.target and status.target.name and tostring(status.target.name) ~= "" then
+                return tostring(status.target.name)
+            end
+            local p = _G.SabcomStealTarget
+            if type(p) == "table" and p.name and tostring(p.name) ~= "" then
+                return tostring(p.name)
+            end
+            return "..."
+        end
+        RunService.RenderStepped:Connect(function()
+            local nm = _stealHudName()
+            hudName.Text = "STEAL " .. nm
+            hudProgressFill.BackgroundColor3 = SKY
+            if LP:GetAttribute("Stealing") then
+                hudProgressFill.Size = UDim2.new(1, 0, 1, 0)
+                hudPercent.Text = "100%"
+                return
+            end
+            local status = _G.Sabcom_StealStatus or {}
+            if status.active then
+                local p = math.clamp((tick() - (status.start or 0)) / (status.duration or 1.3), 0, 1)
+                hudProgressFill.Size = UDim2.new(p, 0, 1, 0)
+                hudPercent.Text = math.floor(p * 100) .. "%"
+            else
+                hudProgressFill.Size = UDim2.new(0, 0, 1, 0)
+                hudPercent.Text = "0%"
+            end
+        end)
+        _G.SabcomHubStealHud = true
+        _G.SabcomStealBarFill = hudProgressFill
+        _G.SabcomStealBarName = hudName
+        _G.SabcomStealBar = targetHud
+    end
+end
+
+do
+    local wG = Instance.new("Frame")
+    wG.Size = UDim2.new(0, 0, 1, 0)
+    wG.BackgroundTransparency = 0
+    local TweenService = game:GetService("TweenService")
+    local barTween
+    RunService.Heartbeat:Connect(function()
+        if _G.SabcomHubStealHud then return end
+        local fill = _G.SabcomStealBarFill
+        if fill then
+            fill.Size = wG.Size
+            fill.BackgroundTransparency = wG.BackgroundTransparency
+        end
+    end)
+    local MG = setmetatable({}, {
+        __newindex = function(_, k, v)
+            if k == "Text" then
+                if _G.SabcomHubStealHud then return end
+                local lbl = _G.SabcomStealBarName
+                if lbl then lbl.Text = v end
+            end
+        end,
+        __index = function()
+            return ""
+        end,
+    })
+
+    local PromptMemoryCache = {}
+    local InternalStealCache = {}
+    local STEAL_HOLD_DURATION = 1.3
+    local STEAL_PROXIMITY = 60
+    local _stealHoldStart = 0
+    local _stealHoldActive = false
+    local iG, OG = 1, nil
+
+    local function _pushFlags()
+        _syncStealFlags()
+    end
+
+    local function buildStealCallbacks(prompt)
+        if InternalStealCache[prompt] then return end
+        if not prompt or not prompt.Parent then return end
+        local data = { holdCallbacks = {}, triggerCallbacks = {}, holdEndCallbacks = {}, ready = true }
+        local function grab(sig, into)
+            local ok, conns = pcall(getconnections, sig)
+            if ok and type(conns) == "table" then
+                for _, c in ipairs(conns) do
+                    if type(c.Function) == "function" then table.insert(into, c.Function) end
+                end
+            end
+        end
+        grab(prompt.PromptButtonHoldBegan, data.holdCallbacks)
+        grab(prompt.Triggered, data.triggerCallbacks)
+        grab(prompt.PromptButtonHoldEnded, data.holdEndCallbacks)
+        if #data.holdCallbacks > 0 or #data.triggerCallbacks > 0 or #data.holdEndCallbacks > 0 then
+            InternalStealCache[prompt] = data
+        end
+    end
+
+    local function executeStealAsync(prompt)
+        local data = InternalStealCache[prompt]
+        if not data or not data.ready then return false end
+        if _stealHoldActive and (tick() - _stealHoldStart) < (STEAL_HOLD_DURATION + 1) then
+            return false
+        end
+        data.ready = false
+        _stealHoldStart = tick()
+        _stealHoldActive = true
+        _G.Sabcom_StealStatus = _G.Sabcom_StealStatus or {}
+        _G.Sabcom_StealStatus.active = true
+        _G.Sabcom_StealStatus.start = _stealHoldStart
+        _G.Sabcom_StealStatus.duration = tonumber(_G.SabcomStealHoldDuration) or STEAL_HOLD_DURATION
+        task.spawn(function()
+            for _, fn in ipairs(data.holdCallbacks) do task.spawn(fn) end
+            pcall(function()
+                if prompt.InputHoldBegin then prompt:InputHoldBegin() end
+            end)
+            if barTween then pcall(function() barTween:Cancel() end) end
+            wG.Size = UDim2.new(0, 0, 1, 0)
+            wG.BackgroundTransparency = 0
+            local holdDur = tonumber(_G.SabcomStealHoldDuration) or STEAL_HOLD_DURATION
+            barTween = TweenService:Create(wG, TweenInfo.new(holdDur, Enum.EasingStyle.Linear), { Size = UDim2.new(1, 0, 1, 0) })
+            barTween:Play()
+            local remain = holdDur - (tick() - _stealHoldStart)
+            if remain > 0 then task.wait(remain) end
+            if prompt and prompt.Parent then
+                for _, fn in ipairs(data.triggerCallbacks) do task.spawn(fn) end
+                pcall(function()
+                    if prompt.InputHoldEnd then prompt:InputHoldEnd() end
+                end)
+            end
+            for _, fn in ipairs(data.holdEndCallbacks) do task.spawn(fn) end
+            _stealHoldActive = false
+            if _G.Sabcom_StealStatus then _G.Sabcom_StealStatus.active = false end
+            task.wait(0.05)
+            data.ready = true
+        end)
+        return true
+    end
+
+    local findStealPrompt = function(pet)
+        if not pet then return nil end
+        if pet.prompt and pet.prompt.Parent then return pet.prompt end
+        local uid = pet.uid or (pet.plot and pet.slot and (tostring(pet.plot) .. "_" .. tostring(pet.slot)))
+        local cached = uid and PromptMemoryCache[uid]
+        if cached and cached.Parent then return cached end
+        if pet.plot and pet.slot then
+            local plots = workspace:FindFirstChild("Plots")
+            local plot = plots and plots:FindFirstChild(tostring(pet.plot))
+            local podiums = plot and plot:FindFirstChild("AnimalPodiums")
+            local podium = podiums and podiums:FindFirstChild(tostring(pet.slot))
+            if podium then
+                local base = podium:FindFirstChild("Base")
+                local spawn = base and base:FindFirstChild("Spawn")
+                local attach = spawn and spawn:FindFirstChild("PromptAttachment")
+                if attach then
+                    for _, p in ipairs(attach:GetChildren()) do
+                        if p:IsA("ProximityPrompt") then
+                            if uid then PromptMemoryCache[uid] = p end
+                            return p
+                        end
+                    end
+                end
+                for _, d in ipairs(podium:GetDescendants()) do
+                    if d:IsA("ProximityPrompt") then
+                        if uid then PromptMemoryCache[uid] = d end
+                        return d
+                    end
+                end
+            end
+        end
+        if pet.model and pet.model.Parent then
+            for _, d in ipairs(pet.model:GetDescendants()) do
+                if d:IsA("ProximityPrompt") then return d end
+            end
+        end
+        return nil
+    end
+
+    local function _petStillExists(sel, pets)
+        if not sel or type(pets) ~= "table" then return nil end
+        for _, p in ipairs(pets) do
+            if p and p.plot == sel.plot and tostring(p.slot) == tostring(sel.slot) then return p end
+        end
+        return nil
+    end
+
+    local autoGrab = function(prompt)
+        if not prompt or not prompt.Parent or not prompt.Enabled then return false end
+        local fireFn = fireproximityprompt or _G.__SabcomFirePrompt
+        if type(fireFn) ~= "function" then return false end
+        local now = os.clock()
+        if now - (tonumber(_G.__SabcomPriBurstAt) or 0) < 0.08 then return false end
+        _G.__SabcomPriBurstAt = now
+        for _ = 1, 35 do pcall(fireFn, prompt, 0) end
+        return true
+    end
+
+    local function timeUntilCanSteal()
+        if LP:GetAttribute("Stealing") or LP:GetAttribute("IsTrading")
+            or LP:GetAttribute("IsDuelSelecting") or LP:GetAttribute("Web") then
+            return -1
+        end
+        return 0
+    end
+
+    local _stealLastScan = 0
+    RunService.Heartbeat:Connect(function()
+        if not _G.__sabcomRestReady then return end
+        if _G.SabcomAutoSteal ~= true then return end
+        local man = _G.SabcomManualStealUID
+        local pet = _intendedStealPet(_G.SabcomStealPetList)
+        if type(pet) ~= "table" then
+            pet = _G.SabcomStealTarget or _G.SabcomSelectedPetData or (P and P.SelectedPetData)
+        end
+        if type(pet) ~= "table" or not _petAllowed(pet) then return end
+        if type(man) == "string" and man ~= "" then
+            local uid = (pet.plot and pet.slot and (tostring(pet.plot) .. "_" .. tostring(pet.slot))) or tostring(pet.uid or "")
+            if uid ~= man then return end
+        end
+        local now = os.clock()
+        if now - _stealLastScan < 0.067 then return end
+        _stealLastScan = now
+        local t = timeUntilCanSteal()
+        if t == -1 then return end
+        if t > 0 and t > STEAL_HOLD_DURATION then return end
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local prompt = findStealPrompt(pet)
+        if not prompt or not prompt.Parent then return end
+        local pp = prompt.Parent
+        local ppPos = (pp and pp:IsA("BasePart") and pp.Position)
+            or (pp and pp.Parent and pp.Parent:IsA("BasePart") and pp.Parent.Position)
+            or (pp and pp:IsA("Attachment") and pp.Parent and pp.Parent:IsA("BasePart") and pp.Parent.Position)
+        if ppPos and (hrp.Position - ppPos).Magnitude > STEAL_PROXIMITY then return end
+        local oldMax
+        pcall(function() oldMax = prompt.MaxActivationDistance end)
+        pcall(function() prompt.MaxActivationDistance = math.huge end)
+        autoGrab(prompt)
+        buildStealCallbacks(prompt)
+        if InternalStealCache[prompt] then
+            executeStealAsync(prompt)
+        end
+        pcall(function() if oldMax ~= nil then prompt.MaxActivationDistance = oldMax end end)
+        MG.Text = string.format("%s - %s", pet.name or "Unknown", pet.genText or pet.mpsText or "")
+    end)
+
+    local _promptCache = PromptMemoryCache
+    local _stealTarget = nil
+    local hl
+
+    local function _clearPromptCache(plotName)
+        if plotName then
+            local prefix = tostring(plotName) .. "_"
+            for uid in pairs(_promptCache) do
+                if string.sub(tostring(uid), 1, #prefix) == prefix then
+                    _promptCache[uid] = nil
+                end
+            end
+        else
+            table.clear(_promptCache)
+        end
+    end
+
+    local function _watchPlotSign(plot)
+        if not plot or plot:GetAttribute("SabcomPlotWatch") then return end
+        plot:SetAttribute("SabcomPlotWatch", true)
+        task.spawn(function()
+            local sign = plot:WaitForChild("PlotSign", 15)
+            if not sign then return end
+            local function onSignChange()
+                _bustScanCache()
+                _clearPromptCache(plot.Name)
+                if type(_G.SabcomRefreshStealTarget) == "function" then
+                    task.defer(_G.SabcomRefreshStealTarget)
+                end
+            end
+            local gui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+            local label = gui and gui:FindFirstChildWhichIsA("TextLabel", true)
+            if label then
+                label:GetPropertyChangedSignal("Text"):Connect(onSignChange)
+            end
+            sign.DescendantAdded:Connect(function(ch)
+                if ch:IsA("TextLabel") then
+                    ch:GetPropertyChangedSignal("Text"):Connect(onSignChange)
+                end
+            end)
+        end)
+    end
+
+    local plotsFolder = workspace:FindFirstChild("Plots")
+    if plotsFolder then
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            _watchPlotSign(plot)
+        end
+        plotsFolder.ChildAdded:Connect(function(plot)
+            _bustScanCache()
+            _watchPlotSign(plot)
+            task.delay(0.35, function()
+                if type(_G.SabcomRefreshStealTarget) == "function" then
+                    pcall(_G.SabcomRefreshStealTarget)
+                end
+            end)
+        end)
+    end
+
+    Players.PlayerAdded:Connect(function()
+        _bustScanCache()
+        _clearPromptCache()
+        if type(_G.triggerSafePollBoost) == "function" then pcall(_G.triggerSafePollBoost) end
+        for _, delay in ipairs({ 0.35, 1, 2.5, 5 }) do
+            task.delay(delay, function()
+                if type(_G.SabcomRefreshStealTarget) == "function" then
+                    pcall(_G.SabcomRefreshStealTarget)
+                end
+            end)
+        end
+    end)
+
+    local function _samePet(a, b)
+        if not a or not b then return false end
+        return tostring(a.plot) == tostring(b.plot) and tostring(a.slot) == tostring(b.slot)
+    end
+
+    local function _setHighlight(pet)
+        if hl and hl.Parent then
+            if pet and pet.model and hl.Parent == pet.model then return end
+            pcall(function() hl:Destroy() end)
+            hl = nil
+        end
+        if not pet or not pet.model or not pet.model.Parent then return end
+        local h = Instance.new("Highlight")
+        h.Name = "SabcomStealHL"
+        h.FillColor = Color3.fromRGB(200, 200, 200)
+        h.OutlineColor = Color3.fromRGB(255, 255, 255)
+        h.FillTransparency = 0.7
+        h.OutlineTransparency = 0.2
+        h.Adornee = pet.model
+        h.Parent = pet.model
+        hl = h
+    end
+
+    local function armSteal(pet)
+        pet = _normalizeStealPet(pet)
+        _stealTarget = pet
+        _G.SabcomStealTarget = pet
+        _G.SabcomSelectedPetData = pet
+        P.SelectedPetData = pet
+        if pet and pet.uid then
+            _G.SabcomStealTargetUID = pet.uid
+        end
+        _setHighlight(pet)
+        _G.Sabcom_StealStatus = _G.Sabcom_StealStatus or {}
+        _G.Sabcom_StealStatus.target = pet
+        _G.Sabcom_StealStatus.active = false
+        if pet then
+            MG.Text = string.format("%s - %s", pet.name or "Unknown", pet.genText or pet.mpsText or "")
+        end
+        if type(_G.SabcomOnStealTarget) == "function" then pcall(_G.SabcomOnStealTarget, pet) end
+    end
+    local function disarmSteal()
+        _stealTarget = nil
+        _G.SabcomStealTarget = nil
+        _G.SabcomSelectedPetData = nil
+        P.SelectedPetData = nil
+        _setHighlight(nil)
+        wG.Size = UDim2.new(0, 0, 1, 0)
+        _G.Sabcom_StealStatus = _G.Sabcom_StealStatus or {}
+        _G.Sabcom_StealStatus.target = nil
+        _G.Sabcom_StealStatus.active = false
+    end
+    _G.sabcomArmSteal = armSteal
+    _G.sabcomDisarmSteal = disarmSteal
+    _G.SabcomArmSteal = function()
+        _G.SabcomAutoSteal = true
+        if _G.SabcomSetAutoStealRuntime then _G.SabcomSetAutoStealRuntime(true) end
+    end
+    _G.SabcomDisarmSteal = function()
+        _G.SabcomAutoSteal = false
+        if _G.SabcomSetAutoStealRuntime then _G.SabcomSetAutoStealRuntime(false) end
+        disarmSteal()
+    end
+    _G.SabcomFindStealPrompt = findStealPrompt
+    _G.SabcomExecuteStealAsync = executeStealAsync
+    _G.SabcomBuildStealCallbacks = buildStealCallbacks
+
+    local function _updateStealTarget(pets)
+        _pushFlags()
+        if type(pets) ~= "table" then
+            local ok, scanned = pcall(scanAllPets, true)
+            pets = ok and _buildStealPetList(scanned, _G.SabcomStealMode) or {}
+        end
+        local best = _intendedStealPet(pets)
+        if best then
+            best = _applyStealTarget(best)
+            for idx, pet in ipairs(pets) do
+                if _samePet(pet, best) then
+                    iG = idx
+                    OG = _petUid(best)
+                    best.uid = OG
+                    break
+                end
+            end
+            if _G.SabcomAutoSteal == true then
+                if not _samePet(best, _stealTarget) then
+                    armSteal(best)
+                end
+            elseif _stealTarget then
+                _stealTarget = nil
+                _setHighlight(nil)
+                wG.Size = UDim2.new(0, 0, 1, 0)
+            end
+        elseif type(_G.SabcomManualStealUID) == "string" and _G.SabcomManualStealUID ~= "" then
+            return
+        elseif _stealTarget then
+            disarmSteal()
+        end
+    end
+
+    local function _refreshList()
+        local ok, pets = pcall(scanAllPets, true)
+        if not ok or type(pets) ~= "table" then
+            _G.SabcomStealPetList = {}
+            P.AllAnimalsCache = {}
+            if type(_G.SabcomOnStealList) == "function" then pcall(_G.SabcomOnStealList, {}, _stealTarget) end
+            return {}
+        end
+        local list = _buildStealPetList(pets, _G.SabcomStealMode)
+        _G.SabcomStealPetList = list
+        P.AllAnimalsCache = list
+        if type(_G.SabcomOnStealList) == "function" then pcall(_G.SabcomOnStealList, list, _stealTarget) end
+        return list
+    end
+
+    task.spawn(function()
+        while not _G.__sabcomRestReady do task.wait(0.05) end
+        while true do
+            task.wait(0.25)
+            pcall(function()
+                if type(_G.SabcomPaintStealList) == "function" then pcall(_G.SabcomPaintStealList) end
+            end)
+        end
+    end)
+
+    _G.SabcomRefreshStealTarget = function()
+        pcall(function()
+            local pets = _refreshList()
+            if type(pets) ~= "table" or #pets == 0 then
+                local ok, scanned = pcall(scanAllPets, true)
+                if ok and type(scanned) == "table" then
+                    pets = _buildStealPetList(scanned, _G.SabcomStealMode)
+                    _G.SabcomStealPetList = pets
+                    P.AllAnimalsCache = pets
+                end
+            end
+            _updateStealTarget(pets)
+        end)
+    end
+    _G.SabcomSetStealMode = function(mode)
+        mode = tostring(mode or "priority"):lower()
+        if mode ~= "nearest" then mode = "priority" end
+        _G.SabcomManualStealUID = nil
+        if type(_G.SabcomClearTPSync) == "function" then _G.SabcomClearTPSync() end
+        _G.SabcomStealMode = mode
+        _G.SabcomTPMode = mode
+        if type(_G.SabcomSyncNearestInstant) == "function" then pcall(_G.SabcomSyncNearestInstant) end
+        task.defer(function()
+            if type(_G.SabcomRefreshStealTarget) == "function" then pcall(_G.SabcomRefreshStealTarget) end
+            if type(_G.SabcomPaintTgtMode) == "function" then pcall(_G.SabcomPaintTgtMode) end
+            if type(_G.SabcomPaintStealList) == "function" then pcall(_G.SabcomPaintStealList) end
+        end)
+    end
+
+    task.spawn(function()
+        while not _G.__sabcomRestReady do task.wait(0.05) end
+        while task.wait(0.25) do
+            if _G.sabcomIsTeleporting == true or _G.SabcomIsTeleporting == true then
+                continue
+            end
+            pcall(function()
+                local pets = _refreshList()
+                if not LP:GetAttribute("Stealing") then
+                    _updateStealTarget(pets)
+                end
+            end)
+        end
+    end)
+
+    task.defer(function()
+        while not _G.__sabcomRestReady do task.wait(0.05) end
+        _bustScanCache()
+        pcall(_G.SabcomRefreshStealTarget)
+    end)
+end
+end)()
+
+
+task.spawn(function()
+_G.AntiDieDisabled = false
+do
+    local _conn, _diedConn, _hbConn
+
+    local _hardened = nil
+    local _hardenRaw = (function(hum)
+        if hum.BreakJointsOnDeath then hum.BreakJointsOnDeath = false end
+        if hum.RequiresNeck then hum.RequiresNeck = false end
+        hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+    end)
+    local _harden = (function(hum)
+        if _hardened == hum then return end
+        if pcall(_hardenRaw, hum) then _hardened = hum end
+    end)
+    local _revive = (function(hum)
+        pcall(function() hum.Health = hum.MaxHealth end)
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Running) end)
+    end)
+    local _bind = (function()
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        _harden(hum)
+        if _conn then pcall(function() _conn:Disconnect() end) end
+        if _diedConn then pcall(function() _diedConn:Disconnect() end) end
+        if _hbConn then pcall(function() _hbConn:Disconnect() end) end
+        _conn = hum:GetPropertyChangedSignal("Health"):Connect((function()
+            if _G.AntiDieDisabled then return end
+            if hum.Health <= 0 then _revive(hum) end
+        end))
+        _diedConn = hum.Died:Connect((function()
+            if _G.AntiDieDisabled then return end
+            _revive(hum)
+        end))
+        local _lastHarden = 0
+
+        local _adAlive = true
+        _hbConn = { Disconnect = function() _adAlive = false end }
+        local _adTick = (function()
+            if _G.AntiDieDisabled or not hum or not hum.Parent then return end
+            local now = os.clock()
+            if now - _lastHarden >= 0.5 then _lastHarden = now; _harden(hum) end
+            if hum.Health <= 0 then _revive(hum) end
+
+            if _G.SabcomTPHealLock and hum.Health < hum.MaxHealth then
+                pcall(function() hum.Health = hum.MaxHealth end)
+            end
+            local state = hum:GetState()
+            if state == Enum.HumanoidStateType.Dead or state == Enum.HumanoidStateType.Ragdoll
+               or state == Enum.HumanoidStateType.FallingDown then
+                pcall(function() hum:ChangeState(Enum.HumanoidStateType.Running) end)
+            end
+        end)
+        task.spawn(function()
+            while _adAlive do
+                task.wait(tonumber(_G.SabcomAntiDieHz) or 0.1)
+                _adTick()
+            end
+        end)
+    end)
+    _bind()
+    LP.CharacterAdded:Connect(function(char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if hum then _harden(hum) end
+        task.wait(0.1)
+        _bind()
+    end)
+end
+
+do
+    local antiRagdollConnections = {}
+    local antiRagdollCharacter, antiRagdollHumanoid, antiRagdollRootPart, antiRagdollAnimator
+    local lastVelocity = Vector3.new(0, 0, 0)
+    local velocityChangeThreshold = 40
+    local velocityMagnitudeThreshold = 25
+    local maxVelocity = 15
+
+    local function isFlyingCarpetActive()
+        if not antiRagdollCharacter then return false end
+        local tool = antiRagdollCharacter:FindFirstChildWhichIsA("Tool")
+        if not tool then return false end
+        local hrp = antiRagdollCharacter:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            for _, obj in ipairs(hrp:GetChildren()) do
+                if obj:IsA("BodyVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyGyro") then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local function isRagdolled()
+        if not antiRagdollHumanoid then return false end
+        local state = antiRagdollHumanoid:GetState()
+        return state == Enum.HumanoidStateType.Physics
+            or state == Enum.HumanoidStateType.Ragdoll
+            or state == Enum.HumanoidStateType.FallingDown
+            or state == Enum.HumanoidStateType.GettingUp
+    end
+
+    local function enableAntiRagdollControls()
+        pcall(function()
+            local ps = LP:FindFirstChild("PlayerScripts")
+            local PlayerModule = ps and ps:FindFirstChild("PlayerModule")
+            if not PlayerModule then return end
+            require(PlayerModule):GetControls():Enable()
+        end)
+    end
+
+    local function cleanupRagdoll()
+        if not antiRagdollCharacter then return end
+        local carpetEquipped = isFlyingCarpetActive()
+        local function processChildren(parent)
+            for _, obj in ipairs(parent:GetChildren()) do
+                if obj:IsA("BallSocketConstraint") or obj:IsA("NoCollisionConstraint") or obj:IsA("HingeConstraint")
+                    or (obj:IsA("Attachment") and (obj.Name == "A" or obj.Name == "B")) then
+                    obj:Destroy()
+                elseif obj:IsA("BodyVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyGyro") then
+                    if not carpetEquipped then obj:Destroy() end
+                elseif obj:IsA("Motor6D") then
+                    obj.Enabled = true
+                elseif obj:IsA("BasePart") then
+                    for _, child in ipairs(obj:GetChildren()) do
+                        if child:IsA("BallSocketConstraint") or child:IsA("NoCollisionConstraint") or child:IsA("HingeConstraint") or child:IsA("Motor6D") then
+                            if child:IsA("Motor6D") then
+                                child.Enabled = true
+                            else
+                                child:Destroy()
+                            end
+                        elseif child:IsA("Attachment") and (child.Name == "A" or child.Name == "B") then
+                            child:Destroy()
+                        end
+                    end
+                end
+            end
+        end
+        pcall(function() processChildren(antiRagdollCharacter) end)
+        if antiRagdollAnimator then
+            for _, track in pairs(antiRagdollAnimator:GetPlayingAnimationTracks()) do
+                local animName = track.Animation and track.Animation.Name:lower() or ""
+                if animName:find("rag") or animName:find("fall") or animName:find("hurt") or animName:find("down") then
+                    track:Stop(0)
+                end
+            end
+        end
+    end
+
+    local function setupAntiRagdollCharacter(char)
+        antiRagdollCharacter = char
+        antiRagdollHumanoid = char:WaitForChild("Humanoid", 10)
+        antiRagdollRootPart = char:WaitForChild("HumanoidRootPart", 10)
+        antiRagdollAnimator = antiRagdollHumanoid and antiRagdollHumanoid:WaitForChild("Animator", 10)
+        lastVelocity = Vector3.new(0, 0, 0)
+    end
+
+    local function clearAntiRagdollConnections()
+        for _, c in pairs(antiRagdollConnections) do
+            pcall(function() c:Disconnect() end)
+        end
+        antiRagdollConnections = {}
+    end
+
+    local function setupAntiRagdollConnections()
+        clearAntiRagdollConnections()
+        if not antiRagdollHumanoid or not antiRagdollRootPart then return end
+        table.insert(antiRagdollConnections, antiRagdollHumanoid.StateChanged:Connect(function()
+            if isRagdolled() then
+                if not isFlyingCarpetActive() then
+                    pcall(function() antiRagdollHumanoid:ChangeState(Enum.HumanoidStateType.Running) end)
+                end
+                cleanupRagdoll()
+                pcall(function() workspace.CurrentCamera.CameraSubject = antiRagdollHumanoid end)
+                enableAntiRagdollControls()
+            end
+        end))
+        pcall(function()
+            local impulsePath = RS:FindFirstChild("Packages")
+            impulsePath = impulsePath and impulsePath:FindFirstChild("Net")
+            impulsePath = impulsePath and impulsePath:FindFirstChild("RE/CombatService/ApplyImpulse")
+            if impulsePath then
+                table.insert(antiRagdollConnections, impulsePath.OnClientEvent:Connect(function()
+                    if isRagdolled() and antiRagdollRootPart then
+                        antiRagdollRootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    end
+                end))
+            end
+        end)
+        table.insert(antiRagdollConnections, antiRagdollCharacter.DescendantAdded:Connect(function()
+            if isRagdolled() then cleanupRagdoll() end
+        end))
+        table.insert(antiRagdollConnections, RunService.Heartbeat:Connect(function()
+            if not isRagdolled() or not antiRagdollRootPart then return end
+            cleanupRagdoll()
+            local velocity = antiRagdollRootPart.AssemblyLinearVelocity
+            if (velocity - lastVelocity).Magnitude > velocityChangeThreshold
+                and velocity.Magnitude > velocityMagnitudeThreshold then
+                antiRagdollRootPart.AssemblyLinearVelocity = velocity.Unit * math.min(velocity.Magnitude, maxVelocity)
+            end
+            lastVelocity = velocity
+        end))
+        enableAntiRagdollControls()
+        cleanupRagdoll()
+    end
+
+    LP.CharacterAdded:Connect(function(char)
+        clearAntiRagdollConnections()
+        antiRagdollCharacter = nil
+        antiRagdollHumanoid = nil
+        antiRagdollRootPart = nil
+        antiRagdollAnimator = nil
+        local humanoid = char:WaitForChild("Humanoid", 10)
+        local rootPart = char:WaitForChild("HumanoidRootPart", 10)
+        if not humanoid or not rootPart then return end
+        task.wait(0.2)
+        setupAntiRagdollCharacter(char)
+        setupAntiRagdollConnections()
+    end)
+    if LP.Character then
+        task.spawn(function()
+            setupAntiRagdollCharacter(LP.Character)
+            setupAntiRagdollConnections()
+        end)
+    end
+end
+
+do
+    local Lighting = game:GetService("Lighting")
+    local ab = {
+        connections = {},
+        originalMoveFunction = nil,
+        controlsProtected = false,
+        badLightingNames = { Blue = true, DiscoEffect = true, BeeBlur = true, ColorCorrection = true },
+    }
+    local function nuke(obj)
+        if not obj or not obj.Parent then return end
+        if ab.badLightingNames[obj.Name] then
+            pcall(function() obj:Destroy() end)
+        end
+    end
+    local function protectControls()
+        if ab.controlsProtected then return end
+        pcall(function()
+            local PlayerScripts = LP:FindFirstChild("PlayerScripts")
+            local PlayerModule = PlayerScripts and PlayerScripts:FindFirstChild("PlayerModule")
+            if not PlayerModule then return end
+            local Controls = require(PlayerModule):GetControls()
+            if not Controls then return end
+            if not ab.originalMoveFunction then ab.originalMoveFunction = Controls.moveFunction end
+            local function protectedMoveFunction(self, moveVector, relativeToCamera)
+                if ab.originalMoveFunction then ab.originalMoveFunction(self, moveVector, relativeToCamera) end
+            end
+            table.insert(ab.connections, RunService.Heartbeat:Connect(function()
+                if _G._isTpMoving then return end
+                if Controls.moveFunction ~= protectedMoveFunction then
+                    Controls.moveFunction = protectedMoveFunction
+                end
+            end))
+            Controls.moveFunction = protectedMoveFunction
+            ab.controlsProtected = true
+        end)
+    end
+    local _beeScript, _beeNext = nil, 0
+    local blockBuzzingSound = function()
+        pcall(function()
+            if not _beeScript or not _beeScript.Parent then
+                local now = os.clock()
+                if now < _beeNext then return end
+                _beeNext = now + 2
+                local ps = LP:FindFirstChild("PlayerScripts")
+                _beeScript = ps and ps:FindFirstChild("Bee")
+            end
+            if not _beeScript then return end
+            local buzzing = _beeScript:FindFirstChild("Buzzing")
+            if buzzing and buzzing:IsA("Sound") then
+                buzzing:Stop()
+                buzzing.Volume = 0
+            end
+        end)
+    end
+    protectControls()
+    task.spawn(function()
+        for _ = 1, 20 do
+            if ab.controlsProtected then return end
+            protectControls()
+            task.wait(0.25)
+        end
+    end)
+    _G.SabcomAfterTpLoad(function()
+        pcall(function()
+            for _, inst in ipairs(Lighting:GetDescendants()) do nuke(inst) end
+        end)
+        table.insert(ab.connections, Lighting.DescendantAdded:Connect(nuke))
+        table.insert(ab.connections, RunService.Heartbeat:Connect(blockBuzzingSound))
+    end)
+end
+
+do
+    local xrayOriginal = setmetatable({}, { __mode = "k" })
+    local xrayConns = {}
+    local xrayLoopId = 0
+    local XRAY_ALPHA = 0.5
+    local XRAY_FOLDERS = { "Base", "PlotSign", "FriendPanel", "Cash", "Laser", "Decorations", "Skin", "Unlock", "Purchases" }
+    local function setTransparency(instance, alpha, loopId)
+        if not instance or loopId ~= xrayLoopId then return end
+        local function apply(obj)
+            if not obj:IsA("BasePart") then return end
+            if xrayOriginal[obj] == nil then
+                xrayOriginal[obj] = (obj.Transparency == alpha) and 0 or obj.Transparency
+            end
+            local orig = xrayOriginal[obj]
+            if orig < 1 then
+                local target = orig + (1 - orig) * alpha
+                if math.abs(obj.Transparency - target) > 0.01 then obj.Transparency = target end
+            end
+        end
+        apply(instance)
+        for i, child in ipairs(instance:GetDescendants()) do
+            apply(child)
+            if i % 400 == 0 then
+                if loopId ~= xrayLoopId then return end
+            end
+        end
+    end
+    local function trackSubtree(root, alpha, loopId)
+        if not root or loopId ~= xrayLoopId then return end
+        setTransparency(root, alpha, loopId)
+        xrayConns[#xrayConns + 1] = root.DescendantAdded:Connect(function(obj)
+            if loopId == xrayLoopId then setTransparency(obj, alpha, loopId) end
+        end)
+    end
+    local function processPlot(plot, alpha, loopId)
+        if not plot or loopId ~= xrayLoopId then return end
+        for _, fname in ipairs(XRAY_FOLDERS) do
+            trackSubtree(plot:FindFirstChild(fname), alpha, loopId)
+        end
+        xrayConns[#xrayConns + 1] = plot.ChildAdded:Connect(function(child)
+            if loopId ~= xrayLoopId then return end
+            for _, fname in ipairs(XRAY_FOLDERS) do
+                if child.Name == fname then trackSubtree(child, alpha, loopId); break end
+            end
+        end)
+        local podiums = plot:FindFirstChild("AnimalPodiums")
+        if not podiums then return end
+        local function processPodium(podium)
+            for _, child in ipairs(podium:GetChildren()) do
+                if child.Name == "Claim" then
+                    trackSubtree(child, alpha, loopId)
+                elseif child.Name == "Base" then
+                    trackSubtree(child:FindFirstChild("Decorations"), alpha, loopId)
+                elseif child:IsA("Model") and child.Name ~= "Decorations" then
+                    trackSubtree(child, alpha, loopId)
+                end
+            end
+        end
+        for _, podium in ipairs(podiums:GetChildren()) do processPodium(podium) end
+        xrayConns[#xrayConns + 1] = podiums.ChildAdded:Connect(function(podium)
+            if loopId == xrayLoopId then processPodium(podium) end
+        end)
+    end
+    local function enableXray()
+        for _, c in ipairs(xrayConns) do
+            if typeof(c) == "RBXScriptConnection" then pcall(function() c:Disconnect() end) end
+        end
+        xrayConns = {}
+        xrayLoopId = xrayLoopId + 1
+        local id = xrayLoopId
+        local plotsFolder = workspace:FindFirstChild("Plots")
+        if not plotsFolder then return end
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            if id ~= xrayLoopId then return end
+            processPlot(plot, XRAY_ALPHA, id)
+        end
+        xrayConns[#xrayConns + 1] = plotsFolder.ChildAdded:Connect(function(plot)
+            if id == xrayLoopId then processPlot(plot, XRAY_ALPHA, id) end
+        end)
+    end
+    local function disableXray()
+        for _, c in ipairs(xrayConns) do
+            if typeof(c) == "RBXScriptConnection" then pcall(function() c:Disconnect() end) end
+        end
+        xrayConns = {}
+        xrayLoopId = xrayLoopId + 1
+        local snapshot = xrayOriginal
+        xrayOriginal = setmetatable({}, { __mode = "k" })
+        for obj, orig in pairs(snapshot) do
+            pcall(function() if obj:IsA("BasePart") then obj.Transparency = orig end end)
+        end
+    end
+    _G.SabcomEnableXray = enableXray
+    _G.SabcomDisableXray = disableXray
+    local function applyXrayIfEnabled()
+        if _G.SabcomXray ~= true then return false end
+        local plotsFolder = workspace:FindFirstChild("Plots")
+        if plotsFolder then
+            pcall(enableXray)
+            return true
+        end
+        return false
+    end
+    local xrayRetrying = false
+    local function startXrayRetry()
+        if _G.SabcomXray ~= true then return end
+        if applyXrayIfEnabled() then return end
+        if xrayRetrying then return end
+        xrayRetrying = true
+        task.spawn(function()
+            local t0 = os.clock()
+            local childConn
+            childConn = workspace.ChildAdded:Connect(function(ch)
+                if ch.Name == "Plots" and _G.SabcomXray == true then
+                    pcall(enableXray)
+                end
+            end)
+            while _G.SabcomXray == true and os.clock() - t0 < 45 do
+                if applyXrayIfEnabled() then break end
+                task.wait(0.25)
+            end
+            if childConn then pcall(function() childConn:Disconnect() end) end
+            xrayRetrying = false
+        end)
+    end
+    _G.SabcomApplyXrayIfEnabled = applyXrayIfEnabled
+    _G.SabcomStartXrayRetry = startXrayRetry
+    if _G.SabcomXray == true then
+        startXrayRetry()
+        _G.SabcomAfterTpLoad(function()
+            if _G.SabcomXray == true then pcall(startXrayRetry) end
+        end)
+    end
+end
+
+do
+    local clonerefFn = cloneref or function(o) return o end
+    local TurretPlayers = clonerefFn(game:GetService("Players"))
+    local TurretWorkspace = clonerefFn(game:GetService("Workspace"))
+    local turretLp = LP
+    local autoTurretEnabled = false
+    local turretConns = {}
+    local turretLoopRunning = false
+    local turretAttackBusy = setmetatable({}, { __mode = "k" })
+    local turretAttackQueued = setmetatable({}, { __mode = "k" })
+    local turretAttackCD = setmetatable({}, { __mode = "k" })
+    local turretAttackActive = false
+    local TURRET_RETRY_DELAY = 0.3
+    local function isEnemyTurret(obj)
+        if not obj or not obj:IsA("BasePart") then return false end
+        local ownerId = obj.Name:match("^Sentry_(%d+)$")
+        return ownerId ~= nil and ownerId ~= tostring(turretLp.UserId)
+    end
+    local function setTurretNoClip(turret)
+        if not isEnemyTurret(turret) then return end
+        pcall(function() turret.CanCollide = false end)
+    end
+    local function getTurretTimeLabel(turret)
+        if not turret or not turret.Parent then return nil end
+        local sf = turret:FindFirstChild("SetupFrame")
+        local mf = sf and sf:FindFirstChild("MainFrame")
+        local lbl = mf and mf:FindFirstChild("Time")
+        if lbl and lbl:IsA("TextLabel") then return lbl end
+        return nil
+    end
+    local function shouldAttackTurret(turret)
+        if not turretLp then return false end
+        if turretLp:GetAttribute("Stealing") ~= nil then return false end
+        if not isEnemyTurret(turret) then return false end
+        setTurretNoClip(turret)
+        local lbl = getTurretTimeLabel(turret)
+        if not lbl then return false end
+        local ok, text = pcall(function() return lbl.Text end)
+        if not ok then return false end
+        text = tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        return text ~= "" and string.find(text, "^%d+s!$") ~= nil
+    end
+    local function bringTurretInFront(turret, hrp)
+        if not turret or not hrp then return end
+        local fwd = hrp.CFrame.LookVector
+        local pos = hrp.Position + fwd * 4 + Vector3.new(0, 1.2, 0)
+        local cf = CFrame.lookAt(pos, pos + fwd)
+        pcall(function()
+            hrp.Velocity = Vector3.zero
+            turret.RotVelocity = Vector3.zero
+        end)
+        pcall(function() turret.CFrame = cf end)
+    end
+    local function attackTurret(turret)
+        local now = os.clock()
+        if turretAttackBusy[turret] or turretAttackQueued[turret]
+        or turretAttackActive or not shouldAttackTurret(turret) then return end
+        if (turretAttackCD[turret] or 0) > now then return end
+        turretAttackQueued[turret] = true
+        turretAttackCD[turret] = now + TURRET_RETRY_DELAY
+        task.spawn(function()
+            turretAttackQueued[turret] = nil
+            if turretAttackActive or turretAttackBusy[turret]
+            or not shouldAttackTurret(turret) then return end
+            turretAttackActive = true
+            turretAttackBusy[turret] = true
+            pcall(function()
+                local attempts = 0
+                while attempts < 12 and autoTurretEnabled do
+                    if not turret or not turret.Parent or not shouldAttackTurret(turret) then break end
+                    local char = turretLp.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if not hrp or not hum or hum.Health <= 0 then break end
+                    local okD, dist = pcall(function() return (turret.Position - hrp.Position).Magnitude end)
+                    if okD and dist > 220 then break end
+                    setTurretNoClip(turret)
+                    bringTurretInFront(turret, hrp)
+                    if not turret or not turret.Parent or not shouldAttackTurret(turret) then break end
+                    local bp = turretLp:FindFirstChild("Backpack")
+                    local bat = char:FindFirstChild("Bat") or (bp and bp:FindFirstChild("Bat"))
+                    if bat and bat.Parent ~= char then
+                        pcall(function() hum:EquipTool(bat) end)
+                    end
+                    bat = char:FindFirstChild("Bat") or bat
+                    if bat then pcall(function() bat:Activate() end) end
+                    task.wait(0.03)
+                    if turret and turret.Parent and shouldAttackTurret(turret) then
+                        setTurretNoClip(turret)
+                        bringTurretInFront(turret, hrp)
+                    end
+                    attempts = attempts + 1
+                    task.wait(0.09)
+                end
+            end)
+            turretAttackBusy[turret] = nil
+            turretAttackActive = false
+        end)
+    end
+    local function disconnectTurretAll()
+        for _, c in ipairs(turretConns) do pcall(function() c:Disconnect() end) end
+        turretConns = {}
+    end
+    local function startAutoTurret()
+        disconnectTurretAll()
+        table.insert(turretConns, TurretWorkspace.DescendantAdded:Connect(function(obj)
+            if isEnemyTurret(obj) then setTurretNoClip(obj) end
+            if autoTurretEnabled and shouldAttackTurret(obj) then
+                task.defer(attackTurret, obj)
+            end
+        end))
+        if not turretLoopRunning then
+            turretLoopRunning = true
+            task.spawn(function()
+                while autoTurretEnabled do
+                    task.wait(0.4)
+                    for _, obj in ipairs(TurretWorkspace:GetChildren()) do
+                        if isEnemyTurret(obj) then setTurretNoClip(obj) end
+                        if autoTurretEnabled and shouldAttackTurret(obj) then attackTurret(obj) end
+                    end
+                end
+                turretLoopRunning = false
+            end)
+        end
+    end
+    _G.SabcomSetAutoTurret = function(state)
+        autoTurretEnabled = state == true
+        if autoTurretEnabled then startAutoTurret() else disconnectTurretAll() end
+    end
+    if _G.SabcomAutoTurret == true then
+        _G.SabcomAfterTpLoad(function()
+            if _G.SabcomAutoTurret == true then pcall(_G.SabcomSetAutoTurret, true) end
+        end)
+    end
+end
+
+do
+    local Lighting = game:GetService("Lighting")
+    local conns = {}
+    local on = false
+    local function disc()
+        for _, c in ipairs(conns) do
+            if typeof(c) == "RBXScriptConnection" then pcall(function() c:Disconnect() end) end
+        end
+        conns = {}
+    end
+    local function protected(obj)
+        if not obj then return true end
+        if obj:IsA("ScreenGui") or obj:FindFirstAncestorOfClass("ScreenGui") then return true end
+        if obj:FindFirstAncestor("AnimalPodiums") then return true end
+        local m = obj:FindFirstAncestorOfClass("Model")
+        if m and Players:GetPlayerFromCharacter(m) then return true end
+        if obj:IsA("Tool") or obj:FindFirstAncestorOfClass("Tool") then return true end
+        if obj:IsA("ProximityPrompt") then return true end
+        return false
+    end
+    local function strip(obj)
+        if protected(obj) then return end
+        pcall(function()
+            if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam")
+                or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+                obj.Enabled = false
+            elseif obj:IsA("BloomEffect") or obj:IsA("BlurEffect") or obj:IsA("SunRaysEffect")
+                or obj:IsA("DepthOfFieldEffect") or obj:IsA("ColorCorrectionEffect") then
+                obj.Enabled = false
+            elseif obj:IsA("Atmosphere") or obj:IsA("Clouds") then
+                obj:Destroy()
+            elseif obj:IsA("Texture") or obj:IsA("Decal") then
+                if not (obj.Name == "face" and obj.Parent and obj.Parent.Name == "Head") then
+                    obj:Destroy()
+                end
+            elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+                obj.Enabled = false
+            elseif obj:IsA("BasePart") then
+                obj.CastShadow = false
+                obj.Material = Enum.Material.Plastic
+                obj.Reflectance = 0
+            end
+        end)
+    end
+    local function lightingOn()
+        pcall(function()
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            Lighting.FogStart = 9e9
+            Lighting.EnvironmentDiffuseScale = 0
+            Lighting.EnvironmentSpecularScale = 0
+            Lighting.Brightness = 1.5
+            Lighting.Ambient = Color3.fromRGB(70, 70, 70)
+            for _, v in ipairs(Lighting:GetChildren()) do
+                if v:IsA("PostEffect") then v.Enabled = false
+                elseif v:IsA("Atmosphere") or v:IsA("Clouds") then v:Destroy() end
+            end
+        end)
+        pcall(function()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        end)
+        pcall(setfpscap, 999)
+    end
+    local function lightingOff()
+        pcall(function()
+            Lighting.GlobalShadows = true
+            Lighting.FogEnd = 100000
+            Lighting.EnvironmentDiffuseScale = 1
+            Lighting.EnvironmentSpecularScale = 1
+        end)
+        pcall(function()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+        end)
+    end
+    local function enable()
+        if on then return end
+        on = true
+        disc()
+        lightingOn()
+        task.spawn(function()
+            local desc = workspace:GetDescendants()
+            for i, obj in ipairs(desc) do
+                if not on then return end
+                strip(obj)
+                if i % 80 == 0 then task.wait() end
+            end
+        end)
+        conns[#conns + 1] = workspace.DescendantAdded:Connect(function(obj)
+            if on then strip(obj) end
+        end)
+        conns[#conns + 1] = Lighting.DescendantAdded:Connect(function(obj)
+            if not on then return end
+            if obj:IsA("PostEffect") then pcall(function() obj.Enabled = false end)
+            elseif obj:IsA("Atmosphere") or obj:IsA("Clouds") then pcall(function() obj:Destroy() end) end
+        end)
+    end
+    local function disable()
+        on = false
+        disc()
+        lightingOff()
+    end
+    _G.SabcomSetSuperOptimizer = function(v)
+        if v then enable() else disable() end
+    end
+end
+
+do
+    local fired = false
+    local watchConns = {}
+    local function extractCode(s)
+        s = tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if s == "" then return "" end
+        return s:match("[?&]privateServerLinkCode=([^&]+)")
+            or s:match("[?&]linkCode=([^&]+)")
+            or s:match("[?&]code=([^&]+)")
+            or s
+    end
+    local function kickToPs()
+        local code = extractCode(_G.SabcomPSCode)
+        if code == "" then return false end
+        local launched = false
+        pcall(function()
+            game:GetService("ExperienceService"):LaunchExperience({
+                placeId = game.PlaceId,
+                linkCode = code,
+            })
+            launched = true
+        end)
+        if not launched then
+            pcall(function()
+                game:GetService("TeleportService"):TeleportToPrivateServer(game.PlaceId, code, {LP})
+                launched = true
+            end)
+        end
+        return launched
+    end
+    local function doKick(fromSteal)
+        if fromSteal and _G.SabcomKickToPS ~= false then
+            task.delay(0.2, function()
+                if not kickToPs() then
+                    pcall(function() game:Shutdown() end)
+                    pcall(function() LP:Kick("") end)
+                end
+            end)
+            return
+        end
+        pcall(function() game:Shutdown() end)
+        pcall(function() LP:Kick("") end)
+    end
+    local function stopWatch()
+        for _, c in ipairs(watchConns) do
+            if typeof(c) == "RBXScriptConnection" then pcall(function() c:Disconnect() end) end
+        end
+        watchConns = {}
+    end
+    local function checkText(t)
+        if _G.SabcomAutoKick ~= true or fired then return end
+        if string.find(string.lower(tostring(t or "")), "you stole", 1, true) then
+            fired = true
+            doKick(true)
+        end
+    end
+    local function hookObj(obj)
+        if not (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) then return end
+        checkText(obj.Text)
+        watchConns[#watchConns + 1] = obj:GetPropertyChangedSignal("Text"):Connect(function()
+            checkText(obj.Text)
+        end)
+    end
+    local function watchRoot(root)
+        if not root then return end
+        for _, obj in ipairs(root:GetDescendants()) do hookObj(obj) end
+        watchConns[#watchConns + 1] = root.DescendantAdded:Connect(hookObj)
+    end
+    local function startWatch()
+        stopWatch()
+        fired = false
+        local pg = LP:FindFirstChild("PlayerGui")
+        if not pg then return end
+        for _, g in ipairs(pg:GetChildren()) do watchRoot(g) end
+        watchConns[#watchConns + 1] = pg.ChildAdded:Connect(watchRoot)
+    end
+    _G.SabcomDoKick = function(fromSteal)
+        fired = false
+        doKick(fromSteal == true)
+    end
+    _G.SabcomSetAutoKick = function(on)
+        if on then startWatch() else stopWatch(); fired = false end
+    end
+    if _G.SabcomAutoKick == true then
+        _G.SabcomAfterTpLoad(function()
+            if _G.SabcomAutoKick == true then pcall(startWatch) end
+        end)
+    end
+end
+
+do
+    local Cam = workspace.CurrentCamera
+    local RecoveryInProgress = false
+    local animPlaying = false
+    local tracks, folderConnections = {}, {}
+    local clone, oldRoot, hip, connection
+    local serverGhosts = {}
+    local lastLagbackTime, lagbackCallCount, lagbackWindowStart = 0, 0, 0
+    local errorOrbActive = false
+    local _invisToggleCooldown = 0
+    local visKeepConn, descVisConn
+
+    local function hideDecoyRoot()
+        if oldRoot and oldRoot.Parent then
+            pcall(function()
+                oldRoot.LocalTransparencyModifier = 1
+                oldRoot.Transparency = 1
+            end)
+        end
+    end
+
+    local function showLocalCharacter(character)
+        if not character then return end
+        for _, inst in ipairs(character:GetDescendants()) do
+            pcall(function()
+                if inst:IsA("BasePart") then
+                    inst.LocalTransparencyModifier = 0
+                end
+            end)
+        end
+        if clone and clone.Parent then
+            pcall(function() clone.LocalTransparencyModifier = 0 end)
+        end
+    end
+
+    local function startKeepSelfVisible(character)
+        if visKeepConn then visKeepConn:Disconnect(); visKeepConn = nil end
+        if descVisConn then descVisConn:Disconnect(); descVisConn = nil end
+        if character then
+            descVisConn = character.DescendantAdded:Connect(function(inst)
+                if not animPlaying then return end
+                if inst:IsA("BasePart") then
+                    pcall(function() inst.LocalTransparencyModifier = 0 end)
+                end
+            end)
+        end
+        visKeepConn = RunService.RenderStepped:Connect(function()
+            if not animPlaying then return end
+            showLocalCharacter(LP.Character)
+            hideDecoyRoot()
+        end)
+        showLocalCharacter(character)
+        hideDecoyRoot()
+    end
+
+    local function stopKeepSelfVisible()
+        if visKeepConn then visKeepConn:Disconnect(); visKeepConn = nil end
+        if descVisConn then descVisConn:Disconnect(); descVisConn = nil end
+    end
+
+    local function clearAllGhosts()
+        for _, g in pairs(serverGhosts) do pcall(function() if g and g.Parent then g:Destroy() end end) end
+        serverGhosts = {}
+        lagbackCallCount = 0
+        lastLagbackTime = 0
+        errorOrbActive = false
+        pcall(function()
+            if Cam then
+                for _, c in pairs(Cam:GetChildren()) do
+                    if c.Name == "LagbackGhost" then c:Destroy() end
+                end
+            end
+        end)
+    end
+    local function createServerGhost(position)
+        if errorOrbActive then return end
+        local now = tick()
+        if now - lastLagbackTime < 0.05 then return end
+        lastLagbackTime = now
+        if now - lagbackWindowStart > 1 then lagbackCallCount = 0; lagbackWindowStart = now end
+        lagbackCallCount = lagbackCallCount + 1
+        if lagbackCallCount >= 7 then errorOrbActive = true; return end
+        for _, g in pairs(serverGhosts) do if g and g.Parent then g:Destroy() end end
+        serverGhosts = {}
+        local ghost = Instance.new("Part")
+        ghost.Name = "LagbackGhost"
+        ghost.Shape = Enum.PartType.Ball
+        ghost.Size = Vector3.new(3, 3, 3)
+        ghost.Color = Color3.fromRGB(151, 133, 234)
+        ghost.Material = Enum.Material.Glass
+        ghost.Transparency = 0.3
+        ghost.CanCollide = false
+        ghost.Anchored = true
+        ghost.CastShadow = false
+        ghost.Position = position + Vector3.new(0, 5, 0)
+        ghost.Parent = Cam
+        serverGhosts[#serverGhosts + 1] = ghost
+    end
+    local function removeFolders()
+        local pf = workspace:FindFirstChild(LP.Name)
+        if not pf then return end
+        local dr = pf:FindFirstChild("DoubleRig")
+        if dr then
+            local rr = dr:FindFirstChild("HumanoidRootPart") or dr:FindFirstChildWhichIsA("BasePart")
+            if rr then createServerGhost(rr.Position) end
+            dr:Destroy()
+        end
+        local cs = pf:FindFirstChild("Constraints")
+        if cs then cs:Destroy() end
+        folderConnections[#folderConnections + 1] = pf.ChildAdded:Connect(function(child)
+            if child.Name == "DoubleRig" then
+                task.defer(function()
+                    local rr = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChildWhichIsA("BasePart")
+                    if rr then createServerGhost(rr.Position) end
+                    child:Destroy()
+                end)
+            elseif child.Name == "Constraints" then
+                child:Destroy()
+            end
+        end)
+    end
+    local function doClone()
+        local character = LP.Character
+        if not (character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0) then return false end
+        hip = character.Humanoid.HipHeight
+        oldRoot = character:FindFirstChild("HumanoidRootPart")
+        if not oldRoot or not oldRoot.Parent then return false end
+        for _, c in pairs(oldRoot:GetChildren()) do
+            if c:IsA("Attachment") and (c.Name:find("Beam") or c.Name:find("Attach")) then c:Destroy() end
+        end
+        for _, c in pairs(oldRoot:GetChildren()) do
+            if c:IsA("Beam") then c:Destroy() end
+        end
+        local tmp = Instance.new("Model")
+        tmp.Parent = game
+        character.Parent = tmp
+        clone = oldRoot:Clone()
+        clone.Parent = character
+        oldRoot.Parent = Cam
+        clone.CFrame = oldRoot.CFrame
+        character.PrimaryPart = clone
+        character.Parent = workspace
+        for _, v in pairs(character:GetDescendants()) do
+            if v:IsA("Weld") or v:IsA("Motor6D") then
+                if v.Part0 == oldRoot then v.Part0 = clone end
+                if v.Part1 == oldRoot then v.Part1 = clone end
+            end
+        end
+        tmp:Destroy()
+        pcall(function() clone.LocalTransparencyModifier = 0 end)
+        return true
+    end
+    local function revertClone()
+        local character = LP.Character
+        if not oldRoot or not oldRoot:IsDescendantOf(workspace) or not character or character.Humanoid.Health <= 0 then return end
+        local tmp = Instance.new("Model")
+        tmp.Parent = game
+        character.Parent = tmp
+        oldRoot.Parent = character
+        character.PrimaryPart = oldRoot
+        character.Parent = workspace
+        oldRoot.CanCollide = true
+        for _, v in pairs(character:GetDescendants()) do
+            if v:IsA("Weld") or v:IsA("Motor6D") then
+                if v.Part0 == clone then v.Part0 = oldRoot end
+                if v.Part1 == clone then v.Part1 = oldRoot end
+            end
+        end
+        if clone then
+            local p = clone.CFrame
+            clone:Destroy()
+            clone = nil
+            oldRoot.CFrame = p
+        end
+        oldRoot = nil
+        if character and character.Humanoid then character.Humanoid.HipHeight = hip end
+        pcall(function()
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then part.LocalTransparencyModifier = 0 end
+            end
+        end)
+        clearAllGhosts()
+    end
+    local function animationTrickery()
+        local character = LP.Character
+        if not (character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0) then return end
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "http://www.roblox.com/asset/?id=18537363391"
+        local humanoid = character.Humanoid
+        local animator = humanoid:FindFirstChild("Animator") or Instance.new("Animator", humanoid)
+        local animTrack = animator:LoadAnimation(anim)
+        animTrack.Priority = Enum.AnimationPriority.Action4
+        animTrack:Play(0, 1, 0)
+        anim:Destroy()
+        tracks[#tracks + 1] = animTrack
+        animTrack.Stopped:Connect(function() if animPlaying then animationTrickery() end end)
+        task.delay(0, function()
+            animTrack.TimePosition = 0.7
+            task.delay(0.3, function() if animTrack then animTrack:AdjustSpeed(math.huge) end end)
+        end)
+    end
+    local invisTurnOff, invisTurnOn
+    invisTurnOff = function()
+        clearAllGhosts()
+        if not animPlaying then return end
+        local character = LP.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        animPlaying = false
+        _G.invisibleStealEnabled = false
+        for _, t in pairs(tracks) do pcall(function() t:Stop(0) end) end
+        tracks = {}
+        if connection then connection:Disconnect(); connection = nil end
+        for _, c in ipairs(folderConnections) do if c then c:Disconnect() end end
+        folderConnections = {}
+        stopKeepSelfVisible()
+        revertClone()
+        clearAllGhosts()
+        if humanoid then
+            pcall(function()
+                local animator = humanoid:FindFirstChildOfClass("Animator")
+                if animator then
+                    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                        if track.Priority == Enum.AnimationPriority.Action4 or track.Priority == Enum.AnimationPriority.Action3 then
+                            track:Stop(0)
+                        end
+                    end
+                end
+                humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                task.defer(function()
+                    if humanoid and humanoid.Parent then humanoid:ChangeState(Enum.HumanoidStateType.Running) end
+                end)
+            end)
+        end
+        _invisToggleCooldown = tick()
+        if type(_G.SabcomPaintInvisToggles) == "function" then pcall(_G.SabcomPaintInvisToggles) end
+    end
+    invisTurnOn = function()
+        if animPlaying then return end
+        local character = LP.Character
+        if not character then return end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+        animPlaying = true
+        _G.invisibleStealEnabled = true
+        tracks = {}
+        removeFolders()
+        if not doClone() then
+            animPlaying = false
+            _G.invisibleStealEnabled = false
+            if type(_G.SabcomPaintInvisToggles) == "function" then pcall(_G.SabcomPaintInvisToggles) end
+            return
+        end
+        task.wait(0.05)
+        animationTrickery()
+        startKeepSelfVisible(character)
+        local lastSetPosition, skipFrames = nil, 5
+        connection = RunService.PreSimulation:Connect(function()
+            if not (character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 and oldRoot) then return end
+            local root = character.PrimaryPart or character:FindFirstChild("HumanoidRootPart")
+            if not root then return end
+            if skipFrames > 0 then
+                skipFrames = skipFrames - 1
+                lastSetPosition = nil
+            elseif lastSetPosition then
+                local jumpDist = (oldRoot.Position - lastSetPosition).Magnitude
+                if jumpDist > 6 and not RecoveryInProgress and LP:GetAttribute("Stealing") then
+                    lastSetPosition = nil
+                    createServerGhost(oldRoot.Position)
+                    if _G.AutoRecoverLagback ~= false then
+                        RecoveryInProgress = true
+                        task.spawn(function()
+                            invisTurnOff()
+                            task.wait(0.6)
+                            if LP:GetAttribute("Stealing") then invisTurnOn() end
+                            RecoveryInProgress = false
+                        end)
+                    end
+                end
+            end
+            if clone then
+                clone.CanCollide = true
+                clone.LocalTransparencyModifier = 0
+            end
+            showLocalCharacter(character)
+            hideDecoyRoot()
+            if oldRoot and oldRoot.Parent then
+                for _, c in pairs(oldRoot:GetChildren()) do
+                    if c:IsA("Attachment") or c:IsA("Beam") then c:Destroy() end
+                end
+                local sa = (tonumber(_G.SinkSliderValue) or 7) * 0.5 * _avatarScale(character)
+                local cf = root.CFrame - Vector3.new(0, sa, 0)
+                oldRoot.CFrame = cf * CFrame.Angles(math.rad(tonumber(_G.InvisStealAngle) or 225), 0, 0)
+                oldRoot.AssemblyLinearVelocity = root.AssemblyLinearVelocity
+                oldRoot.CanCollide = false
+                lastSetPosition = oldRoot.Position
+            end
+        end)
+        if type(_G.SabcomPaintInvisToggles) == "function" then pcall(_G.SabcomPaintInvisToggles) end
+    end
+    local function forceToggle()
+        if animPlaying then invisTurnOff() else invisTurnOn() end
+    end
+    _G.toggleInvisibleSteal = function()
+        if (tick() - _invisToggleCooldown) < 0.3 then return end
+        forceToggle()
+    end
+    _G._forceInvisToggle = forceToggle
+    _G.SabcomInvisOff = invisTurnOff
+    _G.SabcomInvisOn = invisTurnOn
+    _G.invisibleStealEnabled = false
+    LP.CharacterAdded:Connect(function()
+        clearAllGhosts()
+        RecoveryInProgress = false
+        pcall(function()
+            if Cam then
+                for _, c in pairs(Cam:GetChildren()) do
+                    if c:IsA("BasePart") and c.Name == "HumanoidRootPart" then c:Destroy() end
+                end
+            end
+        end)
+        if oldRoot then pcall(function() oldRoot:Destroy() end); oldRoot = nil end
+        if clone then pcall(function() clone:Destroy() end); clone = nil end
+        stopKeepSelfVisible()
+        animPlaying = false
+        _G.invisibleStealEnabled = false
+        if connection then connection:Disconnect(); connection = nil end
+        if type(_G.SabcomPaintInvisToggles) == "function" then pcall(_G.SabcomPaintInvisToggles) end
+    end)
+    _G.SabcomAfterTpLoad(function()
+        local wasStealing, autoEnabled = false, false
+        while true do
+            task.wait(0.15)
+            if _G.AutoInvisDuringSteal ~= true then
+                if autoEnabled and animPlaying then pcall(forceToggle); autoEnabled = false end
+                wasStealing = LP:GetAttribute("Stealing")
+            else
+                local isStealing = LP:GetAttribute("Stealing")
+                if isStealing and not wasStealing and not animPlaying then
+                    task.defer(function()
+                        if LP:GetAttribute("Stealing") and not animPlaying then
+                            pcall(forceToggle)
+                            autoEnabled = true
+                        end
+                    end)
+                end
+                if not isStealing and autoEnabled and animPlaying then
+                    task.wait(0.3)
+                    if not LP:GetAttribute("Stealing") then
+                        pcall(forceToggle)
+                        autoEnabled = false
+                    end
+                end
+                wasStealing = isStealing
+            end
+        end
+    end)
+end
+
+local _BLOCKING_MACHINE_TYPES = {
+    Fuse     = true,
+    Duel     = true,
+    Trade    = true,
+    Crafting = true,
+}
+local function _SabcomIsFusing(animalData)
+    if type(animalData) ~= "table" then return false end
+    local m = animalData.Machine
+    if type(m) ~= "table" then return false end
+    return _BLOCKING_MACHINE_TYPES[m.Type] == true
+end
+
+local secure_call
+do
+    local LAYERS = 2
+    local TEMPLATE do
+        local lines = {
+            "return function(__renv, __func, ...)",
+            "    setfenv(0, __renv)",
+            ("    local function l%d(...) return __func(...) end"):format(LAYERS),
+        }
+        for c = LAYERS - 1, 1, -1 do
+            lines[#lines + 1] = ("    local function l%d(...) return l%d(...) end"):format(c, c + 1)
+        end
+        lines[#lines + 1] = "    return l1(...)"
+        lines[#lines + 1] = "end"
+        TEMPLATE = table.concat(lines, string.char(10))
+    end
+    local _gti = getthreadidentity or get_thread_identity or getidentity
+    local _sti = setthreadidentity or set_thread_identity or setidentity
+    local _sentinel, _senv
+    secure_call = (function(func, mask, ...)
+        if type(func) ~= "function" or typeof(mask) ~= "Instance" then return nil end
+        if not (_gti and _sti and getrenv and loadstring and setfenv) then return nil end
+        local renv = getrenv()
+        if not _sentinel then
+            local ok, env = pcall(getsenv, mask)
+            if not ok or type(env) ~= "table" then
+                env = setmetatable({ script = mask, _G = {}, shared = {} }, { __index = renv, __newindex = renv })
+            end
+            local loader = loadstring(TEMPLATE, "=" .. mask:GetFullName())
+            if not loader then return nil end
+            setfenv(loader, env)
+            _sentinel, _senv = loader(), env
+        end
+        local level = _gti()
+        local changed = {}
+        local okU, snap = pcall(debug.getupvalues, func)
+        if okU and type(snap) == "table" then
+            for i, v in pairs(snap) do
+                if typeof(v) == "Instance" and v:IsA("LuaSourceContainer") then
+                    if pcall(debug.setupvalue, func, i, mask) then changed[i] = v end
+                end
+            end
+        end
+        _sti(2)
+        local co, args = coroutine.create(_sentinel), table.pack(renv, func, ...)
+        local response, err
+        while true do
+            local r = table.pack(coroutine.resume(co, table.unpack(args, 1, args.n)))
+            if not r[1] then err = r[2] break end
+            if coroutine.status(co) == "dead" then
+                response = table.pack(table.unpack(r, 2, r.n)) break
+            end
+            args = table.pack(coroutine.yield(table.unpack(r, 2, r.n)))
+        end
+        _sti(level)
+        for i, orig in pairs(changed) do pcall(debug.setupvalue, func, i, orig) end
+        if err or not response then return nil end
+        return table.unpack(response, 1, response.n)
+    end)
+end
+_G.secure_call = secure_call
+
+local _sc_mask
+local _sc_getMask = (function()
+    if _sc_mask and _sc_mask.Parent then return _sc_mask end
+    local c = RS:FindFirstChild("Controllers") or RS:WaitForChild("Controllers", 1)
+    _sc_mask = c and (c:FindFirstChild("PlotController") or c:WaitForChild("PlotController", 1))
+    return _sc_mask
+end)
+_G.SabcomGetMask = _sc_getMask
+end)
+
+task.defer(function()
+    local guiParent
+    pcall(function() guiParent = game:GetService("CoreGui") end)
+    if guiParent then
+    local saveTpSettings = _G.SabcomSaveConfig or function() end
+    pcall(function()
+        for _, name in ipairs({ "SabcomUI", "TPStealTestUI" }) do
+            local old = guiParent:FindFirstChild(name)
+            if old then old:Destroy() end
+            local pg = LP:FindFirstChild("PlayerGui")
+            local oldPg = pg and pg:FindFirstChild(name)
+            if oldPg then oldPg:Destroy() end
+            if gethui then
+                local h = gethui()
+                local oldH = h and h:FindFirstChild(name)
+                if oldH and oldH ~= old then oldH:Destroy() end
+            end
+        end
+    end)
+
+    local F, FB = Enum.Font.Gotham, Enum.Font.GothamBold
+    local bg = Color3.fromRGB(0, 0, 0)
+    local btnC = Color3.fromRGB(16, 16, 18)
+    local accent = Color3.fromRGB(125, 211, 252)
+    local onC = accent
+    local tx = Color3.fromRGB(248, 250, 252)
+    local mute = Color3.fromRGB(148, 163, 184)
+    local strokeC = Color3.fromRGB(125, 211, 252)
+    local onTx = Color3.fromRGB(255, 255, 255)
+    local glowStrokes, essenceGrads = {}, {}
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "SabcomUI"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.DisplayOrder = 80
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    sg.Parent = guiParent
+
+    local function mk(cls, par, props)
+        local i = Instance.new(cls)
+        if par then i.Parent = par end
+        if props then for k, v in pairs(props) do i[k] = v end end
+        return i
+    end
+    local function corner(i, r)
+        mk("UICorner", i, {CornerRadius = UDim.new(0, r or 8)})
+        return i
+    end
+    local function stroke(i)
+        local edge = mk("UIStroke", i, {Name = "GlowIn", Color = strokeC, Thickness = 1.4, Transparency = 0.12})
+        glowStrokes[#glowStrokes + 1] = edge
+        local sheen = mk("Frame", i, {
+            Name = "Essence", Size = UDim2.fromScale(1, 1), BackgroundColor3 = accent,
+            BackgroundTransparency = 0.93, BorderSizePixel = 0, ZIndex = 1, Active = false,
+        })
+        pcall(function() sheen.Interactable = false end)
+        corner(sheen, 12)
+        local g = mk("UIGradient", sheen, {
+            Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0)),
+                ColorSequenceKeypoint.new(0.46, Color3.new(0, 0, 0)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 230, 255)),
+                ColorSequenceKeypoint.new(0.54, Color3.new(0, 0, 0)),
+                ColorSequenceKeypoint.new(1, Color3.new(0, 0, 0)),
+            }),
+            Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(0.47, 0.55),
+                NumberSequenceKeypoint.new(0.5, 0.05),
+                NumberSequenceKeypoint.new(0.53, 0.55),
+                NumberSequenceKeypoint.new(1, 1),
+            }),
+            Rotation = 18,
+        })
+        essenceGrads[#essenceGrads + 1] = g
+        return i
+    end
+    local function btn(par, txt, sz, pos)
+        local b = mk("TextButton", par, {
+            Size = sz, Position = pos, BackgroundColor3 = btnC, BorderSizePixel = 0,
+            Text = txt, Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = true,
+        })
+        corner(b, 7)
+        return b
+    end
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then
+            local f = cam:FindFirstChild("SabcomGuiBlur")
+            if f then f:Destroy() end
+        end
+        local old = game:GetService("Lighting"):FindFirstChild("SabcomUIBlur")
+        if old then old:Destroy() end
+    end)
+    local function drag(handle, frame, save)
+        handle.Active = true
+        handle.InputBegan:Connect(function(input)
+            if _G.SabcomLockUi then return end
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            local s, x, y = input.Position, frame.Position.X.Offset, frame.Position.Y.Offset
+            local mv, en
+            local function stop()
+                if mv then mv:Disconnect() end
+                if en then en:Disconnect() end
+                if save then save(frame) end
+            end
+            mv = UIS.InputChanged:Connect(function(m)
+                if m.UserInputType ~= Enum.UserInputType.MouseMovement and m.UserInputType ~= Enum.UserInputType.Touch then return end
+                local d = m.Position - s
+                frame.Position = UDim2.fromOffset(x + d.X, y + d.Y)
+            end)
+            en = UIS.InputEnded:Connect(function(e)
+                if e.UserInputType == Enum.UserInputType.MouseButton1 or e.UserInputType == Enum.UserInputType.Touch then stop() end
+            end)
+        end)
+    end
+    local function bindPanelDrag(handle, frame, gX, gY)
+        drag(handle, frame, function(fr)
+            _G[gX] = fr.Position.X.Offset
+            _G[gY] = fr.Position.Y.Offset
+            saveTpSettings()
+        end)
+    end
+    local function slider(label, min, max, step, getV, setV, parent)
+        parent = parent or gearF
+        local row = mk("Frame", parent, {Size = UDim2.new(1, -4, 0, 32), BackgroundTransparency = 1})
+        local lab = mk("TextLabel", row, {
+            BackgroundTransparency = 1, Size = UDim2.new(0.72, 0, 0, 14), Font = F, TextSize = 11,
+            TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = label,
+        })
+        local val = mk("TextLabel", row, {
+            BackgroundTransparency = 1, Size = UDim2.new(0.28, 0, 0, 14), Position = UDim2.new(0.72, 0, 0, 0),
+            Font = F, TextSize = 11, TextColor3 = mute, TextXAlignment = Enum.TextXAlignment.Right, Text = "",
+        })
+        local hit = mk("TextButton", row, {
+            Position = UDim2.fromOffset(0, 14), Size = UDim2.new(1, 0, 0, 18),
+            BackgroundTransparency = 1, BorderSizePixel = 0, Text = "", AutoButtonColor = false, Active = true,
+        })
+        local bar = mk("Frame", hit, {
+            AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0),
+            Size = UDim2.new(1, 0, 0, 6), BackgroundColor3 = btnC, BorderSizePixel = 0,
+        })
+        corner(bar, 3)
+        local fill = mk("Frame", bar, {Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = onC, BorderSizePixel = 0})
+        corner(fill, 3)
+        local function fmt(v)
+            if v >= 1000000 then return string.format("%.1fM", v / 1000000) end
+            if v >= 10000 then return string.format("%.0fk", v / 1000) end
+            if step < 1 then return string.format("%.2f", v) end
+            return tostring(math.floor(v + 0.5))
+        end
+        local function paint()
+            local v = tonumber(getV()) or min
+            local t = math.clamp((v - min) / (max - min), 0, 1)
+            fill.Size = UDim2.new(t, 0, 1, 0)
+            val.Text = fmt(v)
+        end
+        local function apply(screenX)
+            local t = math.clamp((screenX - hit.AbsolutePosition.X) / math.max(1, hit.AbsoluteSize.X), 0, 1)
+            local v = min + t * (max - min)
+            v = math.floor(v / step + 0.5) * step
+            setV(v)
+            paint()
+        end
+        local function scrollParent(obj)
+            local p = obj.Parent
+            while p do
+                if p:IsA("ScrollingFrame") then return p end
+                p = p.Parent
+            end
+        end
+        local function isDrag(ut)
+            return ut == Enum.UserInputType.MouseButton1 or ut == Enum.UserInputType.Touch
+        end
+        hit.InputBegan:Connect(function(input)
+            if not isDrag(input.UserInputType) then return end
+            local scroll = scrollParent(hit)
+            local prevScroll = scroll and scroll.ScrollingEnabled
+            if scroll then scroll.ScrollingEnabled = false end
+            apply(input.Position.X)
+            local mv, en
+            mv = UIS.InputChanged:Connect(function(m)
+                if m == input or m.UserInputType == Enum.UserInputType.MouseMovement then
+                    apply(m.Position.X)
+                end
+            end)
+            en = UIS.InputEnded:Connect(function(e)
+                if e ~= input and e.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+                if mv then mv:Disconnect() end
+                if en then en:Disconnect() end
+                if scroll then scroll.ScrollingEnabled = prevScroll ~= false end
+                saveTpSettings()
+            end)
+        end)
+        paint()
+    end
+    local function pillTog(parent, label, getOn, setOn)
+        local row = mk("Frame", parent, {Size = UDim2.new(1, -4, 0, 22), BackgroundTransparency = 1})
+        mk("TextLabel", row, {
+            BackgroundTransparency = 1, Size = UDim2.new(1, -44, 1, 0), Font = F, TextSize = 11,
+            TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = label,
+        })
+        local track = mk("TextButton", row, {
+            Size = UDim2.fromOffset(36, 18), Position = UDim2.new(1, -36, 0.5, -9),
+            BackgroundColor3 = btnC, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
+        })
+        corner(track, 9)
+        local knob = mk("Frame", track, {
+            Size = UDim2.fromOffset(14, 14), Position = UDim2.fromOffset(2, 2),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0,
+        })
+        corner(knob, 7)
+        local function paint()
+            local onv = getOn()
+            track.BackgroundColor3 = onv and onC or btnC
+            knob.Position = onv and UDim2.fromOffset(20, 2) or UDim2.fromOffset(2, 2)
+        end
+        track.MouseButton1Click:Connect(function()
+            setOn(not getOn())
+            paint()
+            saveTpSettings()
+        end)
+        paint()
+        return paint
+    end
+    local function tog(parent, label, getOn, setOn)
+        local paint = pillTog(parent, label, getOn, setOn)
+        return nil, paint
+    end
+    local function togGear(parent, label, getOn, setOn, onGear)
+        local row = mk("Frame", parent, {Size = UDim2.new(1, -4, 0, 22), BackgroundTransparency = 1})
+        mk("TextLabel", row, {
+            BackgroundTransparency = 1, Size = UDim2.new(1, -68, 1, 0), Font = F, TextSize = 11,
+            TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = label,
+        })
+        local track = mk("TextButton", row, {
+            Size = UDim2.fromOffset(36, 18), Position = UDim2.new(1, -64, 0.5, -9),
+            BackgroundColor3 = btnC, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
+        })
+        corner(track, 9)
+        local knob = mk("Frame", track, {
+            Size = UDim2.fromOffset(14, 14), Position = UDim2.fromOffset(2, 2),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0,
+        })
+        corner(knob, 7)
+        local function paint()
+            local onv = getOn()
+            track.BackgroundColor3 = onv and onC or btnC
+            knob.Position = onv and UDim2.fromOffset(20, 2) or UDim2.fromOffset(2, 2)
+        end
+        track.MouseButton1Click:Connect(function()
+            setOn(not getOn())
+            paint()
+            saveTpSettings()
+        end)
+        paint()
+        local gear = btn(row, "\u{2699}", UDim2.fromOffset(26, 22), UDim2.new(1, -26, 0, 0))
+        gear.TextSize = 14
+        gear.AutoButtonColor = false
+        gear.MouseButton1Click:Connect(function()
+            if onGear then onGear() end
+        end)
+        return nil, paint
+    end
+    local function keyBindRow(parent, label, getN, setN)
+        local row = mk("Frame", parent, {Size = UDim2.new(1, -4, 0, 26), BackgroundTransparency = 1})
+        mk("TextLabel", row, {
+            BackgroundTransparency = 1, Size = UDim2.new(1, -62, 1, 0), Font = F, TextSize = 11,
+            TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = label,
+        })
+        local k = btn(row, tostring(getN() or ""), UDim2.fromOffset(56, 24), UDim2.new(1, -56, 0, 1))
+        k.MouseButton1Click:Connect(function()
+            k.Text = "..."
+            _G.SabcomCapturingKey = true
+            local conn
+            conn = UIS.InputBegan:Connect(function(input)
+                if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                conn:Disconnect()
+                _G.SabcomCapturingKey = false
+                setN(input.KeyCode.Name)
+                k.Text = input.KeyCode.Name
+                if type(_G.SabcomSaveConfigNow) == "function" then
+                    pcall(_G.SabcomSaveConfigNow)
+                else
+                    saveTpSettings()
+                end
+            end)
+        end)
+    end
+
+    local akPaintMain, akPaintSteal
+    local faPaintMain, faPaintSteal
+    local ivPaintMain, ivPaintSteal
+    local wsPaintPanel, wsPaintSteal
+    local fovPaintPanel, fovPaintSteal
+    local akPanel, psPanel, faPanel, ivPanel, wsPanel, fovPanel
+    local AK_W, AK_H, PS_W, PS_H = 200, 118, 200, 108
+    local IV_W, IV_H = 200, 228
+    local WS_W, WS_H = 200, 100
+    local FOV_W, FOV_H = 200, 92
+    local faSearch, faList, faRefreshList
+    local paintInvisSteal, paintInvisIv
+    local gearF
+    local function setInvisGui(v)
+        _G.SabcomInvisGui = v and true or false
+        if ivPanel then ivPanel.Visible = _G.SabcomInvisGui == true end
+        if ivPaintMain then ivPaintMain() end
+        if ivPaintSteal then ivPaintSteal() end
+    end
+    local function setFaceAwayGui(v)
+        _G.SabcomFaceAwayGui = v and true or false
+        if faPanel then faPanel.Visible = _G.SabcomFaceAwayGui == true end
+        if faPaintMain then faPaintMain() end
+        if faPaintSteal then faPaintSteal() end
+    end
+    local function setFaceAway(on)
+        _G.SabcomFaceAway = on and true or false
+        if type(_G.SabcomSetFaceAway) == "function" then pcall(_G.SabcomSetFaceAway, on) end
+        saveTpSettings()
+    end
+    local function setAutoKickGui(v)
+        _G.SabcomAutoKickGui = v and true or false
+        if akPanel then akPanel.Visible = _G.SabcomAutoKickGui == true end
+        if not v and psPanel then psPanel.Visible = false end
+        if akPaintMain then akPaintMain() end
+        if akPaintSteal then akPaintSteal() end
+    end
+    local function setWalkSpeedGui(v)
+        _G.SabcomWalkSpeedGui = v and true or false
+        if wsPanel then wsPanel.Visible = _G.SabcomWalkSpeedGui ~= false end
+    end
+    local function setFovGui(v)
+        _G.SabcomFovGui = v and true or false
+        if fovPanel then fovPanel.Visible = _G.SabcomFovGui ~= false end
+    end
+    local function syncInvisToggle(wantOn)
+        local on = _G.invisibleStealEnabled == true
+        if wantOn == on then return end
+        if type(_G.toggleInvisibleSteal) == "function" then
+            pcall(_G.toggleInvisibleSteal)
+        end
+    end
+    local function paintAllInvisToggles()
+        if paintInvisSteal then paintInvisSteal() end
+        if paintInvisIv then paintInvisIv() end
+    end
+    _G.SabcomPaintInvisToggles = paintAllInvisToggles
+
+    RunService.Heartbeat:Connect(function()
+        local t = os.clock()
+        local pulse = 0.1 + math.sin(t * 2.1) * 0.07
+        for i = 1, #glowStrokes do
+            local s = glowStrokes[i]
+            if s and s.Parent then s.Transparency = pulse end
+        end
+        local rot = (t * 26) % 360
+        for i = 1, #essenceGrads do
+            local g = essenceGrads[i]
+            if g and g.Parent then g.Rotation = rot end
+        end
+    end)
+
+
+    local guiHidden = false
+    local extrasHidden = _G.SabcomAutoCloseGui == true
+    local tgt, extras, priOpenBtn, priPanel
+    local extrasBtn, extrasStroke, extrasLbl
+    local function paintOpenGuiBtn()
+        if not extrasBtn then return end
+        local closed = extrasHidden == true
+        extrasLbl.Text = closed and "OPEN GUI" or "EXTRAS"
+        extrasLbl.TextColor3 = closed and Color3.fromRGB(185, 235, 255) or tx
+        extrasLbl.TextStrokeTransparency = closed and 0.35 or 0.7
+        extrasStroke.Transparency = closed and 0.06 or 0.42
+        extrasBtn.BackgroundTransparency = closed and 0.02 or 0.18
+        extrasBtn.BackgroundColor3 = closed and Color3.fromRGB(0, 0, 0) or btnC
+    end
+    local function setExtrasHidden(v)
+        extrasHidden = v and true or false
+        if extras then extras.Visible = (not guiHidden) and (not extrasHidden) end
+        paintOpenGuiBtn()
+    end
+    local openBtn = mk("TextButton", sg, {
+        AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 72),
+        Size = UDim2.fromOffset(152, 36), BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.04, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
+        Visible = false, ZIndex = 130,
+    })
+    mk("UICorner", openBtn, {CornerRadius = UDim.new(1, 0)})
+    local openStroke = mk("UIStroke", openBtn, {Color = accent, Thickness = 1.3, Transparency = 0.18})
+    glowStrokes[#glowStrokes + 1] = openStroke
+    local openLbl = mk("TextLabel", openBtn, {
+        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0,
+        Text = "OPEN GUI", Font = Enum.Font.GothamBlack, TextSize = 16,
+        TextColor3 = Color3.fromRGB(170, 230, 255),
+        TextStrokeColor3 = Color3.fromRGB(70, 170, 255),
+        TextStrokeTransparency = 0.4, ZIndex = 132,
+    })
+    openBtn.MouseEnter:Connect(function()
+        openLbl.TextColor3 = Color3.fromRGB(230, 248, 255)
+        openStroke.Transparency = 0.04
+    end)
+    openBtn.MouseLeave:Connect(function()
+        openLbl.TextColor3 = Color3.fromRGB(170, 230, 255)
+        openStroke.Transparency = 0.18
+    end)
+    local function setGuiHidden(v)
+        guiHidden = v and true or false
+        _G.SabcomGuiHidden = guiHidden
+        if extras then extras.Visible = (not guiHidden) and (not extrasHidden) end
+        if akPanel then akPanel.Visible = (not guiHidden) and (_G.SabcomAutoKickGui == true) end
+        if psPanel and guiHidden then psPanel.Visible = false end
+        if ivPanel then ivPanel.Visible = (not guiHidden) and (_G.SabcomInvisGui == true) end
+        if wsPanel then wsPanel.Visible = (not guiHidden) and (_G.SabcomWalkSpeedGui ~= false) end
+        if fovPanel then fovPanel.Visible = (not guiHidden) and (_G.SabcomFovGui ~= false) end
+        if faPanel then faPanel.Visible = (not guiHidden) and (_G.SabcomFaceAwayGui == true) end
+        if priPanel and guiHidden then priPanel.Visible = false end
+        openBtn.Visible = guiHidden
+        if extrasBtn then extrasBtn.Visible = not guiHidden end
+        paintOpenGuiBtn()
+    end
+    _G.SabcomSetGuiHidden = setGuiHidden
+    _G.SabcomToggleGui = function()
+        setGuiHidden(not guiHidden)
+    end
+    openBtn.MouseButton1Click:Connect(function()
+        setGuiHidden(false)
+    end)
+
+    local paintBar = function() end
+    tgt = mk("Frame", sg, {
+        Size = UDim2.fromOffset(248, 258),
+        Position = UDim2.fromOffset(tonumber(_G._stp_stealX) or 16, tonumber(_G._stp_stealY) or 80),
+        BackgroundColor3 = bg, BackgroundTransparency = 0, BorderSizePixel = 0, Active = true,
+    })
+    corner(tgt, 12)
+    stroke(tgt)
+    local tgtH = mk("TextButton", tgt, {
+        Size = UDim2.new(1, -118, 0, 28), BackgroundTransparency = 1,
+        Text = "", AutoButtonColor = false,
+    })
+    mk("TextLabel", tgtH, {
+        BackgroundTransparency = 1, Size = UDim2.fromOffset(78, 28), Position = UDim2.fromOffset(10, 0),
+        Font = FB, TextSize = 13, TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = "TARGETS",
+    })
+    local tgtCountLbl = mk("TextLabel", tgtH, {
+        BackgroundTransparency = 1, Size = UDim2.fromOffset(36, 28), Position = UDim2.fromOffset(86, 0),
+        Font = FB, TextSize = 13, TextColor3 = mute, TextXAlignment = Enum.TextXAlignment.Left, Text = "0",
+    })
+    extrasBtn = mk("TextButton", tgt, {
+        AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 2),
+        Size = UDim2.fromOffset(104, 24), BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.02, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
+        Active = true, ZIndex = 8,
+    })
+    mk("UICorner", extrasBtn, {CornerRadius = UDim.new(1, 0)})
+    extrasStroke = mk("UIStroke", extrasBtn, {Color = accent, Thickness = 1.3, Transparency = 0.08})
+    glowStrokes[#glowStrokes + 1] = extrasStroke
+    extrasLbl = mk("TextLabel", extrasBtn, {
+        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0,
+        Text = "OPEN GUI", Font = Enum.Font.GothamBlack, TextSize = 12,
+        TextColor3 = Color3.fromRGB(185, 235, 255),
+        TextStrokeColor3 = Color3.fromRGB(70, 170, 255),
+        TextStrokeTransparency = 0.35, ZIndex = 9,
+    })
+    extrasBtn.MouseEnter:Connect(function()
+        extrasLbl.TextColor3 = Color3.fromRGB(230, 248, 255)
+        extrasStroke.Transparency = 0.02
+    end)
+    extrasBtn.MouseLeave:Connect(function()
+        paintOpenGuiBtn()
+    end)
+    extrasBtn.MouseButton1Click:Connect(function()
+        setExtrasHidden(not extrasHidden)
+    end)
+    paintOpenGuiBtn()
+    mk("Frame", tgt, {
+        Size = UDim2.new(1, -20, 0, 1), Position = UDim2.fromOffset(10, 28),
+        BackgroundColor3 = onC, BackgroundTransparency = 0.35, BorderSizePixel = 0,
+    })
+    drag(tgtH, tgt, function(fr)
+        _G._stp_stealX, _G._stp_stealY = fr.Position.X.Offset, fr.Position.Y.Offset
+        saveTpSettings()
+    end)
+    local tgtModeRow = mk("Frame", tgt, {
+        Size = UDim2.new(1, -16, 0, 26), Position = UDim2.fromOffset(8, 36),
+        BackgroundTransparency = 1,
+    })
+    local tgtPriBtn = btn(tgtModeRow, "PRIORITY", UDim2.new(0.5, -3, 1, 0), UDim2.new(0, 0, 0, 0))
+    local tgtNearBtn = btn(tgtModeRow, "NEAREST", UDim2.new(0.5, -3, 1, 0), UDim2.new(0.5, 3, 0, 0))
+    tgtPriBtn.TextSize = 11
+    tgtNearBtn.TextSize = 11
+    tgtPriBtn.AutoButtonColor = false
+    tgtNearBtn.AutoButtonColor = false
+    corner(tgtPriBtn, 8)
+    corner(tgtNearBtn, 8)
+    local tgtScroll = mk("ScrollingFrame", tgt, {
+        Position = UDim2.fromOffset(8, 90), Size = UDim2.new(1, -16, 1, -98),
+        BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.fromOffset(0, 0),
+    })
+    mk("UIListLayout", tgtScroll, {Padding = UDim.new(0, 6)})
+    local lastSig = ""
+    local paintList
+    local function paintTgtMode()
+        local mode = tostring(_G.SabcomStealMode or "priority"):lower()
+        if mode == "highest" then mode = "value" end
+        local priOn = mode ~= "nearest"
+        tgtPriBtn.BackgroundColor3 = priOn and onC or btnC
+        tgtPriBtn.TextColor3 = priOn and onTx or mute
+        tgtNearBtn.BackgroundColor3 = (mode == "nearest") and onC or btnC
+        tgtNearBtn.TextColor3 = (mode == "nearest") and onTx or mute
+    end
+    local function setTgtMode(m)
+        m = tostring(m or "priority"):lower()
+        if m ~= "nearest" then m = "priority" end
+        _G.SabcomManualStealUID = nil
+        if type(_G.SabcomClearTPSync) == "function" then _G.SabcomClearTPSync() end
+        _G.SabcomStealMode = m
+        _G.SabcomTPMode = m
+        if type(_G.SabcomSyncNearestInstant) == "function" then pcall(_G.SabcomSyncNearestInstant) end
+        if type(_G.SabcomForceResortList) == "function" then pcall(_G.SabcomForceResortList) end
+        if type(_G.SabcomRefreshStealTarget) == "function" then pcall(_G.SabcomRefreshStealTarget) end
+        saveTpSettings()
+        paintTgtMode()
+        lastSig = ""
+        if paintList then paintList() end
+    end
+    tgtPriBtn.MouseButton1Click:Connect(function() setTgtMode("priority") end)
+    tgtNearBtn.MouseButton1Click:Connect(function() setTgtMode("nearest") end)
+    local autoGoBtn = btn(tgt, "AUTO GO ON SWITCH", UDim2.new(1, -16, 0, 22), UDim2.fromOffset(8, 64))
+    autoGoBtn.TextSize = 10
+    autoGoBtn.AutoButtonColor = false
+    corner(autoGoBtn, 8)
+    local function paintAutoGoBtn()
+        local on = _G.SabcomAutoGoOnSwitch == true
+        autoGoBtn.BackgroundColor3 = on and onC or btnC
+        autoGoBtn.TextColor3 = on and onTx or mute
+    end
+    autoGoBtn.MouseButton1Click:Connect(function()
+        _G.SabcomAutoGoOnSwitch = not (_G.SabcomAutoGoOnSwitch == true)
+        paintAutoGoBtn()
+        saveTpSettings()
+    end)
+    paintAutoGoBtn()
+    _G.SabcomPaintTgtMode = paintTgtMode
+    paintList = function()
+        local pets = _G.SabcomStealPetList
+        if type(pets) ~= "table" then pets = {} end
+        local mode = tostring(_G.SabcomStealMode or "priority"):lower()
+        if mode == "highest" then mode = "value" end
+        tgtCountLbl.Text = tostring(#pets)
+        paintTgtMode()
+        local selUid = _G.SabcomManualStealUID
+        if type(selUid) ~= "string" or selUid == "" then
+            local sel = _G.SabcomStealTarget
+            if sel and sel.plot and sel.slot then
+                selUid = tostring(sel.plot) .. "_" .. tostring(sel.slot)
+            elseif sel and sel.uid then
+                selUid = tostring(sel.uid)
+            end
+        end
+        local sig = mode .. "#" .. tostring(selUid) .. "#" .. tostring(#pets)
+        if pets[1] then sig = sig .. tostring(pets[1].name) .. tostring(pets[1].mps) end
+        if sig == lastSig then return end
+        lastSig = sig
+        for _, ch in ipairs(tgtScroll:GetChildren()) do
+            if ch:IsA("GuiObject") and not ch:IsA("UIListLayout") then ch:Destroy() end
+        end
+        local cardC = Color3.fromRGB(24, 24, 30)
+        for i, pet in ipairs(pets) do
+            if i > 14 then break end
+            local uid = tostring(pet.plot) .. "_" .. tostring(pet.slot)
+            local gen
+            if _G.SabcomEnsurePetGen then
+                _, gen = _G.SabcomEnsurePetGen(pet)
+            else
+                gen = pet.genText or tostring(pet.mps or "")
+            end
+            local mut = tostring(pet.mutation or "")
+            if mut == "None" then mut = "" end
+            local subTxt = tostring(gen or "")
+            if mut ~= "" then
+                subTxt = (subTxt ~= "" and (subTxt .. "  " .. mut) or mut)
+            end
+            if subTxt == "" then subTxt = "#" .. i end
+            local selected = selUid and selUid == uid
+            local row = mk("TextButton", tgtScroll, {
+                Size = UDim2.new(1, -4, 0, 46), BackgroundColor3 = cardC, BorderSizePixel = 0,
+                Text = "", AutoButtonColor = false,
+            })
+            corner(row, 10)
+            local accentBar = mk("Frame", row, {
+                Size = UDim2.fromOffset(3, 22), Position = UDim2.new(0, 8, 0.5, -11),
+                BackgroundColor3 = selected and onC or Color3.fromRGB(255, 255, 255),
+                BorderSizePixel = 0,
+            })
+            corner(accentBar, 2)
+            mk("TextLabel", row, {
+                BackgroundTransparency = 1, Position = UDim2.fromOffset(18, 6),
+                Size = UDim2.new(1, -26, 0, 18), Font = FB, TextSize = 13, TextColor3 = tx,
+                TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+                Text = tostring(pet.name or "?"),
+            })
+            mk("TextLabel", row, {
+                BackgroundTransparency = 1, Position = UDim2.fromOffset(18, 24),
+                Size = UDim2.new(1, -26, 0, 16), Font = F, TextSize = 11, TextColor3 = mute,
+                TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+                Text = subTxt,
+            })
+            row.MouseButton1Click:Connect(function()
+                if _G.SabcomManualStealUID == uid then
+                    _G.SabcomManualStealUID = nil
+                    if type(_G.SabcomClearTPSync) == "function" then
+                        pcall(_G.SabcomClearTPSync)
+                    end
+                else
+                    _G.SabcomManualStealUID = uid
+                    pet.uid = uid
+                    _G.SabcomStealTargetUID = uid
+                    _G.SabcomTPSyncActive = true
+                    pcall(_G.SabcomApplyStealTarget, pet)
+                    if type(_G.sabcomArmSteal) == "function" then
+                        pcall(_G.sabcomArmSteal, pet)
+                    end
+                    task.defer(function()
+                        if type(_G.SabcomTryGoOnTargetSwitch) == "function" then
+                            pcall(_G.SabcomTryGoOnTargetSwitch, pet)
+                        end
+                    end)
+                end
+                lastSig = ""
+                paintList()
+            end)
+        end
+    end
+    _G.SabcomOnStealList = function() paintList() end
+    _G.SabcomOnStealTarget = function() paintList(); paintBar() end
+    _G.SabcomPaintStealList = paintList
+    _G.SabcomPaintStealBar = paintBar
+    paintTgtMode()
+    paintList()
+    _G.__sabcomRestReady = true
+    _G.__sabcomTpGuiReady = true
+    task.defer(function()
+        if _G.SabcomXray == true then
+            if type(_G.SabcomStartXrayRetry) == "function" then
+                pcall(_G.SabcomStartXrayRetry)
+            elseif type(_G.SabcomApplyXrayIfEnabled) == "function" then
+                pcall(_G.SabcomApplyXrayIfEnabled)
+            end
+        end
+    end)
+
+    local extrasBuilt = false
+    local function ensureExtras()
+        if extrasBuilt then return extras end
+        extrasBuilt = true
+        extras = mk("Frame", sg, {
+            Name = "Extras",
+            Size = UDim2.fromOffset(248, 360),
+            Position = UDim2.fromOffset(
+                tonumber(_G._stp_exX) or ((tonumber(_G._stp_stealX) or 16) + 260),
+                tonumber(_G._stp_exY) or (tonumber(_G._stp_stealY) or 80)
+            ),
+            BackgroundColor3 = bg, BackgroundTransparency = 0, BorderSizePixel = 0, Active = true,
+            Visible = (not guiHidden) and (not extrasHidden), ClipsDescendants = true,
+        })
+        corner(extras, 12)
+        stroke(extras)
+        local exHead = mk("TextButton", extras, {
+            Size = UDim2.new(1, 0, 0, 24), BackgroundTransparency = 1,
+            Text = "", AutoButtonColor = false,
+        })
+        mk("TextLabel", exHead, {
+            BackgroundTransparency = 1, Size = UDim2.new(1, -12, 1, 0), Position = UDim2.fromOffset(10, 0),
+            Font = FB, TextSize = 12, TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left,
+            Text = "SABCOM EXTRAS",
+        })
+        drag(exHead, extras, function(fr)
+            _G._stp_exX, _G._stp_exY = fr.Position.X.Offset, fr.Position.Y.Offset
+            saveTpSettings()
+        end)
+        mk("Frame", extras, {
+            Size = UDim2.new(1, -20, 0, 1), Position = UDim2.fromOffset(10, 24),
+            BackgroundColor3 = onC, BackgroundTransparency = 0.4, BorderSizePixel = 0,
+        })
+        local tabRow = mk("Frame", extras, {
+            Size = UDim2.new(1, -16, 0, 22), Position = UDim2.fromOffset(8, 30),
+            BackgroundTransparency = 1,
+        })
+        local featTab = btn(tabRow, "FEATURES", UDim2.new(0.5, -3, 1, 0), UDim2.new(0, 0, 0, 0))
+        local bindTab = btn(tabRow, "KEYBINDS", UDim2.new(0.5, -3, 1, 0), UDim2.new(0.5, 3, 0, 0))
+        featTab.TextSize = 10
+        bindTab.TextSize = 10
+        featTab.AutoButtonColor = false
+        bindTab.AutoButtonColor = false
+        featTab.BackgroundTransparency = 1
+        bindTab.BackgroundTransparency = 1
+        local featU = mk("Frame", featTab, {
+            AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0),
+            Size = UDim2.new(0.72, 0, 0, 2), BackgroundColor3 = onC, BorderSizePixel = 0,
+        })
+        local bindU = mk("Frame", bindTab, {
+            AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0),
+            Size = UDim2.new(0.72, 0, 0, 2), BackgroundColor3 = onC, BorderSizePixel = 0, Visible = false,
+        })
+        local featPage = mk("ScrollingFrame", extras, {
+            Position = UDim2.fromOffset(8, 56), Size = UDim2.new(1, -16, 1, -96),
+            BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
+            CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            Visible = true,
+        })
+        mk("UIListLayout", featPage, {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
+        mk("UIPadding", featPage, {PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 10)})
+        local bindPage = mk("ScrollingFrame", extras, {
+            Position = UDim2.fromOffset(8, 56), Size = UDim2.new(1, -16, 1, -96),
+            BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
+            CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+            Visible = false,
+        })
+        mk("UIListLayout", bindPage, {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder})
+        mk("UIPadding", bindPage, {PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 6)})
+        local extrasTab = "features"
+        local function paintTabs()
+            featTab.TextColor3 = extrasTab == "features" and tx or mute
+            bindTab.TextColor3 = extrasTab == "keybinds" and tx or mute
+            featU.Visible = extrasTab == "features"
+            bindU.Visible = extrasTab == "keybinds"
+            featPage.Visible = extrasTab == "features"
+            bindPage.Visible = extrasTab == "keybinds"
+        end
+        featTab.MouseButton1Click:Connect(function() extrasTab = "features"; paintTabs() end)
+        bindTab.MouseButton1Click:Connect(function() extrasTab = "keybinds"; paintTabs() end)
+        paintTabs()
+        local function section(parent, title)
+            local wrap = mk("Frame", parent, {Size = UDim2.new(1, -4, 0, 16), BackgroundTransparency = 1})
+            mk("TextLabel", wrap, {
+                BackgroundTransparency = 1, Size = UDim2.new(1, 0, 1, 0), Font = FB, TextSize = 10,
+                TextColor3 = mute, TextXAlignment = Enum.TextXAlignment.Left, Text = title,
+            })
+        end
+        local function actionRow(parent, a, fa, b, fb)
+            local row = mk("Frame", parent, {Size = UDim2.new(1, -4, 0, 24), BackgroundTransparency = 1})
+            local ba = btn(row, a, UDim2.new(0.5, -3, 1, 0), UDim2.new(0, 0, 0, 0))
+            local bb = btn(row, b, UDim2.new(0.5, -3, 1, 0), UDim2.new(0.5, 3, 0, 0))
+            ba.TextSize = 11
+            bb.TextSize = 11
+            ba.MouseButton1Click:Connect(fa)
+            bb.MouseButton1Click:Connect(fb)
+            return ba, bb
+        end
+        gearF = featPage
+        section(featPage, "MOVE")
+        _, wsPaintSteal = togGear(featPage, "walk speed", function() return _G.SabcomWalkSpeedOn == true end, function(v)
+            if type(_G.SabcomSetWalkSpeed) == "function" then
+                pcall(_G.SabcomSetWalkSpeed, v)
+            else
+                _G.SabcomWalkSpeedOn = v and true or false
+            end
+        end, function()
+            setWalkSpeedGui(not (_G.SabcomWalkSpeedGui ~= false))
+        end)
+        _, fovPaintSteal = togGear(featPage, "fov", function() return _G.SabcomFovOn == true end, function(v)
+            if type(_G.SabcomSetFov) == "function" then
+                pcall(_G.SabcomSetFov, v)
+            else
+                _G.SabcomFovOn = v and true or false
+            end
+        end, function()
+            setFovGui(not (_G.SabcomFovGui ~= false))
+        end)
+        local _, paintFloat = tog(featPage, "float", function() return _G.SabcomFloat == true end, function(v)
+            if type(_G.SabcomSetFloat) == "function" then
+                pcall(_G.SabcomSetFloat, v)
+            else
+                _G.SabcomFloat = v and true or false
+            end
+        end)
+        _G.SabcomPaintFloat = paintFloat
+        local _, paintInfJump = tog(featPage, "infinity jump", function() return _G.SabcomInfJump == true end, function(v)
+            if type(_G.SabcomSetInfJump) == "function" then
+                pcall(_G.SabcomSetInfJump, v)
+            else
+                _G.SabcomInfJump = v and true or false
+            end
+        end)
+        _G.SabcomPaintInfJump = paintInfJump
+        _G.SabcomPaintWalkSpeed = function()
+            if wsPaintSteal then wsPaintSteal() end
+            if wsPaintPanel then wsPaintPanel() end
+        end
+        _G.SabcomPaintFov = function()
+            if fovPaintSteal then fovPaintSteal() end
+            if fovPaintPanel then fovPaintPanel() end
+        end
+        section(featPage, "STEAL")
+        pillTog(featPage, "auto steal", function() return _G.SabcomAutoSteal == true end, function(v)
+            _G.SabcomAutoSteal = v and true or false
+            if type(_G.SabcomSetAutoStealRuntime) == "function" then
+                _G.SabcomSetAutoStealRuntime(_G.SabcomAutoSteal)
+            end
+            if type(_G.SabcomSyncNearestInstant) == "function" then pcall(_G.SabcomSyncNearestInstant) end
+        end)
+        _, akPaintSteal = togGear(featPage, "auto kick", function() return _G.SabcomAutoKick == true end, function(v)
+            _G.SabcomAutoKick = v and true or false
+            if type(_G.SabcomSetAutoKick) == "function" then pcall(_G.SabcomSetAutoKick, v) end
+        end, function()
+            setAutoKickGui(not (_G.SabcomAutoKickGui == true))
+        end)
+        section(featPage, "INVIS")
+        pillTog(featPage, "auto invis on steal", function() return _G.AutoInvisDuringSteal == true end, function(v)
+            _G.AutoInvisDuringSteal = v and true or false
+        end)
+        _, paintInvisSteal = tog(featPage, "invis", function() return _G.invisibleStealEnabled == true end, function(v)
+            syncInvisToggle(v)
+        end)
+        _, ivPaintSteal = tog(featPage, "invis gui", function() return _G.SabcomInvisGui == true end, setInvisGui)
+        slider("invis depth", 0, 20, 0.5, function() return tonumber(_G.SinkSliderValue) or 7 end, function(v) _G.SinkSliderValue = v end, featPage)
+        slider("invis rotation", 0, 360, 5, function() return tonumber(_G.InvisStealAngle) or 225 end, function(v) _G.InvisStealAngle = v end, featPage)
+        section(featPage, "TP")
+        pillTog(featPage, "auto tp", function() return _G.SabcomAutoTP ~= false end, function(v)
+            _G.SabcomAutoTP = v and true or false
+            _G.sabcomAutoTP = v and true or false
+            if type(_G.SabcomSyncBabySharkTpGlobals) == "function" then pcall(_G.SabcomSyncBabySharkTpGlobals) end
+        end)
+        actionRow(featPage, "manual tp", function()
+            task.spawn(function()
+                if type(_G.SabcomStartSideTP) == "function" then pcall(_G.SabcomStartSideTP) end
+            end)
+        end, "reset", function()
+            if type(_G.SabcomInstantReset) == "function" then pcall(_G.SabcomInstantReset) end
+        end)
+        do
+            local row = mk("Frame", featPage, {Size = UDim2.new(1, -4, 0, 24), BackgroundTransparency = 1})
+            mk("TextLabel", row, {
+                BackgroundTransparency = 1, Size = UDim2.new(0, 62, 1, 0), Font = F, TextSize = 11,
+                TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = "tp item :",
+            })
+            local nameBtn = btn(row, currentCarpetTool(), UDim2.new(1, -66, 1, 0), UDim2.new(0, 64, 0, 0))
+            nameBtn.TextSize = 11
+            nameBtn.TextTruncate = Enum.TextTruncate.AtEnd
+            nameBtn.MouseButton1Click:Connect(function()
+                nameBtn.Text = cycleCarpetTool()
+                if type(_G.SabcomSaveConfigNow) == "function" then
+                    pcall(_G.SabcomSaveConfigNow)
+                else
+                    saveTpSettings()
+                end
+            end)
+        end
+        slider("min gen", 0, 50000000, 100000, function() return tonumber(_G.SabcomMinGen) or 0 end, function(v) _G.SabcomMinGen = v end, featPage)
+        slider("velocity", 200, 750, 5, function() return _G.TPVelocity end, function(v) _G.TPVelocity = v end, featPage)
+        slider("climb", 100, 800, 5, function() return _G.SabcomClimb end, function(v) _G.SabcomClimb = v end, featPage)
+        slider("go speed", 80, 800, 5, function() return _G.SabcomGoSpeed end, function(v) _G.SabcomGoSpeed = v; _G.SabcomBrainrotSpeed = v end, featPage)
+        slider("close speed", 20, 250, 5, function() return _G.SabcomCloseSpeed end, function(v) _G.SabcomCloseSpeed = v end, featPage)
+        slider("landing delay", 0.15, 0.75, 0.05, function() return _G.LandingDelay end, function(v) _G.LandingDelay = v end, featPage)
+        slider("tp delay", 0, 5, 0.05, function()
+            return tonumber(_G._stp_tpDelay) or tonumber(_G.TPDelay) or 0
+        end, function(v)
+            _G._stp_tpDelay = v
+            _G.TPDelay = v
+        end, featPage)
+        slider("boost window", 1, 60, 1, function() return _G.SabcomBoostWindow end, function(v) _G.SabcomBoostWindow = v end, featPage)
+        slider("post clone delay", 0, 0.5, 0.05, function() return _G.SabcomPostCloneDelay end, function(v) _G.SabcomPostCloneDelay = v end, featPage)
+        section(featPage, "ESP")
+        pillTog(featPage, "esp player", function() return _G.SabcomEspPlayer == true end, function(v)
+            if type(_G.SabcomSetEspPlayer) == "function" then
+                pcall(_G.SabcomSetEspPlayer, v)
+            else
+                _G.SabcomEspPlayer = v and true or false
+            end
+        end)
+        pillTog(featPage, "brainrot esp", function() return _G.SabcomBrainrotEsp == true end, function(v)
+            if type(_G.SabcomSetBrainrotEsp) == "function" then
+                pcall(_G.SabcomSetBrainrotEsp, v)
+            else
+                _G.SabcomBrainrotEsp = v and true or false
+            end
+            pcall(_G.SabcomSaveConfig)
+        end)
+        pillTog(featPage, "line to base", function() return _G.SabcomLineToBase == true end, function(v)
+            if type(_G.SabcomSetLineToBase) == "function" then
+                pcall(_G.SabcomSetLineToBase, v)
+            else
+                _G.SabcomLineToBase = v and true or false
+            end
+        end)
+        pillTog(featPage, "line to brainrot", function() return _G.SabcomLineToBrainrot == true end, function(v)
+            if type(_G.SabcomSetLineToBrainrot) == "function" then
+                pcall(_G.SabcomSetLineToBrainrot, v)
+            else
+                _G.SabcomLineToBrainrot = v and true or false
+            end
+        end)
+        section(featPage, "UI")
+        pillTog(featPage, "auto close gui", function() return _G.SabcomAutoCloseGui == true end, function(v)
+            _G.SabcomAutoCloseGui = v and true or false
+            if v then setExtrasHidden(true) end
+        end)
+        pillTog(featPage, "lock position", function() return _G.SabcomLockUi == true end, function(v)
+            _G.SabcomLockUi = v and true or false
+        end)
+        section(featPage, "MORE")
+        pillTog(featPage, "direct path", function() return _G.SabcomDirect ~= false end, function(v) _G.SabcomDirect = v and true or false end)
+        pillTog(featPage, "jump once", function() return _G.SabcomJumpOnce ~= false end, function(v) _G.SabcomJumpOnce = v and true or false end)
+        pillTog(featPage, "prefer front", function() return _G.SabcomPreferFrontOnRow ~= false end, function(v) _G.SabcomPreferFrontOnRow = v and true or false end)
+        pillTog(featPage, "x ray", function() return _G.SabcomXray == true end, function(v)
+            _G.SabcomXray = v and true or false
+            if v then
+                if type(_G.SabcomStartXrayRetry) == "function" then
+                    pcall(_G.SabcomStartXrayRetry)
+                elseif type(_G.SabcomApplyXrayIfEnabled) == "function" then
+                    pcall(_G.SabcomApplyXrayIfEnabled)
+                elseif type(_G.SabcomEnableXray) == "function" then
+                    pcall(_G.SabcomEnableXray)
+                end
+            else
+                if type(_G.SabcomDisableXray) == "function" then pcall(_G.SabcomDisableXray) end
+            end
+        end)
+        pillTog(featPage, "auto turret", function() return _G.SabcomAutoTurret == true end, function(v)
+            _G.SabcomAutoTurret = v and true or false
+            if type(_G.SabcomSetAutoTurret) == "function" then
+                pcall(_G.SabcomSetAutoTurret, _G.SabcomAutoTurret)
+            end
+        end)
+        pillTog(featPage, "auto recover", function() return _G.AutoRecoverLagback ~= false end, function(v) _G.AutoRecoverLagback = v and true or false end)
+        _, faPaintSteal = tog(featPage, "face away", function() return _G.SabcomFaceAwayGui == true end, setFaceAwayGui)
+        local _, paintCarpet = tog(featPage, "carpet speed", function() return _G.SabcomCarpetSpeed == true end, function(v)
+            if type(_G.SabcomSetCarpetSpeed) == "function" then
+                pcall(_G.SabcomSetCarpetSpeed, v)
+            else
+                _G.SabcomCarpetSpeed = v and true or false
+            end
+        end)
+        _G.SabcomPaintCarpetSpeed = paintCarpet
+        local _, paintAutoBuy = tog(featPage, "auto buy", function() return _G.SabcomAutoBuy == true end, function(v)
+            if type(_G.SabcomSetAutoBuy) == "function" then
+                pcall(_G.SabcomSetAutoBuy, v)
+            else
+                _G.SabcomAutoBuy = v and true or false
+            end
+        end)
+        _G.SabcomPaintAutoBuy = paintAutoBuy
+
+        local foot = mk("Frame", extras, {
+            Size = UDim2.new(1, -16, 0, 24), Position = UDim2.new(0, 8, 1, -32),
+            BackgroundTransparency = 1,
+        })
+        local kickBtn
+        kickBtn, priOpenBtn = actionRow(foot, "kick", function()
+            if type(_G.SabcomDoKick) == "function" then pcall(_G.SabcomDoKick, true) end
+        end, "edit priority", function()
+            if type(_G.SabcomTogglePriorityList) == "function" then
+                pcall(_G.SabcomTogglePriorityList)
+            end
+        end)
+        kickBtn.Size = UDim2.new(0.5, -3, 1, 0)
+        priOpenBtn.Size = UDim2.new(0.5, -3, 1, 0)
+        kickBtn.BackgroundTransparency = 1
+        kickBtn.TextColor3 = onC
+        kickBtn.Font = FB
+
+        keyBindRow(bindPage, "hide gui", function() return _G._stp_hideGuiKeyName or "RightShift" end, function(v) _G._stp_hideGuiKeyName = v end)
+        keyBindRow(bindPage, "manual tp", function() return _G._stp_tpKeyName or "T" end, function(v) _G._stp_tpKeyName = v end)
+        keyBindRow(bindPage, "instant reset", function() return _G._stp_resetKeyName or "X" end, function(v) _G._stp_resetKeyName = v end)
+        keyBindRow(bindPage, "instant clone", function() return _G._stp_cloneKeyName or "C" end, function(v) _G._stp_cloneKeyName = v end)
+        keyBindRow(bindPage, "drop brainrot", function() return _G._stp_dropKeyName or "B" end, function(v) _G._stp_dropKeyName = v end)
+        keyBindRow(bindPage, "invis key", function() return _G._stp_invisKeyName or "U" end, function(v) _G._stp_invisKeyName = v end)
+        keyBindRow(bindPage, "float", function() return _G._stp_floatKeyName or "Z" end, function(v) _G._stp_floatKeyName = v end)
+        keyBindRow(bindPage, "infinity jump", function() return _G._stp_infJumpKeyName or "G" end, function(v) _G._stp_infJumpKeyName = v end)
+        keyBindRow(bindPage, "carpet speed key", function() return _G._stp_carpetSpeedKeyName or "Q" end, function(v) _G._stp_carpetSpeedKeyName = v end)
+        keyBindRow(bindPage, "auto buy", function() return _G._stp_autoBuyKeyName or "K" end, function(v) _G._stp_autoBuyKeyName = v end)
+        keyBindRow(bindPage, "walk speed", function() return _G._stp_walkSpeedKeyName or "V" end, function(v) _G._stp_walkSpeedKeyName = v end)
+        keyBindRow(bindPage, "kick", function() return _G._stp_kickKeyName or "P" end, function(v) _G._stp_kickKeyName = v end)
+
+
+    local function buildRestGuis()
+    akPanel = mk("Frame", sg, {
+        Size = UDim2.fromOffset(AK_W, AK_H),
+        Position = UDim2.fromOffset(tonumber(_G._stp_akX) or 16, tonumber(_G._stp_akY) or 320),
+        BackgroundColor3 = bg, BorderSizePixel = 0, Active = true,
+        Visible = _G.SabcomAutoKickGui == true,
+    })
+    corner(akPanel, 10)
+    stroke(akPanel)
+    local akHeader = mk("TextButton", akPanel, {
+        Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "auto kick", Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = false,
+    })
+    bindPanelDrag(akHeader, akPanel, "_stp_akX", "_stp_akY")
+    local akBody = mk("Frame", akPanel, {
+        Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -30),
+        BackgroundTransparency = 1,
+    })
+    mk("UIListLayout", akBody, {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
+    togGear(akBody, "auto kick", function() return _G.SabcomAutoKick == true end, function(v)
+        _G.SabcomAutoKick = v and true or false
+        if type(_G.SabcomSetAutoKick) == "function" then pcall(_G.SabcomSetAutoKick, v) end
+    end, function()
+        if psPanel then psPanel.Visible = not psPanel.Visible end
+    end)
+    do
+        local rejoinBtn = btn(akBody, "rejoin", UDim2.new(1, -4, 0, 26), UDim2.new())
+        rejoinBtn.MouseButton1Click:Connect(function()
+            pcall(function()
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, LP)
+            end)
+        end)
+    end
+    do
+        local kickBtn = btn(akBody, "kick", UDim2.new(1, -4, 0, 26), UDim2.new())
+        kickBtn.MouseButton1Click:Connect(function()
+            if type(_G.SabcomDoKick) == "function" then pcall(_G.SabcomDoKick, true) end
+        end)
+    end
+
+    psPanel = mk("Frame", sg, {
+        Size = UDim2.fromOffset(PS_W, PS_H),
+        Position = UDim2.fromOffset(tonumber(_G._stp_psX) or 224, tonumber(_G._stp_psY) or 320),
+        BackgroundColor3 = bg, BorderSizePixel = 0, Active = true, Visible = false,
+    })
+    corner(psPanel, 10)
+    stroke(psPanel)
+    local psHeader = mk("TextButton", psPanel, {
+        Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "private server", Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = false,
+    })
+    bindPanelDrag(psHeader, psPanel, "_stp_psX", "_stp_psY")
+    local psBody = mk("Frame", psPanel, {
+        Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -30),
+        BackgroundTransparency = 1,
+    })
+    mk("UIListLayout", psBody, {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
+    tog(psBody, "kick to ps", function() return _G.SabcomKickToPS ~= false end, function(v)
+        _G.SabcomKickToPS = v and true or false
+    end)
+    local psBox = mk("TextBox", psBody, {
+        Size = UDim2.new(1, -4, 0, 26), BackgroundColor3 = btnC, BorderSizePixel = 0,
+        Font = F, TextSize = 11, TextColor3 = tx, PlaceholderText = "ps code or link",
+        PlaceholderColor3 = mute, Text = tostring(_G.SabcomPSCode or ""), ClearTextOnFocus = false,
+    })
+    corner(psBox, 7)
+    psBox.FocusLost:Connect(function()
+        _G.SabcomPSCode = tostring(psBox.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        saveTpSettings()
+    end)
+
+    wsPanel = mk("Frame", sg, {
+        Size = UDim2.fromOffset(WS_W, WS_H),
+        Position = UDim2.fromOffset(tonumber(_G._stp_wsX) or 16, tonumber(_G._stp_wsY) or 560),
+        BackgroundColor3 = bg, BorderSizePixel = 0, Active = true,
+        Visible = _G.SabcomWalkSpeedGui ~= false,
+    })
+    corner(wsPanel, 10)
+    stroke(wsPanel)
+    local wsHeader = mk("TextButton", wsPanel, {
+        Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "walk speed", Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = false,
+    })
+    bindPanelDrag(wsHeader, wsPanel, "_stp_wsX", "_stp_wsY")
+    local wsBody = mk("Frame", wsPanel, {
+        Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -30),
+        BackgroundTransparency = 1,
+    })
+    mk("UIListLayout", wsBody, {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
+    do
+        local row = mk("Frame", wsBody, {Size = UDim2.new(1, -4, 0, 26), BackgroundTransparency = 1})
+        mk("TextLabel", row, {
+            BackgroundTransparency = 1, Size = UDim2.new(1, -100, 1, 0), Font = F, TextSize = 11,
+            TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = "keybind",
+        })
+        local k = btn(row, tostring(_G._stp_walkSpeedKeyName or "V"), UDim2.fromOffset(56, 24), UDim2.new(1, -96, 0, 1))
+        k.MouseButton1Click:Connect(function()
+            k.Text = "..."
+            _G.SabcomCapturingKey = true
+            local conn
+            conn = UIS.InputBegan:Connect(function(input)
+                if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                conn:Disconnect()
+                _G.SabcomCapturingKey = false
+                _G._stp_walkSpeedKeyName = input.KeyCode.Name
+                k.Text = input.KeyCode.Name
+                if type(_G.SabcomSaveConfigNow) == "function" then
+                    pcall(_G.SabcomSaveConfigNow)
+                else
+                    saveTpSettings()
+                end
+            end)
+        end)
+        local track = mk("TextButton", row, {
+            Size = UDim2.fromOffset(36, 18), Position = UDim2.new(1, -36, 0.5, -9),
+            BackgroundColor3 = btnC, BorderSizePixel = 0, Text = "", AutoButtonColor = false,
+        })
+        corner(track, 9)
+        local knob = mk("Frame", track, {
+            Size = UDim2.fromOffset(14, 14), Position = UDim2.fromOffset(2, 2),
+            BackgroundColor3 = Color3.fromRGB(255, 255, 255), BorderSizePixel = 0,
+        })
+        corner(knob, 7)
+        local function paint()
+            local onv = _G.SabcomWalkSpeedOn == true
+            track.BackgroundColor3 = onv and onC or btnC
+            knob.Position = onv and UDim2.fromOffset(20, 2) or UDim2.fromOffset(2, 2)
+        end
+        track.MouseButton1Click:Connect(function()
+            local want = not (_G.SabcomWalkSpeedOn == true)
+            if type(_G.SabcomSetWalkSpeed) == "function" then
+                pcall(_G.SabcomSetWalkSpeed, want)
+            else
+                _G.SabcomWalkSpeedOn = want
+            end
+            paint()
+            saveTpSettings()
+        end)
+        paint()
+        wsPaintPanel = paint
+    end
+    slider("walk speed", 16, 100, 1, function() return tonumber(_G.SabcomWalkSpeed) or 16 end, function(v)
+        _G.SabcomWalkSpeed = math.clamp(tonumber(v) or 16, 16, 100)
+    end, wsBody)
+
+    fovPanel = mk("Frame", sg, {
+        Size = UDim2.fromOffset(FOV_W, FOV_H),
+        Position = UDim2.fromOffset(tonumber(_G._stp_fovX) or 16, tonumber(_G._stp_fovY) or 660),
+        BackgroundColor3 = bg, BorderSizePixel = 0, Active = true,
+        Visible = _G.SabcomFovGui ~= false,
+    })
+    corner(fovPanel, 10)
+    stroke(fovPanel)
+    local fovHeader = mk("TextButton", fovPanel, {
+        Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "FOV", Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = false,
+    })
+    bindPanelDrag(fovHeader, fovPanel, "_stp_fovX", "_stp_fovY")
+    local fovBody = mk("Frame", fovPanel, {
+        Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -30),
+        BackgroundTransparency = 1,
+    })
+    mk("UIListLayout", fovBody, {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
+    _, fovPaintPanel = tog(fovBody, "fov", function() return _G.SabcomFovOn == true end, function(v)
+        if type(_G.SabcomSetFov) == "function" then
+            pcall(_G.SabcomSetFov, v)
+        else
+            _G.SabcomFovOn = v and true or false
+        end
+    end)
+    slider("fov", 70, 120, 1, function() return tonumber(_G.SabcomFov) or 70 end, function(v)
+        _G.SabcomFov = math.clamp(tonumber(v) or 70, 70, 120)
+        if _G.SabcomFovOn == true then
+            local cam = workspace.CurrentCamera
+            if cam then cam.FieldOfView = _G.SabcomFov end
+        end
+    end, fovBody)
+
+    ivPanel = mk("Frame", sg, {
+        Size = UDim2.fromOffset(IV_W, IV_H),
+        Position = UDim2.fromOffset(tonumber(_G._stp_ivX) or 16, tonumber(_G._stp_ivY) or 450),
+        BackgroundColor3 = bg, BorderSizePixel = 0, Active = true,
+        Visible = _G.SabcomInvisGui == true,
+    })
+    corner(ivPanel, 10)
+    stroke(ivPanel)
+    local ivHeader = mk("TextButton", ivPanel, {
+        Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "invis steal", Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = false,
+    })
+    bindPanelDrag(ivHeader, ivPanel, "_stp_ivX", "_stp_ivY")
+    local ivBody = mk("ScrollingFrame", ivPanel, {
+        Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -30),
+        BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4,
+        CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    })
+    mk("UIListLayout", ivBody, {Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder})
+    _, paintInvisIv = tog(ivBody, "invis", function() return _G.invisibleStealEnabled == true end, function(v)
+        syncInvisToggle(v)
+        saveTpSettings()
+    end)
+    do
+        local keyRow = mk("Frame", ivBody, {Size = UDim2.new(1, -4, 0, 26), BackgroundTransparency = 1})
+        mk("TextLabel", keyRow, {
+            BackgroundTransparency = 1, Size = UDim2.new(1, -62, 1, 0), Font = F, TextSize = 11,
+            TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = "invis key",
+        })
+        local k = btn(keyRow, tostring(_G._stp_invisKeyName or "U"), UDim2.fromOffset(56, 24), UDim2.new(1, -56, 0, 1))
+        k.MouseButton1Click:Connect(function()
+            k.Text = "..."
+            _G.SabcomCapturingKey = true
+            local conn
+            conn = UIS.InputBegan:Connect(function(input)
+                if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                conn:Disconnect()
+                _G.SabcomCapturingKey = false
+                _G._stp_invisKeyName = input.KeyCode.Name
+                k.Text = input.KeyCode.Name
+                if type(_G.SabcomSaveConfigNow) == "function" then
+                    pcall(_G.SabcomSaveConfigNow)
+                else
+                    saveTpSettings()
+                end
+            end)
+        end)
+    end
+    slider("depth", 0, 20, 0.5, function() return tonumber(_G.SinkSliderValue) or 7 end, function(v) _G.SinkSliderValue = v end, ivBody)
+    slider("rotation", 0, 360, 5, function() return tonumber(_G.InvisStealAngle) or 225 end, function(v) _G.InvisStealAngle = v end, ivBody)
+    tog(ivBody, "auto invis", function() return _G.AutoInvisDuringSteal == true end, function(v) _G.AutoInvisDuringSteal = v and true or false end)
+    tog(ivBody, "auto recover", function() return _G.AutoRecoverLagback ~= false end, function(v) _G.AutoRecoverLagback = v and true or false end)
+    do
+        local runBtn = btn(ivBody, "toggle invis", UDim2.new(1, -4, 0, 26), UDim2.new())
+        runBtn.MouseButton1Click:Connect(function()
+            if type(_G.toggleInvisibleSteal) == "function" then
+                pcall(_G.toggleInvisibleSteal)
+                saveTpSettings()
+            end
+        end)
+    end
+
+    local FA_W, FA_H = 210, 262
+    local function setFaPlayer(name)
+        _G.SabcomFaceAwayTarget = tostring(name or "")
+        saveTpSettings()
+        if faRefreshList then faRefreshList() end
+    end
+    faPanel = mk("Frame", sg, {
+        Size = UDim2.fromOffset(FA_W, FA_H),
+        Position = UDim2.fromOffset(tonumber(_G._stp_faX) or 240, tonumber(_G._stp_faY) or 80),
+        BackgroundColor3 = bg, BorderSizePixel = 0, Active = true,
+        Visible = _G.SabcomFaceAwayGui == true,
+    })
+    corner(faPanel, 10)
+    stroke(faPanel)
+    local faHeader = mk("TextButton", faPanel, {
+        Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "face away", Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = false,
+    })
+    bindPanelDrag(faHeader, faPanel, "_stp_faX", "_stp_faY")
+    local faBody = mk("Frame", faPanel, {
+        Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -30),
+        BackgroundTransparency = 1, ClipsDescendants = true,
+    })
+    mk("UIListLayout", faBody, {Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder})
+    tog(faBody, "face away", function() return _G.SabcomFaceAway == true end, setFaceAway)
+    tog(faBody, "base owner", function() return _G.SabcomFaceAwayBaseOwner == true end, function(v)
+        _G.SabcomFaceAwayBaseOwner = v and true or false
+        saveTpSettings()
+    end)
+    tog(faBody, "nearest", function() return _G.SabcomFaceAwayNearest == true end, function(v)
+        _G.SabcomFaceAwayNearest = v and true or false
+        saveTpSettings()
+    end)
+    tog(faBody, "click to face", function() return _G.SabcomFaceAwayClick == true end, function(v)
+        _G.SabcomFaceAwayClick = v and true or false
+        saveTpSettings()
+    end)
+    faSearch = mk("TextBox", faBody, {
+        Size = UDim2.new(1, -4, 0, 22), BackgroundColor3 = btnC, BorderSizePixel = 0,
+        Font = F, TextSize = 10, TextColor3 = tx, PlaceholderText = "search players...",
+        PlaceholderColor3 = mute, Text = "", ClearTextOnFocus = false,
+    })
+    corner(faSearch, 6)
+    faList = mk("ScrollingFrame", faBody, {
+        Size = UDim2.new(1, -4, 0, 118), BackgroundTransparency = 1, BorderSizePixel = 0,
+        ScrollBarThickness = 3, CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    })
+    mk("UIListLayout", faList, {Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder})
+    faRefreshList = function()
+        for _, ch in ipairs(faList:GetChildren()) do
+            if ch:IsA("TextButton") then ch:Destroy() end
+        end
+        local q = string.lower(tostring(faSearch.Text or ""))
+        local rows = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then
+                local dn, un = string.lower(p.DisplayName), string.lower(p.Name)
+                if q == "" or dn:find(q, 1, true) or un:find(q, 1, true) then
+                    rows[#rows + 1] = p
+                end
+            end
+        end
+        table.sort(rows, function(a, b) return a.DisplayName:lower() < b.DisplayName:lower() end)
+        for _, p in ipairs(rows) do
+            local line = p.DisplayName
+            if #line > 28 then line = string.sub(line, 1, 25) .. "..." end
+            local row = btn(faList, line, UDim2.new(1, -4, 0, 24), UDim2.new())
+            row.TextXAlignment = Enum.TextXAlignment.Left
+            row.TextSize = 9
+            row.Font = F
+            if _G.SabcomFaceAwayTarget == p.Name then
+                row.BackgroundColor3 = onC
+                row.TextColor3 = Color3.fromRGB(12, 12, 14)
+            end
+            row.MouseButton1Click:Connect(function()
+                if _G.SabcomFaceAwayClick == true then
+                    setFaPlayer(p.Name)
+                end
+            end)
+        end
+    end
+    faSearch:GetPropertyChangedSignal("Text"):Connect(faRefreshList)
+    Players.PlayerAdded:Connect(function() task.defer(faRefreshList) end)
+    Players.PlayerRemoving:Connect(function(p)
+        if _G.SabcomFaceAwayTarget == p.Name then
+            setFaPlayer("")
+        else
+            task.defer(faRefreshList)
+        end
+    end)
+    faRefreshList()
+    if _G.SabcomFaceAway == true and type(_G.SabcomSetFaceAway) == "function" then pcall(_G.SabcomSetFaceAway, true) end
+    end
+
+    local pri = mk("Frame", sg, {
+        Size = UDim2.fromOffset(240, 210),
+        Position = UDim2.fromOffset(tonumber(_G._stp_priX) or 300, tonumber(_G._stp_priY) or 80),
+        BackgroundColor3 = bg, BorderSizePixel = 0, Visible = false, Active = true,
+    })
+    corner(pri, 10)
+    stroke(pri)
+    local priH = mk("TextButton", pri, {
+        Size = UDim2.new(1, 0, 0, 22), BackgroundTransparency = 1,
+        Text = "edit priority", Font = FB, TextSize = 12, TextColor3 = tx, AutoButtonColor = false,
+    })
+    bindPanelDrag(priH, pri, "_stp_priX", "_stp_priY")
+    local priScroll = mk("ScrollingFrame", pri, {
+        Position = UDim2.fromOffset(6, 24), Size = UDim2.new(1, -12, 1, -56),
+        BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4,
+        AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.fromOffset(0, 0),
+    })
+    mk("UIListLayout", priScroll, {Padding = UDim.new(0, 3)})
+    local addBox = mk("TextBox", pri, {
+        Position = UDim2.new(0, 6, 1, -28), Size = UDim2.new(1, -40, 0, 22),
+        BackgroundColor3 = btnC, BorderSizePixel = 0, Font = F, TextSize = 12,
+        TextColor3 = tx, PlaceholderText = "add name", Text = "",
+    })
+    corner(addBox, 6)
+    local addBtn = btn(pri, "+", UDim2.fromOffset(24, 22), UDim2.new(1, -30, 1, -28))
+    local function priCopy()
+        local t = {}
+        local src = _G.SHARED_PRIORITY_ITEMS
+        if type(src) == "table" then for i, v in ipairs(src) do t[i] = v end end
+        return t
+    end
+    local function priCommit(t)
+        _G.SHARED_PRIORITY_ITEMS = t
+        _G._stp_priorityCfg = t
+        if type(_G.SabcomInvalidatePriMap) == "function" then pcall(_G.SabcomInvalidatePriMap) end
+        if type(_G.SabcomBustScanCache) == "function" then pcall(_G.SabcomBustScanCache) end
+        if type(_G.SabcomForceResortList) == "function" then pcall(_G.SabcomForceResortList) end
+        if type(_G.SabcomSaveConfigNow) == "function" then
+            pcall(_G.SabcomSaveConfigNow)
+        else
+            saveTpSettings()
+        end
+        if type(_G.SabcomRefreshStealTarget) == "function" then pcall(_G.SabcomRefreshStealTarget) end
+    end
+    local function refreshPri()
+        for _, ch in ipairs(priScroll:GetChildren()) do
+            if ch:IsA("Frame") then ch:Destroy() end
+        end
+        local t = priCopy()
+        for i, name in ipairs(t) do
+            local row = mk("Frame", priScroll, {Size = UDim2.new(1, -4, 0, 20), BackgroundTransparency = 1})
+            mk("TextLabel", row, {
+                BackgroundTransparency = 1, Size = UDim2.new(1, -72, 1, 0), Font = F, TextSize = 11,
+                TextColor3 = tx, TextXAlignment = Enum.TextXAlignment.Left, Text = tostring(name),
+            })
+            local up = btn(row, "^", UDim2.fromOffset(20, 18), UDim2.new(1, -62, 0, 1))
+            local dn = btn(row, "v", UDim2.fromOffset(20, 18), UDim2.new(1, -40, 0, 1))
+            local dl = btn(row, "x", UDim2.fromOffset(20, 18), UDim2.new(1, -18, 0, 1))
+            up.MouseButton1Click:Connect(function()
+                if i <= 1 then return end
+                t[i], t[i - 1] = t[i - 1], t[i]
+                priCommit(t)
+                refreshPri()
+            end)
+            dn.MouseButton1Click:Connect(function()
+                if i >= #t then return end
+                t[i], t[i + 1] = t[i + 1], t[i]
+                priCommit(t)
+                refreshPri()
+            end)
+            dl.MouseButton1Click:Connect(function()
+                table.remove(t, i)
+                priCommit(t)
+                refreshPri()
+            end)
+        end
+    end
+    addBtn.MouseButton1Click:Connect(function()
+        local n = tostring(addBox.Text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if n == "" then return end
+        local t = priCopy()
+        t[#t + 1] = n
+        priCommit(t)
+        addBox.Text = ""
+        refreshPri()
+    end)
+    local function togglePri()
+        refreshPri()
+        pri.Visible = not pri.Visible
+    end
+    _G.SabcomOpenPriorityList = function() refreshPri(); pri.Visible = true end
+    _G.SabcomTogglePriorityList = togglePri
+
+        pcall(buildRestGuis)
+        priPanel = pri
+        if extrasHidden or guiHidden then extras.Visible = false end
+        if guiHidden then setGuiHidden(true) end
+        return extras
+    end
+    task.defer(ensureExtras)
+    end
+end)
+
+task.spawn(function()
+local function instantReset()
+    _G.SabcomTPStop = true
+    _G.sabcomTPStop = true
+    pcall(function()
+        if type(_G.SabcomInvisOff) == "function" then
+            _G.SabcomInvisOff()
+        elseif _G.invisibleStealEnabled == true and type(_G.toggleInvisibleSteal) == "function" then
+            _G.toggleInvisibleSteal()
+        end
+    end)
+    if type(_G.SabcomPaintInvisToggles) == "function" then
+        pcall(_G.SabcomPaintInvisToggles)
+    end
+    pcall(function()
+        local char = LP.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum:UnequipTools() end
+        if char then
+            local bp = LP:FindFirstChild("Backpack")
+            for _, t in ipairs(char:GetChildren()) do
+                if t:IsA("Tool") then
+                    if bp then t.Parent = bp else t:Destroy() end
+                end
+            end
+        end
+    end)
+    local player = game.Players.LocalPlayer
+    local character = player and player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        if type(_G.SabcomClearTpGoState) == "function" then pcall(_G.SabcomClearTpGoState) end
+        return
+    end
+    local n = math.max(1, math.floor(tonumber(_G.SabcomResetRepeats) or 1))
+    local d = tonumber(_G.SabcomResetDelay) or 0.05
+    for i = 1, n do
+        character = player.Character
+        root = character and character:FindFirstChild("HumanoidRootPart")
+        if not root then break end
+        root.CFrame = root.CFrame + Vector3.new(0, 60000, 0)
+        task.wait(d)
+        character = player.Character
+        root = character and character:FindFirstChild("HumanoidRootPart")
+        if not root then break end
+        root.CFrame = root.CFrame + Vector3.new(0, -30000, 0)
+        if i < n then task.wait(d) end
+    end
+    if type(_G.SabcomClearTpGoState) == "function" then
+        pcall(_G.SabcomClearTpGoState)
+    end
+end
+_G.SabcomInstantReset = instantReset
+
+UIS.InputBegan:Connect(function(input, gameProcessed)
+    if input.UserInputType ~= Enum.UserInputType.Keyboard then return end
+    if _G.SabcomCapturingKey then return end
+    if gameProcessed then
+        local box
+        pcall(function() box = UIS:GetFocusedTextBox() end)
+        if box then return end
+    end
+    local name = input.KeyCode.Name
+    local hideWant = _G._stp_hideGuiKeyName
+    if type(hideWant) ~= "string" or hideWant == "" then hideWant = "RightShift" end
+    if name == hideWant then
+        if type(_G.SabcomToggleGui) == "function" then pcall(_G.SabcomToggleGui) end
+        return
+    end
+    local resetWant = _G._stp_resetKeyName
+    if type(resetWant) ~= "string" or resetWant == "" then resetWant = "X" end
+    if name == resetWant then
+        task.spawn(function() pcall(instantReset) end)
+        return
+    end
+    local cloneWant = _G._stp_cloneKeyName
+    if type(cloneWant) ~= "string" or cloneWant == "" then cloneWant = "C" end
+    if name == cloneWant then
+        task.spawn(function()
+            if type(_G.SabcomInstantClone) == "function" then
+                pcall(_G.SabcomInstantClone)
+            end
+        end)
+        return
+    end
+    local dropWant = _G._stp_dropKeyName
+    if type(dropWant) ~= "string" or dropWant == "" then dropWant = "B" end
+    if name == dropWant then
+        task.spawn(function()
+            if type(_G.SabcomDropBrainrot) == "function" then
+                pcall(_G.SabcomDropBrainrot)
+            end
+        end)
+        return
+    end
+    local invWant = _G._stp_invisKeyName
+    if type(invWant) ~= "string" or invWant == "" then invWant = "U" end
+    if name == invWant and type(_G.toggleInvisibleSteal) == "function" then
+        task.spawn(function() pcall(_G.toggleInvisibleSteal) end)
+        return
+    end
+    local floatWant = _G._stp_floatKeyName
+    if type(floatWant) ~= "string" or floatWant == "" then floatWant = "Z" end
+    if name == floatWant and type(_G.toggleFloat) == "function" then
+        task.spawn(function() pcall(_G.toggleFloat) end)
+        return
+    end
+    local infWant = _G._stp_infJumpKeyName
+    if type(infWant) ~= "string" or infWant == "" then infWant = "G" end
+    if name == infWant and type(_G.toggleInfJump) == "function" then
+        task.spawn(function() pcall(_G.toggleInfJump) end)
+        return
+    end
+    local carpetWant = _G._stp_carpetSpeedKeyName
+    if type(carpetWant) ~= "string" or carpetWant == "" then carpetWant = "Q" end
+    if name == carpetWant and type(_G.toggleCarpetSpeed) == "function" then
+        task.spawn(function() pcall(_G.toggleCarpetSpeed) end)
+        return
+    end
+    local buyWant = _G._stp_autoBuyKeyName
+    if type(buyWant) ~= "string" or buyWant == "" then buyWant = "K" end
+    if name == buyWant and type(_G.toggleAutoBuy) == "function" then
+        task.spawn(function() pcall(_G.toggleAutoBuy) end)
+        return
+    end
+    local wsWant = _G._stp_walkSpeedKeyName
+    if type(wsWant) ~= "string" or wsWant == "" then wsWant = "V" end
+    if name == wsWant and type(_G.toggleWalkSpeed) == "function" then
+        task.spawn(function() pcall(_G.toggleWalkSpeed) end)
+        return
+    end
+    local kickWant = _G._stp_kickKeyName
+    if type(kickWant) ~= "string" or kickWant == "" then kickWant = "P" end
+    if name == kickWant and type(_G.SabcomDoKick) == "function" then
+        task.spawn(function() pcall(_G.SabcomDoKick, true) end)
+        return
+    end
+end)
+
+pcall(loadModules)
+
+do
+    local fa = { conn = nil, autoRot = nil, stealing = false, locked = nil, cache = nil, lastTarget = 0 }
+    local function hrpOf(p)
+        local c = p and p.Character
+        return c and c:FindFirstChild("HumanoidRootPart") or nil
+    end
+    local function ownerFromPlot(plot)
+        local sign = plot:FindFirstChild("PlotSign")
+        if not sign then return nil end
+        local gui = sign:FindFirstChildWhichIsA("SurfaceGui", true)
+        if not gui then return nil end
+        local label = gui:FindFirstChildWhichIsA("TextLabel", true)
+        if not label then return nil end
+        local text = label.Text
+        if not text or text == "" or text:lower():find("empty") then return nil end
+        return text:match("^(.+)'s Base$") or text
+    end
+    local function baseOwnerPlayer()
+        local plots = workspace:FindFirstChild("Plots")
+        local me = hrpOf(LP)
+        if not plots or not me then return nil end
+        local bestPlot, bestDist = nil, math.huge
+        for _, plot in ipairs(plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local pos = sign and ((sign:IsA("BasePart") and sign.Position) or (sign.PrimaryPart and sign.PrimaryPart.Position))
+            if pos then
+                local d = (me.Position - pos).Magnitude
+                if d < bestDist then bestDist, bestPlot = d, plot end
+            end
+        end
+        if not bestPlot then return nil end
+        local ownerName = ownerFromPlot(bestPlot)
+        if not ownerName then return nil end
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and (p.Name == ownerName or p.DisplayName == ownerName) then return p end
+        end
+        return nil
+    end
+    local function nearestPlayer()
+        local me = hrpOf(LP)
+        if not me then return nil end
+        local best, bd = nil, math.huge
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then
+                local h = hrpOf(p)
+                if h then
+                    local d = (h.Position - me.Position).Magnitude
+                    if d < bd then bd, best = d, p end
+                end
+            end
+        end
+        return best
+    end
+    local function currentTarget()
+        local tgt = tostring(_G.SabcomFaceAwayTarget or "")
+        if tgt ~= "" then
+            local p = Players:FindFirstChild(tgt)
+            if p then return p end
+        end
+        if _G.SabcomFaceAwayNearest == true then return nearestPlayer() end
+        if _G.SabcomFaceAwayBaseOwner == true then
+            if fa.stealing then
+                if fa.locked and fa.locked.Parent then return fa.locked end
+                local d = baseOwnerPlayer()
+                if d then fa.locked = d; return d end
+                return nil
+            end
+            return baseOwnerPlayer()
+        end
+        return nil
+    end
+    local function releaseRotate()
+        local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+        if hum and fa.autoRot ~= nil then pcall(function() hum.AutoRotate = fa.autoRot end) end
+        fa.autoRot = nil
+    end
+    local function faceAwayFrom(pos)
+        local char = LP.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp then return end
+        if hum and fa.autoRot == nil then
+            fa.autoRot = hum.AutoRotate
+            pcall(function() hum.AutoRotate = false end)
+        end
+        local dir = pos - hrp.Position
+        dir = Vector3.new(dir.X, 0, dir.Z)
+        if dir.Magnitude < 0.05 then return end
+        hrp.CFrame = CFrame.lookAt(hrp.Position, hrp.Position - dir.Unit * 10)
+    end
+    local function stopFaceAway()
+        if fa.conn then fa.conn:Disconnect(); fa.conn = nil end
+        releaseRotate()
+        fa.stealing = false
+        fa.locked = nil
+        fa.cache = nil
+    end
+    local function startFaceAway()
+        stopFaceAway()
+        fa.conn = RunService.Heartbeat:Connect(function()
+            if _G.SabcomFaceAway ~= true then return end
+            local stealing = LP:GetAttribute("Stealing") == true
+            if stealing ~= fa.stealing then
+                fa.stealing = stealing
+                if not stealing then
+                    releaseRotate()
+                    fa.locked = nil
+                end
+            end
+            local now = os.clock()
+            if now - fa.lastTarget >= 0.25 then
+                fa.lastTarget = now
+                fa.cache = currentTarget()
+            end
+            if fa.stealing and fa.cache then
+                local th = hrpOf(fa.cache)
+                if th then faceAwayFrom(th.Position) end
+            end
+        end)
+    end
+    _G.SabcomSetFaceAway = function(on)
+        if on then startFaceAway() else stopFaceAway() end
+    end
+    if _G.SabcomFaceAway == true then pcall(startFaceAway) end
+end
+
+task.spawn(function()
+    local function isClone(model)
+        if not model:IsA("Model") then return false end
+        if not model:FindFirstChild("HumanoidRootPart") then return false end
+        if not model:FindFirstChildOfClass("Humanoid") then return false end
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr.Character == model then return false end
+        end
+        if model.Name:find("Clone") or model.Name:find("clone") then return true end
+        if model:FindFirstChild("Head") and model.Head:IsA("BasePart") then return true end
+        return false
+    end
+
+    local activeClones = {}
+
+    local function scanClones()
+        local newClones = {}
+        local seen = {}
+        local function add(model)
+            if not model or seen[model] then return end
+            if isClone(model) then
+                seen[model] = true
+                newClones[#newClones + 1] = model
+            end
+        end
+        for _, obj in ipairs(workspace:GetChildren()) do
+            add(obj)
+            local dr = obj:FindFirstChild("DoubleRig")
+            if dr then add(dr) end
+        end
+        activeClones = newClones
+    end
+
+    task.spawn(function()
+        while true do
+            task.wait(3)
+            scanClones()
+        end
+    end)
+
+    RunService.Stepped:Connect(function()
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LP and plr.Character then
+                for _, part in ipairs(plr.Character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        pcall(function() part.CanCollide = false end)
+                    end
+                end
+            end
+        end
+        for _, model in ipairs(activeClones) do
+            if model and model.Parent then
+                for _, part in ipairs(model:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        pcall(function() part.CanCollide = false end)
+                    end
+                end
+            end
+        end
+    end)
+end)
+end)
