@@ -1628,7 +1628,7 @@ task.spawn(function()
 	end
 end)
 
-local str2 = "https://autojoiner2-2d181-default-rtdb.firebaseio.com/logs.json?orderBy=%22%24key%22&"
+local str2 = "wss://sinfulnotifier.up.railway.app/ws?key=SINFUL-35J4-X6K7-BYXL-QVWF-ZPN3-MVF9-UL6J-35GZ"
 local tbl8 = {}
 local flag5 = true
 local tbl9 = {}
