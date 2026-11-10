@@ -1212,10 +1212,10 @@ end
 
 for _, obj in ipairs(playerGui:GetDescendants()) do watchRedemptionFeedbackObject(obj) end
 playerGui.DescendantAdded:Connect(function(obj)
-    task.wait(0.04)
-    watchRedemptionFeedbackObject(obj)
+    task.defer(function()
+        watchRedemptionFeedbackObject(obj)
+    end)
 end)
-
 -- ══════════════════════════════════════════════════════════
 -- ANTI-LAG EXTREME FPS BOOST — fonctions apply / remove
 -- ══════════════════════════════════════════════════════════
