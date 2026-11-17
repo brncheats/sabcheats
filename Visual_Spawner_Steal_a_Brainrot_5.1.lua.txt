@@ -1,0 +1,7364 @@
+local version = "5.1"
+local env = getgenv and getgenv() or _G
+if env.__BRSpawner and type(env.__BRSpawner.Destroy) == "function" then
+  pcall(env.__BRSpawner.Destroy)
+end
+local clonerefFn = cloneref or function(arg1)
+  return arg1
+end
+local function getService(arg1)
+  return clonerefFn(game:GetService(arg1))
+end
+local Players = getService("Players")
+local ReplicatedStorage = getService("ReplicatedStorage")
+local RunService = getService("RunService")
+local TweenService = getService("TweenService")
+local UserInputService = getService("UserInputService")
+local HttpService = getService("HttpService")
+local localPlayer = Players.LocalPlayer
+local str = [=[
+local bus = ...
+local RS = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local LP = Players.LocalPlayer
+local PlayerGui = LP:WaitForChild("PlayerGui")
+
+local function log(...)
+    local t = table.pack(...)
+    for i = 1, t.n do t[i] = tostring(t[i]) end
+    table.insert(bus.logs, os.date("%H:%M:%S ") .. table.concat(t, " ", 1, t.n))
+    if #bus.logs > 400 then table.remove(bus.logs, 1) end
+end
+
+local function try(label, fn, ...)
+    local res = table.pack(xpcall(fn, function(e) return tostring(e) .. "\n" .. debug.traceback(nil, 2) end, ...))
+    if not res[1] then log("ERRO [" .. label .. "] " .. tostring(res[2])) end
+    return table.unpack(res, 1, res.n)
+end
+
+local function req(path)
+    local cur = RS
+    for seg in string.gmatch(path, "[^%.]+") do
+        cur = cur and cur:FindFirstChild(seg)
+    end
+    if not cur then log("módulo não encontrado: " .. path) return nil end
+    local ok, m = pcall(require, cur)
+    if not ok then log("require falhou: " .. path .. " -> " .. tostring(m)) return nil end
+    return m
+end
+
+local AnimalsData   = req("Datas.Animals") or {}
+local MutationsData = req("Datas.Mutations") or {}
+local TraitsData    = req("Datas.Traits") or {}
+local RaritiesData  = req("Datas.Rarities") or {}
+local BasesData     = req("Datas.Bases") or {}
+local GameData      = req("Datas.Game") or {}
+local RebirthData   = req("Datas.Rebirth") or {}
+local IndexData     = req("Datas.Index") or {}
+local ServerData    = req("Datas.ServerData")
+local SA            = req("Shared.Animals")
+local BrainrotAssets = req("Shared.BrainrotAssets")
+local EggScale      = req("Shared.EggScale")
+local Friends       = req("Shared.Friends")
+local Updates       = req("Shared.Updates")
+local BaseSkinsFlags = req("Shared.Flags.BaseSkinsFlags")
+local BrainrotCard  = req("Shared.BrainrotCard")
+local Trove         = req("Packages.Trove")
+local FFlags        = req("Packages.FFlags")
+local Spr           = req("Packages.Spr")
+local ReplicatorClient = req("Packages.ReplicatorClient")
+local NumberUtils   = req("Utils.NumberUtils")
+local PlotController = req("Controllers.PlotController")
+local FastOverheadController = req("Controllers.FastOverheadController")
+local AnimalOverheadController = req("Controllers.AnimalOverheadController")
+local AnimationSyncController = req("Controllers.AnimationSyncController")
+local ConfirmationController = req("Controllers.ConfirmationController")
+local NotificationController = req("Controllers.NotificationController")
+local SoundController = req("Controllers.SoundController")
+local HoverInfoController = req("Controllers.HoverInfoController")
+local AnimalPrompt  = req("Classes.PlotClient.AnimalPrompt")
+
+local AnimAnimals = RS:FindFirstChild("Animations") and RS.Animations:FindFirstChild("Animals")
+
+local Global = Trove.new()
+local Fakes, SlotFake = {}, {}
+local Carry = nil
+local TempPlace = {}
+local updatePrompts, removeFake, render, unrender, startCarry, placeCarry, endCarry, sellFake, addCoins, pushList, unlockIndex
+
+local function fmt(n, d) return NumberUtils:ToString(n, d) end
+local function notifyError(msg) pcall(function() NotificationController:Error(msg) end) end
+local function notifyOk(msg) pcall(function() NotificationController:Success(msg) end) end
+local function sound(path, ...) local a = table.pack(...) pcall(function() SoundController:PlaySound(path, table.unpack(a, 1, a.n)) end) end
+
+-- ── catálogo pro hub (só valores simples) ───────────────────────────
+local function rarityWeight(r) local d = RaritiesData[r] return d and d.Weight or 1 end
+local function baseGen(d) return d.Generation or (d.Price or 0) * ((GameData.Game and GameData.Game.AnimalGanerationModifier) or 0.1) end
+
+do
+    local cat = { animals = {}, mutations = {}, traits = {}, rarities = {} }
+    for name, d in AnimalsData do
+        if type(d) == "table" and not d.LuckyBlock and not d.Egg then
+            table.insert(cat.animals, {
+                name = name, display = d.DisplayName or name, rarity = d.Rarity or "Common",
+                gen = baseGen(d), price = d.Price or 0, weight = rarityWeight(d.Rarity),
+            })
+        end
+    end
+    table.sort(cat.animals, function(a, b)
+        if a.weight ~= b.weight then return a.weight > b.weight end
+        if a.gen ~= b.gen then return a.gen > b.gen end
+        return a.display < b.display
+    end)
+    for key, d in MutationsData do
+        if type(d) == "table" then
+            table.insert(cat.mutations, {
+                key = key, display = d.DisplayText or key, icon = d.Icon or "", color = d.MainColor or Color3.new(1, 1, 1),
+                modifier = d.Modifier or 0, order = d.Order or 99,
+            })
+        end
+    end
+    table.sort(cat.mutations, function(a, b)
+        if a.order ~= b.order then return a.order < b.order end
+        if a.modifier ~= b.modifier then return a.modifier < b.modifier end
+        return a.display < b.display
+    end)
+    for key, d in TraitsData do
+        if type(d) == "table" then
+            table.insert(cat.traits, {
+                key = key, display = d.Display or key, icon = d.Icon or "", color = d.Color or Color3.new(1, 1, 1),
+                modifier = d.MultiplierModifier or 0,
+            })
+        end
+    end
+    table.sort(cat.traits, function(a, b)
+        if a.modifier ~= b.modifier then return a.modifier > b.modifier end
+        return a.display < b.display
+    end)
+    for name, d in RaritiesData do
+        cat.rarities[name] = { color = d.Color, preset = d.GradientPreset, weight = d.Weight or 1 }
+    end
+    bus.catalog = cat
+end
+
+-- ── geração (réplica 1:1 do Shared.Animals.GetGeneration, sem chamar o detector) ──
+local function cleanTraits(t) if type(t) == "table" and #t > 0 then return t end return nil end
+
+local IndexSpecial = {
+    Strawberry = "Strawberry Elephant", Meowl = "Meowl", Skibidi = "Skibidi Toilet",
+    Headless = "Headless Horseman", ["John Pork"] = "John Pork", Spyder = "Spyder Elephant",
+}
+local function canShowInIndex(name)
+    local d = AnimalsData[name]
+    if not d then return false end
+    if d.IsEnabled and not d.IsEnabled() then return false end
+    if d.HideFromIndex then return false end
+    return true
+end
+-- réplica do Shared.Index.IsComplete (o original chama Synchronizer:Get, que não responde pra nós)
+local function indexIsComplete(ch, a3)
+    if a3 == "1 OF 1" then
+        local ok, en = pcall(function() return BaseSkinsFlags.OneOfOneEnabled:Get() end)
+        return (ok and en) and LP:GetAttribute("HasOneOfOneBrainrot") == true
+    end
+    local special = IndexSpecial[a3]
+    if special ~= nil then
+        for _, m in ch:Get("AnimalPodiums") or {} do
+            if typeof(m) == "table" and m.Index == special then return true end
+        end
+        return false
+    end
+    local idx = ch:Get("Index") or {}
+    local have, total = 0, 0
+    local def = a3 and IndexData[a3]
+    if def and def.DisableIndex then return false end
+    if def and def.Update and Updates and Updates.Methods and not Updates.Methods.IsEnabled(def.Update) then return false end
+    local list = def and def.Index
+    local pct
+    if not list then
+        for name in AnimalsData do
+            if canShowInIndex(name) then
+                total += 1
+                local e = idx[name]
+                if e and e[a3 and a3 or "Default"] then have += 1 end
+            end
+        end
+        pct = def and def.CompletitionPercent or (if a3 ~= "Default" then 1 else 0.75)
+    else
+        local explicit = false
+        if def.CountAllMutations == true and not def.IsMutation then
+            local t = FFlags:GetInstant(("%*Timer"):format(a3), def.LimitedMutation)
+            explicit = (t and t < workspace:GetServerTimeNow()) and ch:Get("Migrations.LimitedIndexProgress_v1") == true or false
+        end
+        for j, k in list do
+            if not k.IgnoreIndexCounter then total += 1 end
+            local v4 = idx[j]
+            if v4 then
+                local hit
+                if def.CustomIndex then hit = v4[def.CustomIndex.Name]
+                elseif explicit then hit = v4[a3]
+                elseif def.IsMutation then hit = v4[a3]
+                else hit = next(v4) ~= nil end
+                if hit then have += 1 end
+            end
+        end
+        pct = def.CompletitionPercent or (if a3 ~= "Default" then 1 else 0.75)
+    end
+    local need = total
+    if pct ~= 1 then
+        need = math.max(math.ceil(need * pct), 1)
+        if def and def.CompletitionForcedAmount then need = def.CompletitionForcedAmount end
+    end
+    return need <= have
+end
+
+local multCache, multAt = 1, -100
+local function cashMultiplier()
+    if os.clock() - multAt < 5 then return multCache end
+    multAt = os.clock()
+    local ch = bus.chan
+    if not ch then multCache = 1 return 1 end
+    local ok, m = pcall(function()
+        local v = 1
+        local reb = ch:Get("Rebirth")
+        if type(reb) == "number" and reb > 0 then
+            local r = RebirthData[reb]
+            if r and r.Rewards and r.Rewards.Multiplier then v += r.Rewards.Multiplier end
+        end
+        local gp = ch:Get("Gamepass")
+        gp = type(gp) == "table" and gp or {}
+        if gp.VIP == true then v += 0.5 end
+        if gp["2x Money"] == true then v += 2 end
+        local now = DateTime.now().UnixTimestamp
+        local be = ch:Get("BoostExpiration")
+        be = type(be) == "table" and be or {}
+        local a, b = be["2xMoney"], be["2xMoneyBoost"]
+        if (typeof(a) == "number" and a > 0 and now < a) or (typeof(b) == "number" and b > 0 and now < b) then v += 2 end
+        v += Friends:GetFriendBoostModifier(LP)
+        local done = indexIsComplete(ch, nil) and 1 or 0
+        for key, d in IndexData do
+            if type(d) == "table" and not d.LimitedMutation and d.IsMutation then
+                if indexIsComplete(ch, key) then done += 1 end
+            end
+        end
+        v += done * 0.5
+        return v
+    end)
+    if not ok then log("multiplicador: " .. tostring(m)) m = 1 end
+    multCache = m
+    return m
+end
+
+local function calcGen(index, mutation, traits, withPlayer)
+    local d = AnimalsData[index]
+    if not d then return 0 end
+    local v = baseGen(d)
+    local mod = 1
+    if mutation and MutationsData[mutation] then mod += MutationsData[mutation].Modifier or 0 end
+    local sleepy = false
+    for _, t in cleanTraits(traits) or {} do
+        local td = TraitsData[t]
+        if td then
+            if t ~= "Sleepy" then mod += td.MultiplierModifier or 0 else sleepy = true end
+        end
+    end
+    v *= mod
+    if sleepy then v *= 0.5 end
+    if withPlayer then v *= cashMultiplier() end
+    return math.round(v)
+end
+
+-- ── base / slots ─────────────────────────────────────────────────────
+local function getPlot()
+    local ok, p = pcall(function() return PlotController:GetMyPlot() end)
+    if ok and p and p.PlotModel and p.PlotModel.Parent then return p end
+    return nil
+end
+local function podium(plot, slot)
+    local pods = plot.PlotModel:FindFirstChild("AnimalPodiums")
+    return pods and pods:FindFirstChild(tostring(slot))
+end
+local function maxAnimals(plot)
+    -- sua base: igual o TradeController.updateBaseSlots → Bases[Rebirth do canal].MaxAnimals
+    -- (o atributo Tier da base dava outro número: "base cheia" sem estar cheia na trade falsa)
+    if bus.chan then
+        local ok, mine = pcall(function() return plot:GetOwner() == LP end)
+        if ok and mine then
+            local okR, reb = pcall(function() return bus.chan:Get("Rebirth") end)
+            local br = okR and BasesData[reb]
+            if br and br.MaxAnimals then return br.MaxAnimals end
+        end
+    end
+    local b = BasesData[plot.PlotModel:GetAttribute("Tier")]
+    return (b and b.MaxAnimals) or ((GameData.Plot and GameData.Plot.AnimalPodiums) or 10)
+end
+local function realList(plot)
+    local ok, l = pcall(function() return plot.Channel:Get("AnimalList") end)
+    return (ok and type(l) == "table") and l or {}
+end
+local function isSlotFree(plot, i, list)
+    local pod = podium(plot, i)
+    if not pod or pod:GetAttribute("DeferDisplay") then return false end
+    list = list or realList(plot)
+    return type(list[i]) ~= "table" and SlotFake[i] == nil
+end
+local function findFreeSlot(plot)
+    local list = realList(plot)
+    for i = 1, maxAnimals(plot) do
+        if isSlotFree(plot, i, list) then return i end
+    end
+    return nil
+end
+
+-- ── dinheiro visual (HUD + leaderstats) ─────────────────────────────
+local Money = { offset = 0, guard = false, written = {} }
+local SUFFIX_VALUE = {}
+for i, s in { "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud", "Dd", "Td", "Qad", "Qid", "Sxd", "Spd", "Ocd", "Nod", "Vg", "Uvg", "Dvg", "Tvg" } do
+    SUFFIX_VALUE[s] = 1000 ^ (i - 1)
+end
+-- inverso do NumberUtils:ToString ("$640.09T" → 640.09e12)
+local function parseMoney(txt)
+    local num, suf = string.match(tostring(txt or ""), "^%$?([%d%.]+)(%a*)$")
+    local mul = suf and SUFFIX_VALUE[suf]
+    if not num or not mul then return nil end
+    return (tonumber(num) or 0) * mul
+end
+local function realCoins()
+    if bus.chan then
+        local ok, c = pcall(function() return (bus.chan:Get("Coins")) end)
+        if ok and type(c) == "number" then return c end
+    end
+    -- plano B: o último valor que o PRÓPRIO jogo escreveu no HUD (nunca um número inventado)
+    return Money.gameCoins or 0
+end
+local function hud()
+    local lb = PlayerGui:FindFirstChild("LeftBottom")
+    lb = lb and lb:FindFirstChild("LeftBottom")
+    return lb and lb:FindFirstChild("Currency"), lb and lb:FindFirstChild("Cashout")
+end
+local function refreshMoney()
+    if Money.offset == 0 and not Money.dirty then return end
+    Money.guard = true
+    local total = realCoins() + Money.offset
+    local cur = hud()
+    if cur then
+        local txt = ("$%*"):format(fmt(total, 2))
+        Money.written.cur = txt
+        if cur.Text ~= txt then cur.Text = txt end
+    end
+    local ls = LP:FindFirstChild("leaderstats")
+    local cash = ls and ls:FindFirstChild("Cash")
+    if cash and cash:IsA("StringValue") then
+        local txt = fmt(total)
+        Money.written.cash = txt
+        if cash.Value ~= txt then cash.Value = txt end
+    end
+    Money.guard = false
+    if Money.offset == 0 then Money.dirty = false end
+end
+local function hookMoney()
+    local cur = hud()
+    if cur and Money.hookedCur ~= cur then
+        Money.hookedCur = cur
+        Money.gameCoins = Money.gameCoins or parseMoney(cur.Text)
+        -- os sinais do jogo são "deferred": o evento da NOSSA escrita chega depois do guard.
+        -- Por isso compara com o último texto que nós escrevemos em vez de confiar no guard.
+        Global:Add(cur:GetPropertyChangedSignal("Text"):Connect(function()
+            if cur.Text == Money.written.cur then return end
+            Money.gameCoins = parseMoney(cur.Text) or Money.gameCoins -- valor real vindo do jogo
+            if Money.offset ~= 0 then refreshMoney() end
+        end))
+    end
+    local ls = LP:FindFirstChild("leaderstats")
+    local cash = ls and ls:FindFirstChild("Cash")
+    if cash and Money.hookedCash ~= cash then
+        Money.hookedCash = cash
+        Global:Add(cash.Changed:Connect(function()
+            if cash.Value == Money.written.cash then return end
+            if Money.offset ~= 0 then refreshMoney() end
+        end))
+    end
+end
+-- réplica do HudController (OnChanged "Coins"): popup "+$X" no Cashout + som
+local function cashoutPopup(delta)
+    local _, cashout = hud()
+    local tmpl = cashout and cashout:FindFirstChild("Template")
+    if not tmpl then return end
+    local t = tmpl:Clone()
+    t.Text = ("%*$%*"):format(if not (delta > 0) then "-" else "+", fmt(math.abs(delta), 2))
+    t.TextColor3 = delta < 0 and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(13, 255, 0)
+    t.Visible = true
+    t.Parent = cashout
+    local ti = TweenInfo.new(5, Enum.EasingStyle.Linear)
+    local tw = TweenService:Create(t, ti, { TextTransparency = 1 })
+    local st = t:FindFirstChild("UIStroke")
+    tw.Completed:Once(function() t:Destroy() end)
+    tw:Play()
+    if st then TweenService:Create(st, ti, { Transparency = 1 }):Play() end
+    if delta > 0 then sound("Sounds.Sfx.Cashout") end
+end
+function addCoins(delta)
+    if delta == 0 then return end
+    hookMoney()
+    Money.offset += delta
+    Money.dirty = true
+    refreshMoney()
+    cashoutPopup(delta)
+    bus.money = Money.offset
+end
+
+-- ── prompts (Classes.PlotClient.AnimalPrompt do jogo) ───────────────
+local function setState(p, state, cb)
+    if p.State ~= state then p:SetState(state, cb) end
+end
+-- O CustomProximityPromptController do jogo tem uma trava GLOBAL: PromptButtonHoldBegan liga e só
+-- PromptButtonHoldEnded desliga; com ela ligada os prompts Grab/Sell (de TODOS os brainrots, os
+-- originais também) não aparecem. Destruir um prompt no meio do hold (ex.: Place apagava os prompts
+-- dentro do Triggered) deixava a trava ligada pra sempre → "originais param de funcionar".
+-- Regra: nunca destruir prompt segurado sem InputHoldEnd, e rodar a ação depois do HoldEnded.
+local function killPrompt(p)
+    pcall(function() p.ProximityPrompt:InputHoldEnd() end)
+    pcall(function() p:Destroy() end)
+end
+local function later(fn, ...)
+    local args = table.pack(...)
+    return function()
+        task.delay(0.2, function() try("ação do prompt", fn, table.unpack(args, 1, args.n)) end)
+    end
+end
+local function linkPrompts(list)
+    for _, p in list do
+        p.Collector:Add(p.ProximityPrompt.PromptButtonHoldBegan:Connect(function()
+            for _, o in list do if o ~= p then o.ProximityPrompt.Enabled = false end end
+        end))
+        p.Collector:Add(p.ProximityPrompt.PromptButtonHoldEnded:Connect(function()
+            for _, o in list do
+                if o ~= p then
+                    o.ProximityPrompt.Enabled = true
+                    o:SetState(o.State)
+                end
+            end
+        end))
+    end
+end
+local function newPromptPair(slot, index, attachment)
+    local p1 = AnimalPrompt.new(slot, index, attachment)
+    local p2 = AnimalPrompt.new(slot, index, attachment, {
+        KeyboardKeyCode = Enum.KeyCode.F,
+        GamepadKeyCode = Enum.KeyCode.ButtonY,
+        UIOffset = Vector2.new(0, -72),
+    })
+    -- nasce sem estado: desliga até o updatePrompts decidir (igual o PlotClient faz na mesma chamada)
+    p1:SetState("None")
+    p2:SetState("None")
+    -- marca os nossos (os prompts dos pódios reais são do PlotClient e ficam sem a marca)
+    p1.ProximityPrompt:SetAttribute("BRS", true)
+    p2.ProximityPrompt:SetAttribute("BRS", true)
+    local pair = { p1, p2 }
+    linkPrompts(pair)
+    return pair
+end
+local function isBusy()
+    return LP:GetAttribute("IsTrading") == true or LP:GetAttribute("IsDuelSelecting") == true
+end
+
+function updatePrompts()
+    local plot = getPlot()
+    local blocked = isBusy() or (ServerData and (ServerData.IsDuelsServer() or ServerData.IsTradePlaza()))
+    -- carregando um brainrot REAL (mesma conta do buildUpdateContext do PlotClient: Stealing + Steal == você):
+    -- o jogo mostra o Place dele em todos os seus pódios, inclusive no do visual (pro servidor está vazio).
+    -- Os prompts do visual saem do caminho pra esse Place aparecer; ao colocar, é uma troca (ver tick).
+    local realGrab = false
+    if plot and LP:GetAttribute("Stealing") then
+        for i, e in realList(plot) do
+            if type(e) == "table" and e.Steal == LP.UserId then
+                realGrab = true
+                bus.realGrab = { slot = i, at = os.clock() }
+                break
+            end
+        end
+    end
+    -- o Grab real chegou enquanto você carregava um visual = troca: o visual fica no pódio de onde o real saiu
+    if realGrab and Carry and bus.realGrab then
+        local f, slot = Carry.fake, bus.realGrab.slot
+        endCarry()
+        if Fakes[f.uid] == f and slot ~= f.slot then
+            unrender(f)
+            if SlotFake[f.slot] == f then SlotFake[f.slot] = nil end
+            f.slot = slot
+            SlotFake[slot] = f
+            f.stolen = false
+            local ok, why = render(f)
+            if not ok then log("troca visual→real: " .. tostring(why)) end
+        else
+            f.stolen = false
+            if f.updateVisibility then f.updateVisibility() end
+        end
+        pushList()
+    end
+    blocked = blocked or realGrab
+    -- ── troca visual → pódio de um REAL ──
+    -- Carregando um visual, o jogo ainda mostra Grab/Sell nos reais (pro servidor você não carrega nada).
+    -- No original, carregando, o pódio ocupado mostra "Place" e vira troca. Aqui o Grab DO JOGO desse pódio
+    -- passa a se chamar "Place" (só o texto, local) e o Sell some. Segurar é o seu próprio Grab real:
+    -- o real vai pra sua mão e o visual ocupa o pódio dele (feito logo abaixo, quando o Stealing chega).
+    local patched = bus.swapPatched or {}
+    bus.swapPatched = patched
+    local want = {}
+    if Carry and plot and not blocked then
+        local list = realList(plot)
+        for i = 1, maxAnimals(plot) do
+            local e = list[i]
+            local pod = type(e) == "table" and not e.Steal and not e.Machine and podium(plot, i)
+            local att = pod and pod:FindFirstChild("Base") and pod.Base:FindFirstChild("Spawn") and pod.Base.Spawn:FindFirstChild("PromptAttachment")
+            for _, pp in att and att:GetChildren() or {} do
+                if pp:IsA("ProximityPrompt") and not pp:GetAttribute("BRS") then
+                    local st = pp:GetAttribute("State")
+                    if st == "Grab" or st == "Sell" then
+                        want[pp] = true
+                        if not patched[pp] then patched[pp] = { text = pp.ActionText, slot = i } end
+                        if st == "Grab" then
+                            if pp.ActionText ~= "Place" then pp.ActionText = "Place" end
+                        elseif pp.Enabled then
+                            pp.Enabled = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+    for pp, o in patched do
+        if not want[pp] then
+            patched[pp] = nil
+            if pp.Parent then
+                local st = pp:GetAttribute("State")
+                if st == "Grab" and pp.ActionText == "Place" then pp.ActionText = o.text end
+                if st == "Sell" or st == "Grab" then pp.Enabled = true end
+            end
+        end
+    end
+    -- "Place" nos slots vazios enquanto carrega (o PlotClient mostra Place em todos os pódios)
+    if Carry and plot and not blocked then
+        local list = realList(plot)
+        for i = 1, maxAnimals(plot) do
+            if not TempPlace[i] and isSlotFree(plot, i, list) then
+                local pod = podium(plot, i)
+                local att = pod and pod:FindFirstChild("Base") and pod.Base:FindFirstChild("Spawn") and pod.Base.Spawn:FindFirstChild("PromptAttachment")
+                if att then TempPlace[i] = newPromptPair(i, ("None_%*"):format(i), att) end
+            end
+        end
+    end
+    for i, pair in TempPlace do
+        if not Carry or blocked or not plot or not isSlotFree(plot, i) then
+            for _, p in pair do killPrompt(p) end
+            TempPlace[i] = nil
+        else
+            setState(pair[1], "Place", later(placeCarry, i))
+            setState(pair[2], "None")
+        end
+    end
+    for _, f in Fakes do
+        local pr = f.prompts
+        if pr then
+            if blocked or (f.fuse and Carry) then
+                setState(pr[1], "None")
+                setState(pr[2], "None")
+            elseif f.fuse then
+                -- igual o PlotClient: brainrot na máquina (parada) → "Return" no pódio
+                setState(pr[1], "Return", later(function() if bus.fuseReturn then bus.fuseReturn(f) end end))
+                setState(pr[2], "None")
+            elseif Carry then
+                setState(pr[1], "Place", later(placeCarry, f.slot))
+                setState(pr[2], "None")
+            else
+                setState(pr[1], "Grab", later(startCarry, f))
+                setState(pr[2], "Sell", later(sellFake, f))
+            end
+        end
+    end
+end
+
+-- ── render do brainrot no pódio (réplica do PlotClient:UpdateModel) ─
+local DefaultTr = setmetatable({}, { __mode = "k" })
+
+function render(f)
+    local plot = getPlot()
+    if not plot then return false, "base não encontrada" end
+    local pod = podium(plot, f.slot)
+    local spawnPart = pod and pod:FindFirstChild("Base") and pod.Base:FindFirstChild("Spawn")
+    if not spawnPart then return false, "pódio não encontrado" end
+    local src = BrainrotAssets.getModel(f.index, 20)
+    if not src then return false, "modelo não carregou" end
+    if Fakes[f.uid] ~= f or SlotFake[f.slot] ~= f then return false, "cancelado" end
+
+    local tr = Trove.new()
+    f.trove = tr
+    local isTP = ServerData.IsTradePlaza()
+    local m = src:Clone()
+    for _, d in m:GetDescendants() do
+        if d:IsA("BasePart") then
+            d.CanCollide = false
+            d.CanQuery = false
+            d.CanTouch = false
+            d.Massless = true
+            if isTP then d.CastShadow = false end
+        end
+    end
+    m.Parent = plot.PlotModel
+    m.PrimaryPart.Anchored = true
+    tr:Add(m)
+    f.model = m
+    if f.mutation then
+        local r = SA:ApplyMutation(m, f.index, f.mutation)
+        if r then tr:Add(r) end
+        m:SetAttribute("Mutation", f.mutation)
+    end
+    m:PivotTo(spawnPart:GetPivot())
+    local ext = m:GetExtentsSize()
+    local traits = cleanTraits(f.traits)
+    if traits then
+        local r = SA:ApplyTraits(m, f.index, traits)
+        if r then tr:Add(r) end
+    end
+    local parts = {}
+    for _, d in m:GetDescendants() do
+        if d:IsA("BasePart") and not d:HasTag("PhantomPart") and not d:HasTag("PhantomEyesPart") then
+            table.insert(parts, d)
+        end
+    end
+    m:PivotTo(spawnPart:GetPivot())
+    local scale = (if not isTP then 1 else 0.27) * EggScale.GetEggScale(f.index)
+    if scale ~= 1 then m:ScaleTo(m:GetScale() * scale) end
+    if FFlags:GetInstant("Optimisation.HumanoidBrainrotModels", ServerData.IsNewPlayersServer()) then
+        local old = m:FindFirstChild("AnimationController")
+        if old then old:Destroy() end
+        local h = Instance.new("Humanoid", m)
+        Instance.new("Animator", h)
+        h.Name = "AnimationController"
+        h.EvaluateStateMachine = false
+        h.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+        h.PlatformStand = true
+        h.Parent = m
+    end
+    local ac = m:FindFirstChild("AnimationController")
+    local animator = ac and ac:FindFirstChild("Animator")
+    local folder = AnimAnimals and AnimAnimals:FindFirstChild(f.index)
+    local idle = folder and folder:FindFirstChild("Idle")
+    if isTP then
+        -- Trade Plaza: pose congelada do Idle (igual o original)
+        if idle and animator then
+            task.spawn(function()
+                local tk = animator:LoadAnimation(idle)
+                tk:Play(0)
+                local w = 0
+                while tk.Length == 0 and w < 5 do w += task.wait() end
+                task.wait()
+                if f.model ~= m then return end
+                local bones = {}
+                for _, b in m:GetDescendants() do if b:IsA("Bone") then bones[b] = b.Transform end end
+                local c = m:FindFirstChild("AnimationController")
+                if c then c:Destroy() end
+                for b, t in bones do b.Transform = t end
+            end)
+        end
+    elseif idle and animator then
+        local tk = animator:LoadAnimation(idle)
+        tk.Looped = true
+        tk:Play()
+        local stop = AnimationSyncController:Add(tk)
+        tr:Add(function()
+            stop()
+            tk:Stop(0)
+            tk:Destroy()
+        end)
+    end
+
+    -- AnimalOverhead (FastOverhead) no lugar do jogo
+    local def = AnimalsData[f.index]
+    local att = m:FindFirstChild("OVERHEAD_ATTACHMENT", true)
+    if not att then
+        att = tr:Add(Instance.new("Attachment"))
+        att.CFrame = CFrame.new(0, ext.Y * 0.75 * scale * (def and def.OverheadYOffsetModifier or 1), 0)
+        att.Parent = spawnPart
+    end
+    local ovh, ovhClean = FastOverheadController.createFastOverhead({
+        adornee = att,
+        guiTemplate = FastOverheadController.GuiTemplates.AnimalOverhead,
+    })
+    tr:Add(ovhClean)
+    f.overhead = ovh
+    local labels = {}
+    for _, c in ovh:GetChildren() do
+        if c:IsA("TextLabel") then table.insert(labels, c) end
+    end
+    local genText = ("$%*/s"):format(fmt(calcGen(f.index, f.mutation, traits, false)))
+    local Generation = ovh:FindFirstChild("Generation")
+    local function updateOverhead()
+        if not Generation then return end
+        Generation.Text = genText
+        Generation.Visible = genText ~= "" and not (def and def.HideGeneration)
+    end
+    f.updateOverhead = updateOverhead
+    AnimalOverheadController:Populate({
+        Overhead = ovh, Index = f.index, Traits = traits, Mutation = f.mutation, Player = LP, Trove = tr,
+    })
+    -- 1 OF 1: o Populate liga o "1OF1Banner" pelo replicador do servidor (combinação nome:mutação que
+    -- tem só 1 no mundo). Um registro com OneOfOne definido manda nele (BrainrotCard.IsOneOfOne), então o
+    -- banner do visual segue o f.oneOfOne — mesmo se o jogo tentar ligar/desligar depois.
+    local banner = ovh:FindFirstChild("1OF1Banner")
+    if banner then
+        banner.Visible = f.oneOfOne == true
+        tr:Add(banner:GetPropertyChangedSignal("Visible"):Connect(function()
+            local want = f.oneOfOne == true
+            if banner.Visible ~= want then banner.Visible = want end
+        end))
+    end
+    updateOverhead()
+    tr:Add(plot.PlotModel:GetAttributeChangedSignal("Nuked"):Connect(function()
+        if plot.PlotModel:GetAttribute("Nuked") then ovh:Destroy() end
+    end))
+
+    -- STOLEN / transparência (updateVisibility do PlotClient; o dono pegando = v2 true)
+    local lastState = nil
+    local function updateVisibility()
+        -- na fuse: igual o PlotClient com Machine.Type == "Fuse" (transparente + "IN FUSE" azul)
+        local inFuse = f.fuse == true and not f.stolen
+        local stolen = f.stolen == true or inFuse
+        local key = if f.stolen then "s" elseif inFuse then "f" else "n"
+        if key == lastState then return end
+        lastState = key
+        updateOverhead()
+        for _, p in parts do
+            local dt = p:GetAttribute("DefaultTransparency")
+            if dt == nil then
+                dt = p.Transparency
+                p:SetAttribute("DefaultTransparency", dt)
+            end
+            if not stolen or not (p.Transparency < 1) then
+                p.Transparency = dt
+            else
+                p.Transparency = 0.5
+            end
+        end
+        for _, l in labels do
+            if not l:GetAttribute("DefaultState") then
+                l:SetAttribute("DefaultState", l.Visible)
+            end
+            if l.Name == "Stolen" then
+                if inFuse then
+                    l.Text = "IN FUSE"
+                    l.TextColor3 = Color3.fromRGB(0, 140, 255)
+                else
+                    l.Text = "STOLEN"
+                    l.TextColor3 = Color3.fromRGB(255, 0, 4)
+                end
+            end
+            if not stolen then
+                if l.Name ~= "Stolen" then l.Visible = l:GetAttribute("DefaultState") else l.Visible = false end
+            elseif l.Name == "Stolen" then
+                l.Visible = inFuse -- quem pegou foi o próprio dono: escondido; na fuse aparece
+            else
+                l.Visible = false
+            end
+        end
+    end
+    f.updateVisibility = updateVisibility
+    updateVisibility()
+
+    -- CashPad + Claim
+    f.cash = nil
+    if not isTP and not ServerData.IsDuelsServer() then
+        local claim = pod:FindFirstChild("Claim")
+        local main = claim and claim:FindFirstChild("Main")
+        if main then
+            local g, gClean = FastOverheadController.createFastOverhead({
+                adornee = main,
+                guiTemplate = FastOverheadController.GuiTemplates.CashPad,
+            })
+            tr:Add(gClean)
+            f.cash = g
+        end
+        local hb = claim and claim:FindFirstChild("Hitbox")
+        if hb then
+            tr:Add(hb.Touched:Connect(function(hit)
+                if hit.Name ~= "HumanoidRootPart" then return end
+                if Players:GetPlayerFromCharacter(hit.Parent) ~= LP then return end
+                if SlotFake[f.slot] ~= f or Fakes[f.uid] ~= f then return end
+                local now = workspace:GetServerTimeNow()
+                local gen = calcGen(f.index, f.mutation, f.traits, true)
+                -- coletar = acumulado desde o LastCollect + dinheiro offline (OfflineGain * geração)
+                local amount = math.floor(now - f.lastCollect) * gen + math.floor((f.offlineGain or 0) * gen)
+                f.lastCollect = now
+                f.offlineGain = nil
+                if amount > 0 then addCoins(amount) end
+                if f.updateClaim then f.updateClaim() end
+            end))
+        end
+        -- réplica do PlotClient:UpdateClaim (CollectAmount + "(Offline Cash: $X)")
+        f.updateClaim = function()
+            local g = f.cash
+            if not g or not g.Parent then return end
+            local gen = calcGen(f.index, f.mutation, f.traits, true)
+            local amount = math.floor(workspace:GetServerTimeNow() - f.lastCollect) * gen
+            local ca = g:FindFirstChild("CollectAmount")
+            if ca then ca.Text = ("$%*"):format(fmt(amount)) end
+            local off = g:FindFirstChild("Offline")
+            if off then
+                if f.offlineGain then
+                    off.Text = ("(Offline Cash: <font color=\"#73ff00\">$%*</font>)"):format(fmt(f.offlineGain * gen))
+                end
+                off.Visible = f.offlineGain ~= nil
+            end
+            g.Enabled = true
+        end
+        f.updateClaim()
+    end
+
+    -- prompts Grab / Sell
+    f.prompts = nil
+    if not isTP then
+        local att2 = spawnPart:FindFirstChild("PromptAttachment")
+        if att2 then
+            local pair = newPromptPair(f.slot, f.index, att2)
+            f.prompts = pair
+            tr:Add(function()
+                for _, p in pair do killPrompt(p) end
+                if f.prompts == pair then f.prompts = nil end
+            end)
+        end
+    end
+    f.spawnPart = spawnPart
+    return true
+end
+
+function unrender(f)
+    if f.trove then
+        local tr = f.trove
+        f.trove = nil
+        pcall(function() tr:Destroy() end)
+    end
+    f.model, f.prompts, f.cash, f.overhead = nil, nil, nil, nil
+    f.updateVisibility, f.updateOverhead, f.updateClaim = nil, nil, nil
+end
+
+function pushList()
+    local list = {}
+    for _, f in Fakes do
+        local d = AnimalsData[f.index]
+        table.insert(list, {
+            uid = f.uid, index = f.index, display = d and d.DisplayName or f.index, rarity = d and d.Rarity or "Common",
+            mutation = f.mutation, traits = table.clone(f.traits), slot = f.slot, oneOfOne = f.oneOfOne == true,
+            oneMode = if f.forceOne == true then "on" elseif f.forceOne == false then "off" else "auto",
+            exist = bus.existCount and bus.existCount(f.index, f.mutation) or nil,
+            gen = calcGen(f.index, f.mutation, f.traits, false), stolen = f.stolen == true, fuse = f.fuse == true,
+        })
+    end
+    table.sort(list, function(a, b) return a.slot < b.slot end)
+    bus.fakesList = list
+    bus.evt:Fire("fakes")
+end
+
+function removeFake(f)
+    if Carry and Carry.fake == f then endCarry() end
+    unrender(f)
+    Fakes[f.uid] = nil
+    if SlotFake[f.slot] == f then SlotFake[f.slot] = nil end
+    if bus.tradeRemove then bus.tradeRemove(f.uid) end
+    pushList()
+    updatePrompts()
+end
+
+local function moveFake(f, slot)
+    unrender(f)
+    if SlotFake[f.slot] == f then SlotFake[f.slot] = nil end
+    f.slot = slot
+    SlotFake[slot] = f
+    f.stolen = false
+    local ok, why = render(f)
+    if not ok then log("re-render falhou: " .. tostring(why)) end
+end
+
+-- ── carregar (Grab) ─────────────────────────────────────────────────
+-- Réplica do que o servidor + StealController fazem com um brainrot real (capturado no jogo):
+--   • 2 studs NA FRENTE do HRP (CFrame 0,0,-2, mesma rotação) — o jogo solda; aqui o modelo segue
+--     o HRP a cada frame, ancorado, porque a solda num modelo só do cliente afundava o personagem
+--   • modelo = Shared.Animals:GetAnimatedModel(nome, "Idle")
+--   • mutação + traits; escala = __render_scale OU EggScale (só muda ovos). O 0.7 visto na captura do
+--     Grim Cheese era a escala do próprio asset, não uma redução — o tamanho é o real.
+--   • AnimalOverhead de ReplicatedStorage.Overheads no OVERHEAD_ATTACHMENT, só com o "Stolen"
+--     controlando a visibilidade (o dono carregando o próprio brainrot: tudo escondido)
+local CARRY_OFFSET = CFrame.new(0, 0, -2)
+-- Sem solda no personagem: soldado no HRP o modelo entrava na montagem do jogador e fazia ele afundar
+-- (medido: ~2 studs abaixo, depois o personagem era recriado). Agora o modelo fica ANCORADO fora do
+-- personagem e só segue o HRP a cada frame (mesma posição 2 studs à frente) — zero física no jogador.
+local function buildCarryModel(c, f, char, hrp)
+    local m = SA:GetAnimatedModel(f.index, "Idle")
+    if not m then return end
+    if not m.PrimaryPart then m:Destroy() return end
+    c.trove:Add(m)
+    -- GetAnimatedModel devolve no workspace com TUDO desancorado (até a raiz): prende já, longe do
+    -- personagem, até o ghost() abaixo — senão ele cai/encosta no jogador enquanto monta mutação/traits
+    m.PrimaryPart.Anchored = true
+    m:PivotTo(hrp.CFrame * CFrame.new(0, -500, 0))
+    -- o Humanoid "AnimationController" do GetAnimatedModel vira um AnimationController de verdade
+    for _, h in m:GetDescendants() do
+        if h:IsA("Humanoid") then
+            local ac = Instance.new("AnimationController")
+            ac.Name = "AnimationController"
+            local an = Instance.new("Animator")
+            an.Parent = ac
+            ac.Parent = h.Parent
+            h:Destroy()
+            local idle = AnimAnimals and AnimAnimals:FindFirstChild(f.index)
+            idle = idle and idle:FindFirstChild("Idle")
+            if idle then
+                local tk = an:LoadAnimation(idle)
+                tk.Looped = true
+                tk:Play()
+            end
+        end
+    end
+    if f.mutation then
+        local r = SA:ApplyMutation(m, f.index, f.mutation)
+        if r then c.trove:Add(r) end
+    end
+    local traits = cleanTraits(f.traits)
+    if traits then
+        local r = SA:ApplyTraits(m, f.index, traits)
+        if r then c.trove:Add(r) end
+    end
+    local s = EggScale.GetEggScale(f.index)
+    if s ~= 1 then m:ScaleTo(m:GetScale() * s) end
+    -- nada do modelo encosta, é tocado ou aparece em raycast; só a raiz fica ancorada (as juntas animam o resto)
+    local root = m.PrimaryPart
+    local function ghost(d)
+        if d:IsA("BasePart") then
+            d.Anchored = d == root
+            d.Massless = true
+            d.CanCollide = false
+            d.CanTouch = false
+            d.CanQuery = false
+            pcall(function() d.CollisionGroup = "Animal" end)
+        end
+    end
+    for _, d in m:GetDescendants() do ghost(d) end
+    c.trove:Add(m.DescendantAdded:Connect(ghost))
+    m:PivotTo(hrp.CFrame * CARRY_OFFSET)
+    -- segue o HRP depois da física de cada frame (sem atraso visível)
+    c.trove:Add(RunService.RenderStepped:Connect(function()
+        if hrp.Parent and m.Parent then m:PivotTo(hrp.CFrame * CARRY_OFFSET) end
+    end))
+    -- overhead do StealController.renderOverhead
+    local tmpl = RS:FindFirstChild("Overheads") and RS.Overheads:FindFirstChild("AnimalOverhead")
+    if tmpl then
+        local att = m:FindFirstChild("OVERHEAD_ATTACHMENT", true)
+        if not att then
+            att = c.trove:Add(Instance.new("Attachment"))
+            att.CFrame = CFrame.new(0, m:GetExtentsSize().Y * 0.5, 0)
+            att.Parent = m.PrimaryPart
+        end
+        local ovh = c.trove:Clone(tmpl)
+        for _, l in ovh:GetChildren() do
+            if l:IsA("TextLabel") then l.Visible = false end -- __render_stolen = false
+        end
+        ovh.Parent = att
+    end
+    c.model = m
+end
+
+-- animação "Carry" do personagem SEM replicar: tocar no Animator real manda a track pro servidor
+-- (você "carregando" sem estar roubando → o servidor recriava o personagem). Aqui ela toca num boneco
+-- local (clone invisível do seu personagem dentro da Camera, que só existe no cliente) e só a pose dos braços é copiada
+-- pras juntas reais via Motor6D.Transform a cada frame — Transform não replica.
+local function playCarryAnim(c, hum)
+    local CARRY_JOINTS = {
+        RightShoulder = true, LeftShoulder = true, RightElbow = true, LeftElbow = true, RightWrist = true, LeftWrist = true,
+        ["Right Shoulder"] = true, ["Left Shoulder"] = true,
+    }
+    local folder = RS:FindFirstChild("Animations") and RS.Animations:FindFirstChild("Player")
+    local anim = folder and folder:FindFirstChild("Carry")
+    local char = hum.Parent
+    if not (anim and char) then return end
+    local arch = char.Archivable
+    char.Archivable = true
+    local dummy = char:Clone()
+    char.Archivable = arch
+    if not dummy then return end
+    c.trove:Add(dummy)
+    dummy.Name = "CarryPose"
+    local all = dummy:GetDescendants()
+    table.insert(all, dummy)
+    for _, d in all do
+        -- tags do personagem (o jogo observa por tag) não podem ir pro boneco
+        for _, t in d:GetTags() do d:RemoveTag(t) end
+        if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("ParticleEmitter") or d:IsA("BillboardGui") then
+            d:Destroy()
+        elseif d:IsA("BasePart") then
+            d.Anchored = d.Name == "HumanoidRootPart"
+            d.CanCollide, d.CanTouch, d.CanQuery = false, false, false
+            d.Transparency = 1
+        elseif d:IsA("Decal") then
+            d.Transparency = 1
+        end
+    end
+    local dh = dummy:FindFirstChildOfClass("Humanoid")
+    if dh then
+        dh.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+        pcall(function() dh.EvaluateStateMachine = false end)
+        dh.PlatformStand = true
+    end
+    -- Camera: só existe no cliente e fica dentro do workspace (o Animator só anima rig no mundo)
+    -- acima do personagem (abaixo do FallenPartsDestroyHeight as peças seriam apagadas)
+    local hrpR = char:FindFirstChild("HumanoidRootPart")
+    dummy:PivotTo((hrpR and hrpR.CFrame or dummy:GetPivot()) + Vector3.new(0, 250, 0))
+    dummy.Parent = workspace.CurrentCamera
+    local animator = dh and (dh:FindFirstChildOfClass("Animator") or Instance.new("Animator", dh))
+    if not animator then return end
+    local tk = animator:LoadAnimation(anim)
+    tk.Looped = true
+    tk:Play(0)
+    -- pares (junta do boneco → junta real). O rig pode usar Motor6D OU AnimationConstraint (rig novo do
+    -- Roblox exigido pelo Server Authority) — os dois têm Transform. Casa pelo caminho dentro do modelo.
+    local function isJoint(j) return j:IsA("Motor6D") or j:IsA("AnimationConstraint") end
+    local function isArm(n)
+        n = string.lower(n)
+        if CARRY_JOINTS[n] then return true end
+        return string.find(n, "shoulder", 1, true) or string.find(n, "elbow", 1, true)
+            or string.find(n, "wrist", 1, true) or string.find(n, "hand", 1, true) or string.find(n, "arm", 1, true)
+    end
+    local function relPath(inst, root)
+        local parts = {}
+        local cur = inst
+        while cur and cur ~= root do
+            table.insert(parts, 1, cur.Name)
+            cur = cur.Parent
+        end
+        return cur == root and table.concat(parts, "/") or nil
+    end
+    local realByPath = {}
+    for _, j in char:GetDescendants() do
+        if isJoint(j) then
+            local p = relPath(j, char)
+            if p then realByPath[p] = j end
+        end
+    end
+    local pairs_ = {}
+    for _, j in dummy:GetDescendants() do
+        if isJoint(j) and isArm(j.Name) then
+            local p = relPath(j, dummy)
+            local real = p and realByPath[p]
+            if real and real.ClassName == j.ClassName then table.insert(pairs_, { j, real }) end
+        end
+    end
+    -- O Animator do personagem local reaplica as animações na fase de render (o Stepped sozinho perdia):
+    -- a pose do carry é escrita por ÚLTIMO antes do frame ser desenhado (RenderPriority.Last) e também
+    -- no Stepped (pra física/previsão ver o mesmo braço). Transform não replica.
+    local function apply()
+        for _, p in pairs_ do p[2].Transform = p[1].Transform end
+    end
+    local rsPose = "BRCarryPose" .. tostring(c.fake and c.fake.uid or "")
+    RunService:BindToRenderStep(rsPose, Enum.RenderPriority.Last.Value + 1, apply)
+    c.trove:Add(RunService.Stepped:Connect(apply))
+    c.trove:Add(function()
+        pcall(function() RunService:UnbindFromRenderStep(rsPose) end)
+        pcall(function() tk:Stop(0) tk:Destroy() end)
+        for _, p in pairs_ do pcall(function() p[2].Transform = CFrame.identity end) end
+    end)
+end
+
+-- mochila: mesmo efeito do ItemController quando "Stealing" (sem marcar o atributo de verdade,
+-- que faria o PlotClient mandar "entrega" pro servidor)
+local BackpackController = req("Controllers.BackpackController")
+local function setToolsBlocked(blocked)
+    if not BackpackController then return end
+    pcall(function()
+        local free = not blocked and not LP:GetAttribute("BlockTools") and not LP:GetAttribute("Stealing")
+            and not LP:GetAttribute("CartSeated") and not LP:GetAttribute("TrainSeated")
+            and not LP:GetAttribute("SleighSeated") and not RS:GetAttribute("InTrainTravelCutscene")
+        BackpackController:SetEnabled("BlockTools", free)
+    end)
+end
+
+function endCarry()
+    local c = Carry
+    if not c then return end
+    Carry = nil
+    pcall(function() c.trove:Destroy() end)
+    local hum = c.hum
+    if hum and hum.Parent then
+        if c.ws and math.abs(hum.WalkSpeed - c.wsSet) < 0.01 then hum.WalkSpeed = c.ws end
+        if c.jp and hum.UseJumpPower and math.abs(hum.JumpPower - c.jpSet) < 0.01 then hum.JumpPower = c.jp end
+        if c.jh and not hum.UseJumpPower and math.abs(hum.JumpHeight - c.jhSet) < 0.01 then hum.JumpHeight = c.jh end
+    end
+    for i, pair in TempPlace do
+        for _, p in pair do killPrompt(p) end
+        TempPlace[i] = nil
+    end
+end
+
+function startCarry(f)
+    if Carry or Fakes[f.uid] ~= f then return end
+    local char = LP.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum or hum.Health <= 0 then return end
+    local c = { fake = f, trove = Trove.new(), hum = hum }
+    Carry = c
+    f.stolen = true
+    if f.updateVisibility then f.updateVisibility() end
+    try("modelo carregado", buildCarryModel, c, f, char, hrp)
+    try("anim carry", playCarryAnim, c, hum)
+    if char:FindFirstChildOfClass("Tool") then hum:UnequipTools() end
+    setToolsBlocked(true)
+    c.trove:Add(function() setToolsBlocked(false) end)
+    -- mesma redução de quando o jogo marca "Stealing": velocidade e pulo x0.6 (capturado: 34→20.4, 7.2→4.32).
+    -- O jogo reescreve esses valores (upgrades, itens, respawn); sempre que mudar pra um valor que não é
+    -- o nosso, guarda como o "normal" novo e reaplica o x0.6 — assim não dá pra correr/pular alto segurando.
+    local function lockStat(prop, key)
+        c[key] = hum[prop]
+        c[key .. "Set"] = c[key] * 0.6
+        hum[prop] = c[key .. "Set"]
+        c.trove:Add(hum:GetPropertyChangedSignal(prop):Connect(function()
+            local v = hum[prop]
+            if Carry ~= c or math.abs(v - c[key .. "Set"]) < 0.01 then return end
+            c[key] = v
+            c[key .. "Set"] = v * 0.6
+            hum[prop] = c[key .. "Set"]
+        end))
+    end
+    -- Velocidade x0.6 PELO INPUT, não pelo WalkSpeed: com Server Authority o servidor simula o movimento
+    -- com o WalkSpeed DELE; mudar WalkSpeed só no cliente dessincronizava e o servidor recriava o personagem.
+    -- O que o cliente manda é o vetor de movimento: com 60% de força (igual analógico meio apertado) o
+    -- servidor anda a 0.6x — mesma lentidão do "Stealing" real, sem desync. Roda depois do ControlModule
+    -- (prioridade Input) e reaplica o Move com o vetor reduzido no mesmo frame.
+    local _ = lockStat
+    -- A resposta do humanoide à força do input NÃO é linear (60% de input ≠ 60% de velocidade), então a
+    -- força é ajustada em malha fechada: mede a velocidade real do HRP e corrige até bater a velocidade
+    -- do roubo de verdade = SpeedController com "Stealing": CharacterWalkSpeed × SpeedModifier da tool × 0.6
+    -- Server Authority DESLIGADO = a física do personagem é sua: aí o x0.6 direto no WalkSpeed/pulo é
+    -- seguro e idêntico ao do jogo (velocidade e pulo). LIGADO = só pelo input (pulo não dá pra reduzir).
+    local okSA, saOn = pcall(function()
+        local m = req("Shared.ServerAuthority")
+        return m ~= nil and m.isEnabled() == true
+    end)
+    saOn = okSA and saOn
+    if not saOn then
+        lockStat("WalkSpeed", "ws")
+        if hum.UseJumpPower then lockStat("JumpPower", "jp") else lockStat("JumpHeight", "jh") end
+        -- o anti-cheat do jogo (RE/465dfeac…) manda WalkSpeed em float32 a cada 1s; com 20.4 sem estar
+        -- roubando de verdade o servidor recriava o personagem. O hook troca os valores reduzidos pelos
+        -- normais em tudo que sai enquanto bus.carryC estiver definido (ver AK.spoof no hook).
+        bus.carryC = c
+        c.trove:Add(function() if bus.carryC == c then bus.carryC = nil end end)
+    end
+    -- alvo = a SUA velocidade normal × 0.6 (capturado: 34 → 20.4). O CharacterWalkSpeed do StarterPlayer
+    -- não é a velocidade que o servidor te dá — usar ele fazia a calibragem subir até a velocidade normal.
+    local normalSpeed = hum.WalkSpeed
+    c.trove:Add(hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        -- upgrade/item mudou a velocidade de verdade (e não fomos nós no modo direto)
+        if saOn and hum.WalkSpeed > 0 then normalSpeed = hum.WalkSpeed end
+    end))
+    local function stealSpeed() return normalSpeed * 0.6 end
+    local rsName = "BRCarrySlow" .. tostring(f.uid)
+    local lastSet, lastOrig = nil, Vector3.zero
+    local k = 0.6
+    RunService:BindToRenderStep(rsName, Enum.RenderPriority.Input.Value + 2, function(dt)
+        if Carry ~= c or not hum.Parent or not saOn then return end
+        local md = hum.MoveDirection
+        -- se o ControlModule não chamou Move neste frame, o MoveDirection ainda é o nosso: usa o original
+        if lastSet and (md - lastSet).Magnitude < 1e-3 then md = lastOrig end
+        if md.Magnitude < 1e-3 then lastSet = nil return end
+        lastOrig = md
+        local inMag = math.min(md.Magnitude, 1)
+        -- só calibra andando no chão com o input todo (pulo/queda/empurrão distorcem a medida)
+        local vel = hrp.AssemblyLinearVelocity
+        local speed = Vector3.new(vel.X, 0, vel.Z).Magnitude
+        if inMag > 0.95 and hum.FloorMaterial ~= Enum.Material.Air and speed > 1 then
+            local target = stealSpeed() * inMag
+            local ratio = math.clamp(target / speed, 0.5, 2)
+            k = math.clamp(k * (1 + (ratio - 1) * math.min(dt * 6, 0.3)), 0.05, 1)
+        end
+        lastSet = md.Unit * inMag * k
+        hum:Move(lastSet, false)
+    end)
+    c.trove:Add(function() pcall(function() RunService:UnbindFromRenderStep(rsName) end) end)
+    bus.carrying = true
+    c.trove:Add(function() bus.carrying = false end)
+    c.trove:Add(hum.Died:Connect(function()
+        if Carry == c then
+            endCarry()
+            f.stolen = false
+            if f.updateVisibility then f.updateVisibility() end
+            updatePrompts()
+            pushList()
+        end
+    end))
+    c.trove:Add(LP.CharacterRemoving:Connect(function()
+        if Carry == c then
+            endCarry()
+            f.stolen = false
+            if f.updateVisibility then f.updateVisibility() end
+            updatePrompts()
+            pushList()
+        end
+    end))
+    updatePrompts()
+    pushList()
+end
+
+function placeCarry(slot)
+    local c = Carry
+    if not c then return end
+    local f = c.fake
+    endCarry()
+    if Fakes[f.uid] ~= f then return end
+    local plot = getPlot()
+    local other = SlotFake[slot]
+    if slot == f.slot or not plot then
+        f.stolen = false
+        if f.updateVisibility then f.updateVisibility() end
+    elseif other and other ~= f then
+        local a, b = f.slot, slot
+        unrender(f)
+        unrender(other)
+        f.slot, other.slot = b, a
+        SlotFake[a], SlotFake[b] = other, f
+        f.stolen, other.stolen = false, false
+        render(f)
+        render(other)
+    elseif isSlotFree(plot, slot) then
+        moveFake(f, slot)
+    else
+        f.stolen = false
+        if f.updateVisibility then f.updateVisibility() end
+    end
+    updatePrompts()
+    pushList()
+end
+
+-- ── vender (Sell) igual o PlotClient ────────────────────────────────
+function sellFake(f)
+    if Fakes[f.uid] ~= f then return end
+    local def = AnimalsData[f.index]
+    if def and SA:GetRarityWeight(def.Rarity) >= 5 then
+        if ConfirmationController:IsInPrompt() then return end
+        if not ConfirmationController:Show(("Do you want to sell %*?"):format(f.index)) then return end
+    end
+    if Fakes[f.uid] ~= f then return end
+    local value = SA:GetSellValue(f.index)
+    removeFake(f)
+    addCoins(value)
+end
+
+-- ── preview 3D pro hub ──────────────────────────────────────────────
+local Unit = Vector3.new(-1, 0.25, -1).Unit
+local LIFT = {
+    ["Tacorita Bicicleta"] = 0.5, ["W or L"] = 0.5, ["25"] = 0.5, ["Cocoa Assassino"] = 0.5,
+    ["Los Jolly Combinasionas"] = 0.5, ["Bunny Bunny Bunny Sahur"] = 0.5, ["S'more Serat"] = 0.5,
+    ["Boppin Bunny"] = 0.65, ["Queen Bee"] = 0.4,
+}
+local function buildPreview(sel)
+    local token = sel.token
+    local function stale() return bus.previewWant ~= token end
+    if not sel.index then
+        bus.preview = { token = token }
+        bus.evt:Fire("preview", token)
+        return
+    end
+    local src = BrainrotAssets.getModel(sel.index, 20)
+    if stale() then return end
+    if not src then
+        bus.preview = { token = token, err = "modelo indisponível" }
+        bus.evt:Fire("preview", token)
+        return
+    end
+    local wm = Instance.new("WorldModel")
+    local m = src:Clone()
+    m.Parent = wm
+    if sel.mutation then SA:ApplyMutation(m, sel.index, sel.mutation, true) end
+    -- câmera = FitCam do jogo (fov 50, zoom 0.75, folga 0.7 — os mesmos do AttachOnViewport).
+    -- Calculada ANTES dos traits: as peças de trait ainda não estão no lugar e inflariam a caixa.
+    local _, size = SA:GetBoundingBox(sel.index, m)
+    if typeof(size) ~= "Vector3" then local _, s2 = m:GetBoundingBox() size = s2 end
+    local zoom = SA:GetZoom(sel.index, 0.75)
+    local focus
+    if LIFT[sel.index] then
+        focus = m:GetPivot() + Vector3.new(0, size.Y * LIFT[sel.index], 0)
+    else
+        focus = m.PrimaryPart and m.PrimaryPart.CFrame or m:GetPivot()
+    end
+    if sel.index == "Tosto Dino" then focus = focus * CFrame.new(0, 0, -1.75) end
+    local mx = math.max(size.X, size.Y, size.Z)
+    local cam = CFrame.new((focus * CFrame.new(Unit * (mx * 0.5 / math.tan(math.rad(25)) * zoom + mx * 0.7))).Position, focus.Position)
+    local traits = cleanTraits(sel.traits)
+    if traits then
+        SA:ApplyTraits(m, sel.index, traits)
+        task.wait(0.15) -- alguns traits terminam de montar no frame seguinte
+    else
+        task.wait()
+    end
+    if stale() then wm:Destroy() return end
+    -- os traits são presos com RigidConstraint (precisa de física); no ViewportFrame não tem física,
+    -- então encaixa cada peça na posição final na mão e troca o constraint por solda
+    for _, rc in m:GetDescendants() do
+        if rc:IsA("RigidConstraint") then
+            local a0, a1 = rc.Attachment0, rc.Attachment1
+            local p0 = a0 and a0.Parent
+            if p0 and p0:IsA("BasePart") and a1 and a1.Parent then
+                p0.CFrame = a1.WorldCFrame * a0.CFrame:Inverse()
+                local p1 = a1.Parent
+                if p1:IsA("BasePart") then
+                    local w = Instance.new("WeldConstraint")
+                    w.Part0 = p1
+                    w.Part1 = p0
+                    w.Parent = p0
+                end
+            end
+        end
+    end
+    -- cópia "pura" (sem conexões do jogo) — é ela que vai pra GUI protegida
+    local copy = m:Clone()
+    wm:Destroy()
+    -- sem scripts e SEM tags: os Observers do jogo (ClientLoadAnimation, ClientFloat...) reagem a
+    -- tag em qualquer lugar, inclusive dentro do hub escondido — testado: o jogo tocava animação de
+    -- trait dentro do ViewportFrame do gethui
+    for _, d in copy:GetDescendants() do
+        if d:IsA("LuaSourceContainer") then
+            d:Destroy()
+        else
+            for _, t in d:GetTags() do d:RemoveTag(t) end
+        end
+    end
+    for _, t in copy:GetTags() do copy:RemoveTag(t) end
+    local world = Instance.new("WorldModel")
+    copy.Parent = world
+    if stale() then world:Destroy() return end
+    bus.preview = { token = token, world = world, model = copy, cam = cam, focus = focus.Position, index = sel.index }
+    bus.evt:Fire("preview", token)
+end
+
+-- ── trade: cards dos brainrots visuais na sua lista ─────────────────
+local Trade = { cards = {}, selected = {}, tradeId = nil, accepted = false, change = 0, guard = false }
+local tradeRep = ReplicatorClient and ReplicatorClient.get(("Trade_%*"):format(LP.UserId))
+local function tradeGui()
+    local g = PlayerGui:FindFirstChild("TradeLiveTrade")
+    return g and g:FindFirstChild("TradeLiveTrade")
+end
+local function tradeData()
+    if not tradeRep then return nil end
+    local ok, d = pcall(function() return tradeRep:TryIndex({ "active", "data" }) end)
+    return ok and type(d) == "table" and d or nil
+end
+local function rtt()
+    local ok, p = pcall(function() return LP:GetNetworkPing() end)
+    p = (ok and type(p) == "number") and p or 0.1
+    return math.clamp(p * 1.5 + 0.03, 0.06, 1.5)
+end
+local function clearCard(uid)
+    local c = Trade.cards[uid]
+    if c then
+        Trade.cards[uid] = nil
+        pcall(function() c.trove:Destroy() end)
+    end
+    Trade.selected[uid] = nil
+end
+bus.tradeRemove = clearCard
+local function clearAllCards()
+    for uid in Trade.cards do clearCard(uid) end
+    Trade.selected = {}
+end
+local function selCount()
+    local n = 0
+    for uid in Trade.selected do if Fakes[uid] then n += 1 end end
+    return n
+end
+local function fakeCount()
+    local n = 0
+    for _ in Fakes do n += 1 end
+    return n
+end
+-- Contadores "x/max" do TradeController (updateBaseSlots):
+--   Your  = seus brainrots - sua oferta + oferta do outro   (max = Bases[Rebirth].MaxAnimals)
+--   Other = maxSlots - emptySlots - oferta dele + sua oferta
+-- O jogo escreve o valor real; aqui só somamos os visuais por cima desse valor.
+-- Os sinais do jogo são "deferred": o evento da nossa própria escrita chega DEPOIS de qualquer
+-- guard. Antes o script relia o número que ele mesmo escreveu e somava de novo a cada frame
+-- (daí o "25 mil de 19"). Agora cada label guarda o texto real do jogo e o último texto nosso.
+Trade.labels = {}
+local function slotLabel(gui, side)
+    local s = gui:FindFirstChild(side)
+    return s and s:FindFirstChild("BaseSlots")
+end
+local function writeSlots(lbl, delta)
+    local st = Trade.labels[lbl]
+    if not st then return end
+    local a, b = string.match(st.game or "", "^(%d+)/(%d+)$")
+    if not a then return end
+    local v = tonumber(a) + delta
+    local txt = ("%*/%*"):format(v, b)
+    st.mine = txt
+    if lbl.Text ~= txt then lbl.Text = txt end
+    lbl.TextColor3 = if not (tonumber(b) < v) then Color3.fromRGB(255, 255, 255) else Color3.fromRGB(255, 70, 70)
+end
+local function adjustBaseSlots(gui)
+    local your, other = slotLabel(gui, "Your"), slotLabel(gui, "Other")
+    if your then writeSlots(your, fakeCount() - selCount()) end
+    if other then writeSlots(other, selCount()) end
+end
+local function hookSlotLabel(gui, lbl)
+    if not lbl or Trade.labels[lbl] then return end
+    local st = { game = lbl.Text }
+    Trade.labels[lbl] = st
+    Global:Add(lbl:GetPropertyChangedSignal("Text"):Connect(function()
+        if lbl.Text == st.mine or bus.simOpen then return end -- eco da nossa escrita / trade simulada
+        st.game = lbl.Text
+        adjustBaseSlots(gui)
+    end))
+end
+local function hookTradeGui(gui)
+    if Trade.hooked == gui then return end
+    Trade.hooked = gui
+    hookSlotLabel(gui, slotLabel(gui, "Your"))
+    hookSlotLabel(gui, slotLabel(gui, "Other"))
+    local timer = gui:FindFirstChild("Other") and gui.Other:FindFirstChild("Timer")
+    if timer then
+        Global:Add(timer:GetPropertyChangedSignal("Text"):Connect(function()
+            if timer.Text == Trade.timerMine then return end
+            if Trade.cooling then Trade.applyCooldown(gui) end
+        end))
+    end
+end
+-- quantos brainrots a base do outro ainda aceita (mesma conta do contador "Other")
+local function tradeSides(d)
+    local users = type(d.users) == "table" and d.users or {}
+    local players = type(d.players) == "table" and d.players or {}
+    local mine, other
+    for k, uid in users do
+        if uid == LP.UserId then mine = players[k] else other = players[k] end
+    end
+    return mine, other
+end
+local function offerCount(p)
+    local n = 0
+    if p and type(p.offer) == "table" and type(p.offer.brainrots) == "table" then
+        for _ in p.offer.brainrots do n += 1 end
+    end
+    return n
+end
+local function otherHasRoom(d)
+    local mine, other = tradeSides(d)
+    if not other or type(other.emptySlots) ~= "number" then return true end
+    return offerCount(mine) + selCount() + 1 <= other.emptySlots + offerCount(other)
+end
+function Trade.applyCooldown(gui)
+    local left = Trade.change + 5 - workspace:GetServerTimeNow()
+    local other = gui:FindFirstChild("Other")
+    local timer = other and other:FindFirstChild("Timer")
+    local btn = other and other:FindFirstChild("ReadyButton")
+    if left <= 0 then
+        Trade.cooling = false
+        if Trade.blocker then Trade.blocker.Visible = false end
+        return
+    end
+    Trade.cooling = true
+    if timer then
+        local txt = ("⏰%*s Left"):format((math.floor(left * 10)) / 10)
+        Trade.timerMine = txt
+        if timer.Text ~= txt then timer.Text = txt end
+    end
+    if btn then
+        pcall(function() Spr.target(btn, 1, 5, { BackgroundColor3 = Color3.fromRGB(112, 112, 112) }) end)
+        if not Trade.blocker or Trade.blocker.Parent ~= btn then
+            local b = Instance.new("TextButton")
+            b.Name = "Blocker"
+            b.BackgroundTransparency = 1
+            b.Text = ""
+            b.Size = UDim2.fromScale(1, 1)
+            b.ZIndex = 50
+            b.AutoButtonColor = false
+            b.Parent = btn
+            Trade.blocker = b
+            Global:Add(b)
+        end
+        Trade.blocker.Visible = true
+    end
+end
+local function applyCard(c, uid, tabActive, allReady)
+    local sel = Trade.selected[uid] == true
+    local spacer = c.frame:FindFirstChild("Spacer")
+    if spacer then
+        local showSel = sel and not allReady
+        spacer.BackgroundColor3 = if not c.isOneOfOne then (if not showSel then Color3.fromRGB(35, 45, 50) else Color3.fromRGB(15, 50, 15)) else BrainrotCard.OneOfOneBackground
+        local st = spacer:FindFirstChild("UIStroke")
+        if st then
+            st.Color = if not showSel then (if not c.isOneOfOne then Color3.fromRGB(0, 0, 0) else BrainrotCard.OneOfOneStroke) else Color3.fromRGB(0, 255, 0)
+        end
+    end
+    if allReady then
+        c.frame.Visible = sel
+        c.frame.LayoutOrder = 0
+    else
+        c.frame.Visible = tabActive or sel
+        c.frame.LayoutOrder = if tabActive then c.order + 1000000 else c.order
+    end
+end
+local function makeCard(gui, f)
+    local sf = gui.Your:FindFirstChild("ScrollingFrame")
+    local tmpl = sf and sf:FindFirstChild("Template")
+    if not tmpl then return end
+    local tr = Trove.new()
+    local frame = tr:Clone(tmpl)
+    frame.Name = ("Selection_Brainrot_%*"):format(f.uid)
+    frame.Visible = false
+    -- OneOfOne sempre definido (true/false): é o campo que o BrainrotCard confere antes do replicador
+    local record = { Index = f.index, Mutation = f.mutation, Traits = cleanTraits(f.traits), UUID = f.uid, OneOfOne = f.oneOfOne == true }
+    BrainrotCard.Render(frame, record, tr, "LiveTrade")
+    frame.Parent = sf
+    local c = { frame = frame, trove = tr, order = f.slot, isOneOfOne = false }
+    Trade.cards[f.uid] = c
+    if FFlags:GetInstant("TradeController/EnableHoverInfo", true) then
+        tr:Add((HoverInfoController:Add(frame, function() return record.Index, record.Mutation, record.Traits end)))
+    end
+    tr:Add((BrainrotCard.ObserveOneOfOne(record, function(v)
+        c.isOneOfOne = v
+        BrainrotCard.ApplyOneOfOne(frame, v)
+    end)))
+    local busy = false
+    local spacer = frame:FindFirstChild("Spacer")
+    if spacer then
+        tr:Add(spacer.Activated:Connect(function()
+            if busy then return end
+            -- limite do servidor entre mudanças de oferta (mesma mensagem real do jogo)
+            local cd = bus.simCooldown and bus.simCooldown("Brainrot") or 1
+            if bus.tradeClickAt and os.clock() - bus.tradeClickAt < cd then
+                local key = if Trade.selected[f.uid] then "Brainrot:remove:spam" else "Brainrot:add:spam"
+                local m = bus.simLearned and bus.simLearned(key)
+                if m then notifyError(m) end
+                return
+            end
+            bus.tradeClickAt = os.clock()
+            busy = true
+            sound("Sounds.Sfx.Activated")
+            -- mesmo tempo do InvokeServer + replicação da oferta no original
+            task.wait(rtt())
+            local d = tradeData()
+            if Trade.cards[f.uid] == c and d then
+                local adding = not Trade.selected[f.uid]
+                if adding and not otherHasRoom(d) then
+                    -- só o texto real (aprendido numa trade); sem ele não inventa mensagem
+                    local m = bus.simLearned and (bus.simLearned("Brainrot:add:", "space") or bus.simLearned("Brainrot:add:", "slot"))
+                    if m then notifyError(m) end
+                else
+                    Trade.selected[f.uid] = if adding then true else nil
+                    Trade.change = workspace:GetServerTimeNow()
+                    Trade.applyCooldown(gui)
+                    adjustBaseSlots(gui)
+                end
+            end
+            busy = false
+        end))
+    end
+    return c
+end
+local function syncTrade()
+    local d = tradeData()
+    local gui = tradeGui()
+    if not d or not gui then
+        if Trade.tradeId then
+            if Trade.accepted then
+                -- trade concluída: os visuais oferecidos "foram embora"
+                for uid in Trade.selected do
+                    local f = Fakes[uid]
+                    if f then removeFake(f) end
+                end
+            end
+            clearAllCards()
+            Trade.tradeId, Trade.accepted, Trade.change, Trade.cooling = nil, false, 0, false
+            if Trade.blocker then Trade.blocker.Visible = false end
+        end
+        return
+    end
+    if d.tradeId ~= Trade.tradeId then
+        clearAllCards()
+        Trade.tradeId = d.tradeId
+        Trade.accepted, Trade.change, Trade.cooling = false, 0, false
+    end
+    hookTradeGui(gui)
+    local players = type(d.players) == "table" and d.players or {}
+    local allReady, allAccepted = next(players) ~= nil, next(players) ~= nil
+    for _, p in players do
+        if not p.ready then allReady = false end
+        if not p.accepted then allAccepted = false end
+    end
+    if allAccepted or d.isProcessing then Trade.accepted = true end
+    local sb = gui:FindFirstChild("Side Buttons")
+    local btn = sb and sb:FindFirstChild("Brainrots")
+    local tabActive = true
+    if btn then
+        local c3 = btn.BackgroundColor3
+        tabActive = math.abs(c3.R * 255 - 81) < 6 and math.abs(c3.G * 255 - 158) < 6 and math.abs(c3.B * 255 - 86) < 6
+    end
+    for uid, f in Fakes do
+        if not Trade.cards[uid] then try("card trade", makeCard, gui, f) end
+    end
+    for uid, c in Trade.cards do
+        if not Fakes[uid] then
+            clearCard(uid)
+        else
+            c.order = Fakes[uid].slot
+            applyCard(c, uid, tabActive, allReady)
+        end
+    end
+    if Trade.cooling then Trade.applyCooldown(gui) end
+    if next(Fakes) then adjustBaseSlots(gui) end
+end
+
+-- ── Index: igual ao servidor quando você ganha um brainrot ──────────
+-- O canal guarda Index[nome][mutação ou "Default"] = quantas vezes você teve (tabela viva do cache,
+-- testado). O IndexController lê isso ao abrir/trocar de página; a conclusão do Index entra no
+-- multiplicador de dinheiro (Shared.Index:GetMultipliers), por isso o cache do multiplicador é zerado.
+-- Tudo que já foi pra Index pelo script fica em IndexSeen e vai pro config.json: excluiu o brainrot,
+-- saiu e voltou → continua desbloqueado (no jogo, "já teve" = fica na Index).
+local IndexSeen = {} -- [nome] = { [mutação|"Default"] = true }
+local function liveIndex()
+    local ch = bus.chan
+    if not ch then return nil end
+    local ok, idx = pcall(function() return (ch:Get("Index")) end)
+    if not ok or type(idx) ~= "table" or table.isfrozen(idx) then return nil end
+    return idx
+end
+local function markSeen(name, key)
+    IndexSeen[name] = IndexSeen[name] or {}
+    IndexSeen[name][key] = true
+end
+-- garante a entrada sem somar de novo (usado ao carregar o save)
+local function ensureIndex(name, key)
+    local idx = liveIndex()
+    if not idx or not AnimalsData[name] then return end
+    local e = idx[name]
+    if type(e) ~= "table" then
+        e = {}
+        idx[name] = e
+    end
+    if not tonumber(e[key]) or tonumber(e[key]) < 1 then e[key] = 1 end
+    multAt = -100
+end
+function unlockIndex(f)
+    local key = f.mutation or "Default"
+    markSeen(f.index, key)
+    local idx = liveIndex()
+    if not idx then return end
+    local e = idx[f.index]
+    if type(e) ~= "table" then
+        e = {}
+        idx[f.index] = e
+    end
+    e[key] = (tonumber(e[key]) or 0) + 1
+    multAt = -100
+end
+
+-- ── 1 OF 1 ───────────────────────────────────────────────────────────
+-- Automático pelas contagens do próprio jogo — é 1 of 1 quando existe 1 só daquela combinação:
+--   • "PublicExistCounts" (o mesmo do "X Exist" do HoverInfo): data[nome].mutations[mutação|"None"]
+--     (só tem os brainrots da lista pública e só enche depois que o jogo pede — ao passar o mouse
+--      num brainrot no Index/trade; quando chegar, o visual atualiza sozinho)
+--   • "SingletonBrainrotMutations": pairs["Nome:Mutação|Normal"] = true quando existe exatamente 1
+-- Forçado: pela aba "1 of 1" do hub (f.forceOne = true/false; nil = automático).
+local singletonRep = ReplicatorClient and ReplicatorClient.get("SingletonBrainrotMutations")
+local existRep = ReplicatorClient and ReplicatorClient.get("PublicExistCounts")
+local function existCount(index, mutation)
+    local ok, n = pcall(function()
+        local e = existRep:TryIndex({ "data", index })
+        local muts = type(e) == "table" and e.mutations
+        return type(muts) == "table" and muts[mutation or "None"] or nil
+    end)
+    return ok and tonumber(n) or nil
+end
+bus.existCount = existCount -- usado pelo pushList (que fica acima no arquivo); o hub não chama
+-- O PublicExistCounts é preenchido pelo pedido ExistCounts/RequestPublic. O Index manda esse pedido a
+-- CADA abertura (sem checar nada), o HoverInfo no 1º hover e o Glossário ao abrir — sempre fora do
+-- servidor de Duels. Aqui: o mesmo pedido ao iniciar e de novo a cada 60s (menos que abrir o Index
+-- algumas vezes), pra contagem/1 of 1 ficarem atualizados sem abrir o Index.
+-- (v4.6 só pedia com o repositório VAZIO — ele já tem dados parciais ao entrar, então nunca pedia.)
+-- O Net recusa (nome de remote "envenenado") qualquer pedido de thread criada pelo executor — inclusive
+-- esta. Então aqui só se MARCA o pedido; quem dispara é o hook do anti-kick, de dentro de uma thread
+-- do PRÓPRIO jogo (testado: 0 → 120 contagens em 1s, sem abrir o Index).
+task.spawn(function()
+    if not existRep then return end
+    if ServerData and ServerData.IsDuelsServer and ServerData.IsDuelsServer() then return end
+    while not bus.dead do
+        bus.wantExist = true
+        task.wait(60)
+    end
+end)
+local function isSingleton(index, mutation)
+    local ok, v = pcall(function()
+        local data = singletonRep and singletonRep.Data
+        return type(data) == "table" and type(data.pairs) == "table" and data.pairs[("%*:%*"):format(index, mutation or "Normal")] == true
+    end)
+    return ok and v == true
+end
+local function autoOneOfOne(index, mutation)
+    return existCount(index, mutation) == 1 or isSingleton(index, mutation)
+end
+local function setBanner(f)
+    local b = f.overhead and f.overhead.Parent and f.overhead:FindFirstChild("1OF1Banner")
+    if b and b.Visible ~= (f.oneOfOne == true) then b.Visible = f.oneOfOne == true end
+end
+-- recalcula o 1 of 1 de um visual; se mudou, atualiza overhead, card do trade e lista do hub
+local function refreshOneOfOne(f)
+    local v
+    if f.forceOne ~= nil then v = f.forceOne else v = autoOneOfOne(f.index, f.mutation) end
+    if v == (f.oneOfOne == true) then return false end
+    f.oneOfOne = v
+    setBanner(f)
+    if bus.tradeRemove then bus.tradeRemove(f.uid) end -- o card do trade é refeito com o novo estado
+    return true
+end
+
+-- ── módulos usados pela trade e pelas Configurações ─────────────────
+local BaseSkinsMod = req("Shared.BaseSkins")
+local AnimatedButton = req("Classes.AnimatedButton")
+-- ── Configurações do jogo: botão do hub ──
+local SettingsUI = {}
+local ON_BG, ON_ST = Color3.new(0.0470588, 0.466667, 0.235294), Color3.new(0.00784314, 0.219608, 0)
+local OFF_BG, OFF_ST = Color3.new(0.490196, 0.435294, 0.435294), Color3.new(0.403922, 0.356863, 0.356863)
+local function settingsScroll()
+    local sg = PlayerGui:FindFirstChild("Settings")
+    local s = sg and sg:FindFirstChild("Settings")
+    local c = s and s:FindFirstChild("Content")
+    return c and c:FindFirstChild("ScrollingFrame"), s
+end
+-- mesmas cores do botão On/Off do SettingsController
+local function styleToggle(btn, on)
+    local txt = btn:FindFirstChild("Text")
+    if txt then
+        txt.Text = on and "On" or "Off"
+        local ts = txt:FindFirstChildOfClass("UIStroke")
+        if ts then ts.Color = on and ON_ST or OFF_ST end
+    end
+    btn.BackgroundColor3 = on and ON_BG or OFF_BG
+    local st = btn:FindFirstChildOfClass("UIStroke")
+    if st then st.Color = on and ON_ST or OFF_ST end
+end
+function SettingsUI.ensureRow()
+    local sf = settingsScroll()
+    local tmpl = sf and sf:FindFirstChild("Template")
+    if not tmpl then return end
+    local row = SettingsUI.row
+    if not row or row.Parent ~= sf then
+        row = tmpl:Clone()
+        row.Name = "Brainrot Spawner"
+        local fn = row:FindFirstChild("Function")
+        if fn then fn.Text = "Brainrot Spawner" end
+        local btn = row:FindFirstChild("Buttons") and row.Buttons:FindFirstChild("Button")
+        if not btn then row:Destroy() return end
+        row.Parent = sf
+        SettingsUI.row, SettingsUI.btn = row, btn
+        local ok, ab = pcall(function() return AnimatedButton.new(btn) end)
+        if ok and ab then
+            pcall(function() ab:Animate() end)
+            Global:Add(ab)
+            Global:Add(ab.OnActivated:Connect(function()
+                sound("Sounds.Sfx.Activated")
+                bus.evt:Fire("hubToggle")
+            end))
+        else
+            Global:Add(btn.Activated:Connect(function() bus.evt:Fire("hubToggle") end))
+        end
+        Global:Add(row)
+    end
+    -- organizado: logo depois da última opção do jogo
+    local maxOrder = 0
+    for _, c in sf:GetChildren() do
+        if c ~= row and c:IsA("GuiObject") and c.Visible then maxOrder = math.max(maxOrder, c.LayoutOrder) end
+    end
+    row.LayoutOrder = maxOrder + 1
+    row.Visible = true
+    styleToggle(SettingsUI.btn, bus.hubVisible ~= false)
+end
+-- ── estado salvo (o hub grava em BrainrotSpawner/config.json) ───────
+local function buildState()
+    local now = workspace:GetServerTimeNow()
+    local list = {}
+    for _, f in Fakes do
+        table.insert(list, {
+            index = f.index, mutation = f.mutation, traits = table.clone(f.traits), slot = f.slot,
+            forceOne = f.forceOne, pending = math.max(0, now - f.lastCollect), offline = f.offlineGain or 0,
+            fuse = f.fuse, fuseAt = f.fuseAt,
+        })
+    end
+    table.sort(list, function(a, b) return a.slot < b.slot end)
+    local seen = {}
+    for name, muts in IndexSeen do
+        seen[name] = {}
+        for k in muts do table.insert(seen[name], k) end
+    end
+    bus.state = { fakes = list, money = Money.offset, index = seen, trade = bus.simSave and bus.simSave() or nil,
+        fuse = bus.fuseSave and bus.fuseSave() or nil }
+end
+-- tempo máximo de dinheiro offline do jogo: Datas.Game.Game.OfflineMaxTime ([0] normal, [1] VIP), em minutos
+local function offlineCapSeconds()
+    local t = GameData.Game and GameData.Game.OfflineMaxTime or {}
+    local vip = false
+    pcall(function()
+        local gp = bus.chan:Get("Gamepass")
+        vip = type(gp) == "table" and gp.VIP == true
+    end)
+    return (t[vip and 1 or 0] or t[0] or 60) * 60
+end
+
+-- ── comandos do hub ─────────────────────────────────────────────────
+local uidN = 0
+local function spawnFake(sel)
+    local def = AnimalsData[sel.index]
+    if not def then return end
+    local plot = getPlot()
+    if not plot then
+        notifyError("Base not found!")
+        bus.evt:Fire("spawnfail", "base não encontrada")
+        return
+    end
+    local slot = findFreeSlot(plot)
+    if not slot then
+        notifyError("Your base is full")
+        bus.evt:Fire("spawnfail", "base cheia")
+        return
+    end
+    uidN += 1
+    local f = {
+        uid = ("V%*%*"):format(uidN, string.sub(HttpService:GenerateGUID(false), 1, 6)),
+        index = sel.index,
+        mutation = sel.mutation,
+        traits = type(sel.traits) == "table" and sel.traits or {},
+        slot = slot,
+        lastCollect = workspace:GetServerTimeNow(),
+        stolen = false,
+    }
+    f.oneOfOne = autoOneOfOne(f.index, f.mutation)
+    Fakes[f.uid] = f
+    SlotFake[slot] = f
+    local ok, why = render(f)
+    if not ok then
+        unrender(f)
+        Fakes[f.uid] = nil
+        if SlotFake[slot] == f then SlotFake[slot] = nil end
+        notifyError(("Could not load %*"):format(def.DisplayName or sel.index))
+        log("spawn falhou: " .. tostring(why))
+        bus.evt:Fire("spawnfail", tostring(why))
+        return
+    end
+    unlockIndex(f)
+    updatePrompts()
+    pushList()
+    bus.evt:Fire("spawned", f.uid, slot, sel.fromTrade == true)
+end
+
+local function deleteFake(uid)
+    local f = Fakes[uid]
+    if not f then return end
+    local def = AnimalsData[f.index]
+    local name = def and def.DisplayName or f.index
+    if ConfirmationController:IsInPrompt() then return end
+    if not ConfirmationController:Show(("Do you want to delete %*?"):format(name)) then return end
+    if Fakes[uid] ~= f then return end
+    removeFake(f)
+    notifyOk(("%* was deleted!"):format(name))
+end
+
+local function deleteAll()
+    if not next(Fakes) then return end
+    if ConfirmationController:IsInPrompt() then return end
+    if not ConfirmationController:Show("Do you want to delete ALL visual brainrots?") then return end
+    local n = 0
+    for _, f in Fakes do removeFake(f) n += 1 end
+    notifyOk(("%* brainrots were deleted!"):format(n))
+end
+
+-- volta tudo que estava salvo: brainrots nos mesmos slots, dinheiro pendente de cada um,
+-- dinheiro offline (tempo fora, até o limite do jogo), dinheiro visual e skin
+local function restoreState(saved)
+    if type(saved) ~= "table" then return end
+    -- histórico de trades / mensagens aprendidas / última trade real
+    if bus.simLoad and type(saved.trade) == "table" then try("trade save", bus.simLoad, saved.trade) end
+    if bus.fuseLoad and type(saved.fuse) == "table" then try("fuse save", bus.fuseLoad, saved.fuse) end
+    local plot
+    for _ = 1, 60 do
+        plot = getPlot()
+        if plot then break end
+        task.wait(0.5)
+    end
+    if not plot then log("restaurar: base não encontrada") return end
+    -- Index salva: tudo que você já teve volta desbloqueado (sem somar de novo)
+    if type(saved.index) == "table" then
+        for name, muts in saved.index do
+            if type(muts) == "table" then
+                for _, k in muts do
+                    if type(k) == "string" then
+                        markSeen(name, k)
+                        ensureIndex(name, k)
+                    end
+                end
+            end
+        end
+    end
+    if type(saved.money) == "number" and saved.money ~= 0 then
+        Money.offset = saved.money
+        Money.dirty = true
+        hookMoney()
+        refreshMoney()
+        bus.money = Money.offset
+    end
+    local nowUnix = DateTime.now().UnixTimestamp
+    local away = math.max(0, nowUnix - (tonumber(saved.savedAt) or nowUnix))
+    local cap = offlineCapSeconds()
+    local now = workspace:GetServerTimeNow()
+    local n = 0
+    for _, s in type(saved.fakes) == "table" and saved.fakes or {} do
+        if type(s) == "table" and AnimalsData[s.index] then
+            local list = realList(plot)
+            local slot = (type(s.slot) == "number" and isSlotFree(plot, s.slot, list)) and s.slot or findFreeSlot(plot)
+            if slot then
+                uidN += 1
+                local f = {
+                    uid = ("V%*%*"):format(uidN, string.sub(HttpService:GenerateGUID(false), 1, 6)),
+                    index = s.index, mutation = s.mutation,
+                    traits = type(s.traits) == "table" and s.traits or {},
+                    slot = slot, stolen = false,
+                    lastCollect = now - (tonumber(s.pending) or 0), -- o que já tinha gerado antes de sair
+                }
+                if type(s.forceOne) == "boolean" then f.forceOne = s.forceOne end
+                if s.fuse == true then f.fuse, f.fuseAt = true, tonumber(s.fuseAt) or 0 end
+                if saved.offlineEnabled ~= false then
+                    local off = math.min((tonumber(s.offline) or 0) + away, cap)
+                    if off >= 1 then f.offlineGain = math.floor(off) end
+                end
+                Fakes[f.uid] = f
+                SlotFake[slot] = f
+                f.oneOfOne = (f.forceOne ~= nil and f.forceOne) or autoOneOfOne(f.index, f.mutation)
+                local ok = select(1, try("restaurar " .. s.index, render, f))
+                if ok and f.model then
+                    unlockIndex(f)
+                    n += 1
+                else
+                    unrender(f)
+                    Fakes[f.uid] = nil
+                    if SlotFake[slot] == f then SlotFake[slot] = nil end
+                end
+            end
+        end
+    end
+    updatePrompts()
+    pushList()
+    if n > 0 then
+        log(("restaurados %d brainrots (fora %ds, offline máx %ds)"):format(n, away, cap))
+        bus.evt:Fire("restored", n, math.min(away, cap))
+    end
+end
+
+-- ── trade simulada (parceiro fictício "TradeBot", nenhum jogador real) ──
+-- Usa a própria tela TradeLiveTrade do jogo e as mesmas regras do TradeController:
+--   • qualquer mudança de oferta zera ready/accept e volta o contador de 5s (lastChange)
+--   • READY só depois dos 5s e com algo na oferta; com os dois prontos o botão vira ACCEPT
+--   • os dois aceitaram → "Processing..." → troca concluída
+--   • contadores BaseSlots com a mesma conta do updateBaseSlots
+-- Os handlers do jogo nessa tela só existem durante uma trade real (trove u39), então aqui não há briga.
+-- Fica numa função própria (o motor já está no limite de 200 locais) e sai pela tabela SimAPI.
+local SimAPI = {}
+;(function()
+local InterfaceController = req("Controllers.InterfaceController")
+local CornerNotificationController = req("Controllers.CornerNotificationController")
+local GearsMod = req("Shared.Gears")
+local TradingFlags = req("Shared.Flags.TradingFlags")
+local TextService = game:GetService("TextService")
+local SIM_NAME, SIM_ID = "Roblox", 1 -- conta oficial do Roblox (não é um jogador do servidor)
+local SIM_TAB = { Brainrots = "Brainrot", BaseSkins = "BaseSkin", Gears = "Gear" }
+-- Mensagens do servidor (não estão no cliente): capturadas em trades reais e FIXAS aqui na source.
+-- Nada é aprendido/salvo em arquivo. gap = intervalo mínimo entre cliques que o servidor aceitou.
+-- O servidor ainda recusou um clique 0,97s depois do anterior (Gear), então o intervalo base é ~1s.
+local DEFAULT_COOLDOWN = 1
+local LEARNED_DEFAULT = {
+    ["BaseSkin:add:spam"] = { msg = "Please wait before adding another item", gap = 0.36 },
+    ["BaseSkin:remove:spam"] = { msg = "Please wait before removing another item", gap = 0.35 },
+    ["Brainrot:add:spam"] = { msg = "Please wait before adding another brainrot", gap = 0.19 },
+    ["Brainrot:remove:spam"] = { msg = "Please wait before removing another brainrot", gap = 0.36 },
+    ["Gear:add:spam"] = { msg = "Please wait before adding another item", gap = 0.97 },
+    ["Gear:remove:spam"] = { msg = "Please wait before removing another item", gap = 0.59 },
+    -- Fim de trade — capturado com NotifyCapture (25/10). O servidor manda SEMPRE em inglês e o Roblox
+    -- traduz na tela pra língua do jogador; aqui vai igual (inglês) e o Roblox faz o mesmo. %s = nome.
+    -- cancelada: Notify("<font color=#FA0103>@<quem cancelou> canceled</font>", 5, "Sounds.Sfx.Error") = :Error
+    ["end:cancel"] = { ok = false, nameFmt = true, msg = "@%s canceled" },
+    -- concluída: Notify("<font color=#92FF67>Trade with @<outro> completed! 🎉</font>", 5, "Sounds.Sfx.Success")
+    -- = :Success → verde, área normal de notificações (PlayerGui.Notification), embaixo
+    ["end:complete"] = { ok = true, nameFmt = true, msg = "Trade with @%s completed! 🎉" },
+}
+local Sim = {
+    state = "idle", partner = {}, mine = {}, cards = {}, otherCards = {}, n = 0, tab = "Brainrot", lastChange = 0,
+    me = { ready = false, accepted = false }, bot = { ready = false, accepted = false }, other = { maxSlots = 10, emptySlots = 10, used = 0 },
+    inflight = false, nextChange = 0, chat = {}, chatCd = 0, chatTrove = nil, lastClick = {},
+    cfg = { chat = "off", botReady = "auto", botAccept = "auto", slotMode = "bot", botMax = 10, botUsed = 4, playerId = 0, botName = SIM_NAME },
+    learn = table.clone(LEARNED_DEFAULT), -- ["Brainrot:add:spam"] = { msg, gap }  (gap = segundos desde o clique anterior)
+    lastReal = nil,  -- { name, userId, maxSlots, emptySlots } da última trade real
+    history = {},    -- trades simuladas concluídas (mais nova primeiro)
+}
+bus.sim = { state = "idle", partner = {}, name = SIM_NAME }
+-- nome do parceiro escolhido no hub (Config.simBotName); o userId (foto) é resolvido em segundo plano
+local simIdCache = {}
+local function simName() return Sim.cfg.botName or SIM_NAME end
+local function simId()
+    local n = simName()
+    if n == SIM_NAME then return SIM_ID end
+    local pl = Players:FindFirstChild(n)
+    if pl and pl:IsA("Player") then return pl.UserId end
+    return simIdCache[string.lower(n)] or SIM_ID
+end
+
+local function flag(f, def)
+    local ok, v = pcall(function() return f:Get() end)
+    if ok and v ~= nil then return v end
+    return def
+end
+local function simTypeActive(t)
+    if t == "Brainrot" then return true end
+    local ok, off = pcall(function()
+        return FFlags:GetInstant("TradeService/GenericItemTradesDisabled", ServerData and ServerData.IsProdGame() or false)
+    end)
+    return not (ok and off)
+end
+local function simAllReady() return Sim.me.ready and Sim.bot.ready end
+local function simAllAccepted() return Sim.me.accepted and Sim.bot.accepted end
+local function simPush()
+    local list = {}
+    for _, p in Sim.partner do
+        local d = AnimalsData[p.index]
+        table.insert(list, { key = p.key, index = p.index, display = d and d.DisplayName or p.index, mutation = p.mutation, traits = p.traits })
+    end
+    local left = Sim.lastChange + 5 - workspace:GetServerTimeNow()
+    bus.sim = {
+        state = Sim.state, partner = list, name = simName(), cfg = table.clone(Sim.cfg),
+        meReady = Sim.me.ready, meAcc = Sim.me.accepted, botReady = Sim.bot.ready, botAcc = Sim.bot.accepted,
+        allReady = simAllReady(), timerOk = left <= 0,
+        presets = table.clone(flag(TradingFlags and TradingFlags.SignPresets, {})),
+        other = table.clone(Sim.other), lastReal = Sim.lastReal,
+        histCount = #Sim.history,
+    }
+    bus.evt:Fire("sim")
+end
+local function simMyBase()
+    local plot = getPlot()
+    if not plot then return 0, 10 end
+    local max = maxAnimals(plot)
+    local n = 0
+    local list = realList(plot)
+    for i = 1, max do
+        if type(list[i]) == "table" or SlotFake[i] then n += 1 end
+    end
+    return n, max
+end
+-- base de um jogador do servidor (só os números: tamanho e quantos brainrots tem)
+local function simPlayerBase(userId)
+    local ok, plots = pcall(function() return PlotController:GetPlots() end)
+    for _, pc in ok and type(plots) == "table" and plots or {} do
+        local okO, owner = pcall(function() return pc:GetOwner() end)
+        if okO and owner and owner.UserId == userId and pc.PlotModel then
+            local max = maxAnimals(pc)
+            local list = realList(pc)
+            local used = 0
+            for i = 1, max do if type(list[i]) == "table" then used += 1 end end
+            return max, used, owner.Name
+        end
+    end
+    return nil
+end
+-- slots da base dele: bot (editável no hub) / jogador do servidor / última trade real
+local function simComputeOther()
+    local cfg = Sim.cfg
+    local max, used, src
+    if cfg.slotMode == "player" then
+        max, used, src = simPlayerBase(tonumber(cfg.playerId) or 0)
+    elseif cfg.slotMode == "last" and Sim.lastReal then
+        max = Sim.lastReal.maxSlots
+        used = Sim.lastReal.maxSlots - Sim.lastReal.emptySlots
+        src = Sim.lastReal.name
+    end
+    if not max then
+        max = math.clamp(math.floor(tonumber(cfg.botMax) or 10), 1, 100)
+        used = math.floor(tonumber(cfg.botUsed) or 0)
+        src = nil
+    end
+    used = math.clamp(used, 0, max)
+    Sim.other = { maxSlots = max, emptySlots = max - used, used = used, source = src, mode = cfg.slotMode }
+end
+local function simOfferCount(side)
+    local n = 0
+    if side == "me" then
+        for _, it in Sim.mine do if it.type == "Brainrot" and it.selected then n += 1 end end
+    else
+        n = #Sim.partner
+    end
+    return n
+end
+-- mesma conta dos dois contadores BaseSlots (updateBaseSlots)
+local function simSlotsAfter()
+    local mineN, max = simMyBase()
+    local yb, ob = simOfferCount("me"), simOfferCount("bot")
+    return mineN - yb + ob, max, Sim.other.maxSlots - Sim.other.emptySlots - ob + yb, Sim.other.maxSlots
+end
+-- texto real aprendido: chave exata ou a 1ª mensagem aprendida com esse prefixo que contém o padrão
+local function simLearned(key, pattern)
+    local e = Sim.learn[key]
+    if e and (not pattern or string.find(string.lower(e.msg), pattern)) then return e.msg end
+    if pattern then
+        for k, v in Sim.learn do
+            if string.sub(k, 1, #key) == key and string.find(string.lower(v.msg), pattern) then return v.msg end
+        end
+    end
+    return nil
+end
+-- devolve (texto real aprendido ou nil, explicação pro hub) quando alguma base não comporta a troca
+local function simSpaceError()
+    local y, ymax, o, omax = simSlotsAfter()
+    if y > ymax then
+        return simLearned("Ready:", "space") or simLearned("Ready:", "slot"),
+            ("sua base ficaria com %d/%d"):format(y, ymax)
+    end
+    if o > omax then
+        return simLearned("Brainrot:add:", "space") or simLearned("Brainrot:add:", "slot"),
+            ("a base dele ficaria com %d/%d"):format(o, omax)
+    end
+    return nil
+end
+local function simHasOffer()
+    if #Sim.partner > 0 then return true end
+    for _, it in Sim.mine do if it.selected then return true end end
+    return false
+end
+local function simChanged()
+    Sim.lastChange = workspace:GetServerTimeNow()
+    Sim.me.ready, Sim.me.accepted, Sim.bot.ready, Sim.bot.accepted = false, false, false, false
+    Sim.n += 1
+end
+-- mostra o erro real do jogo; se ainda não foi aprendido, explica só no hub (nada inventado na tela do jogo)
+local function simError(msg, hubWhy)
+    if msg then notifyError(msg) else bus.evt:Fire("simfail", hubWhy) end
+end
+-- mostra a mensagem fixa do servidor (nameFmt: "%s" = quem fez a ação; na simulada, quem cancela é você)
+local function simNotifyLearned(key, who)
+    local e = Sim.learn[key]
+    if not e then return end
+    local msg = e.msg
+    if e.nameFmt then msg = msg:format(who or LP.Name) end
+    -- :Success / :Error = Notify(<font cor>texto</font>, 5, som) — exatamente o que o servidor manda
+    if e.ok then notifyOk(msg) else notifyError(msg) end
+end
+local function simCooldown(t)
+    local best
+    for k, v in Sim.learn do
+        if string.sub(k, 1, #t + 1) == t .. ":" and string.sub(k, -5) == ":spam" and type(v.gap) == "number" then
+            best = math.max(best or 0, v.gap)
+        end
+    end
+    return math.max(best and (best + 0.05) or 0, DEFAULT_COOLDOWN)
+end
+bus.simCooldown = simCooldown
+-- trava de mudança de oferta (sua ou dele): devolve false + mensagem quando é spam
+local function simTryLock(t, action)
+    t = t or "Brainrot"
+    if Sim.inflight or os.clock() < Sim.nextChange then
+        simError(simLearned(("%*:%*:spam"):format(t, action or "add")),
+            ("espere um pouco antes de mexer na oferta (%s)"):format(t))
+        return false
+    end
+    Sim.inflight = true
+    Sim.lockType = t
+    return true
+end
+local function simUnlock()
+    Sim.inflight = false
+    Sim.nextChange = os.clock() + simCooldown(Sim.lockType or "Brainrot")
+end
+
+-- ── cards ──
+local function simFetchMine()
+    local out = {}
+    local ch = bus.chan
+    local plot = getPlot()
+    if plot then
+        local list = realList(plot)
+        for i = 1, maxAnimals(plot) do
+            local j = list[i]
+            local f = SlotFake[i]
+            if type(j) == "table" and not j.Machine and AnimalsData[j.Index] then
+                table.insert(out, { type = "Brainrot", key = "R" .. i, order = i, real = true,
+                    content = ("%*:%*:%*"):format(j.Index, tostring(j.Mutation), table.concat(j.Traits or {}, ",")),
+                    record = j })
+            elseif f then
+                table.insert(out, { type = "Brainrot", key = "F" .. f.uid, order = i, fake = f,
+                    content = ("%*:%*:%*:%*"):format(f.index, tostring(f.mutation), table.concat(f.traits or {}, ","), tostring(f.oneOfOne)),
+                    record = { Index = f.index, Mutation = f.mutation, Traits = cleanTraits(f.traits), UUID = f.uid, OneOfOne = f.oneOfOne == true } })
+            end
+        end
+    end
+    if ch and simTypeActive("BaseSkin") then
+        local inv = ch:Get("BaseSkinInventory")
+        local i = 0
+        for k, j in type(inv) == "table" and inv or {} do
+            if type(k) == "string" and type(j) == "table" and type(j.SkinName) == "string"
+                and (not BaseSkinsMod or BaseSkinsMod.IsTradable(j.SkinName)) then
+                i += 1
+                table.insert(out, { type = "BaseSkin", key = "S" .. k, order = i, content = j.SkinName, record = { UUID = k, SkinName = j.SkinName } })
+            end
+        end
+    end
+    if ch and GearsMod and simTypeActive("Gear") then
+        local ok, owned = pcall(GearsMod.ListOwned, ch)
+        for i, j in ok and owned or {} do
+            local id = if type(j.UUID) ~= "string" then ("name:%*"):format(j.GearName) else j.UUID
+            table.insert(out, { type = "Gear", key = "G" .. id, order = i, content = j.GearName, record = { GearName = j.GearName, UUID = j.UUID } })
+        end
+    end
+    return out
+end
+local function simRenderCard(frame, it, tr, ctx)
+    if it.type == "Brainrot" then
+        BrainrotCard.Render(frame, it.record, tr, ctx or "LiveTrade")
+        if FFlags:GetInstant("TradeController/EnableHoverInfo", true) then
+            local r = it.record
+            tr:Add((HoverInfoController:Add(frame, function() return r.Index, r.Mutation, r.Traits end)))
+        end
+        return
+    end
+    local sp = frame:FindFirstChild("Spacer")
+    if not sp then return end
+    local vp = sp:FindFirstChild("ViewportFrame")
+    local img
+    if it.type == "Gear" then
+        sp.Title.Text = GearsMod.GetDisplayName(it.record.GearName)
+        sp.Cash.Text = "Gear"
+        img = GearsMod.GetImage(it.record.GearName)
+    else
+        sp.Title.Text = it.record.SkinName
+        sp.Cash.Text = "Base Skin"
+        img = BaseSkinsMod and BaseSkinsMod.GetImage(it.record.SkinName)
+        if not img and vp then
+            local d = IndexData[it.record.SkinName]
+            if d and d.MainColor then vp.BackgroundColor3 = d.MainColor end
+        end
+    end
+    if img and vp then
+        local il = Instance.new("ImageLabel")
+        il.Name = it.type .. "Image"
+        il.BackgroundTransparency = 1
+        il.AnchorPoint = Vector2.new(0.5, 0.5)
+        il.Position = UDim2.fromScale(0.5, 0.5)
+        il.Size = UDim2.fromScale(1, 1)
+        il.ScaleType = Enum.ScaleType.Fit
+        il.Image = img
+        il.Parent = vp
+        tr:Add(il)
+    end
+end
+-- applySelectionColor; com os dois prontos o jogo troca a lista pelas cópias da oferta (sem destaque verde)
+local function simApplyCard(c)
+    local it = c.item
+    local sel = it.selected == true
+    local allReady = simAllReady()
+    local green = sel and not allReady
+    local sp = c.frame:FindFirstChild("Spacer")
+    if sp then
+        sp.BackgroundColor3 = if not c.isOneOfOne then (if not green then Color3.fromRGB(35, 45, 50) else Color3.fromRGB(15, 50, 15)) else BrainrotCard.OneOfOneBackground
+        local st = sp:FindFirstChild("UIStroke")
+        if st then st.Color = if not green then (if not c.isOneOfOne then Color3.fromRGB(0, 0, 0) else BrainrotCard.OneOfOneStroke) else Color3.fromRGB(0, 255, 0) end
+    end
+    if allReady then
+        c.frame.Visible = sel
+        c.frame.LayoutOrder = c.item.order
+    else
+        c.frame.Visible = Sim.tab == it.type or sel
+        c.frame.LayoutOrder = if it.type ~= Sim.tab then c.item.order else c.item.order + 1000000
+    end
+end
+
+local simRefresh
+local function simClickMine(c)
+    if Sim.state ~= "open" or simAllReady() then return end -- com os dois prontos a lista é só leitura
+    -- cliente original: trava só o próprio card enquanto o InvokeServer não volta (u132)
+    if c.busy then return end
+    c.busy = true
+    sound("Sounds.Sfx.Activated")
+    local it = c.item
+    local action = if it.selected then "remove" else "add"
+    if not simTryLock(it.type, action) then c.busy = false return end
+    task.wait(rtt()) -- InvokeServer do Add/Remove
+    simUnlock()
+    c.busy = false
+    if Sim.state ~= "open" or Sim.cards[c.item.key] ~= c then return end
+    -- o loop de 1s recria Sim.mine durante a espera: usa o item atual do card
+    it = c.item
+    if (if it.selected then "remove" else "add") ~= action then return end
+    if action == "add" and it.type == "Brainrot" then
+        local _, _, o, omax = simSlotsAfter()
+        if o + 1 > omax then
+            simError(simLearned("Brainrot:add:", "space") or simLearned("Brainrot:add:", "slot"),
+                ("a base dele ficaria com %d/%d"):format(o + 1, omax))
+            return
+        end
+    end
+    it.selected = not it.selected or nil
+    simChanged()
+    simRefresh()
+    simPush()
+end
+local function simRenderMine()
+    local gui = tradeGui()
+    local sf = gui and gui.Your:FindFirstChild("ScrollingFrame")
+    local tmpl = sf and sf:FindFirstChild("Template")
+    if not tmpl then return end
+    local seen = {}
+    local items = simFetchMine()
+    local byKey = {}
+    for _, it in Sim.mine do byKey[it.key] = it end
+    Sim.mine = {}
+    for _, it in items do
+        local old = byKey[it.key]
+        if old and old.content == it.content then it.selected = old.selected end
+        table.insert(Sim.mine, it)
+        seen[it.key] = true
+        local c = Sim.cards[it.key]
+        if c and c.item.content ~= it.content then
+            pcall(function() c.trove:Destroy() end)
+            Sim.cards[it.key] = nil
+            c = nil
+        end
+        if c then
+            c.item = it
+        else
+            local tr = Trove.new()
+            local frame = tr:Clone(tmpl)
+            frame.Name = ("Selection_%*_%*"):format(it.type, it.key)
+            frame.Visible = false
+            simRenderCard(frame, it, tr)
+            frame.Parent = sf
+            c = { frame = frame, trove = tr, item = it, isOneOfOne = false }
+            Sim.cards[it.key] = c
+            if it.type == "Brainrot" then
+                tr:Add((BrainrotCard.ObserveOneOfOne(it.record, function(v)
+                    c.isOneOfOne = v
+                    BrainrotCard.ApplyOneOfOne(frame, v)
+                    simApplyCard(c)
+                end)))
+            end
+            local sp = frame:FindFirstChild("Spacer")
+            if sp then tr:Add(sp.Activated:Connect(function() task.spawn(try, "trade sim card", simClickMine, c) end)) end
+        end
+    end
+    for k, c in Sim.cards do
+        if not seen[k] then
+            pcall(function() c.trove:Destroy() end)
+            Sim.cards[k] = nil
+        end
+    end
+    -- algo que estava na oferta sumiu do inventário (vendeu/apagou) = mudança de oferta
+    for k, it in byKey do
+        if it.selected and not seen[k] then simChanged() break end
+    end
+end
+local function simRenderOther()
+    local gui = tradeGui()
+    local sf = gui and gui.Other:FindFirstChild("ScrollingFrame")
+    local tmpl = sf and sf:FindFirstChild("Template")
+    if not tmpl then return end
+    local seen = {}
+    for i, p in Sim.partner do
+        seen[p.key] = true
+        local c = Sim.otherCards[p.key]
+        if not c then
+            local tr = Trove.new()
+            local frame = tr:Clone(tmpl)
+            frame.Name = ("Offer_%*"):format(p.key)
+            frame.LayoutOrder = i
+            frame.Visible = true
+            local record = { Index = p.index, Mutation = p.mutation, Traits = cleanTraits(p.traits), UUID = p.key, OneOfOne = p.oneOfOne == true }
+            simRenderCard(frame, { type = "Brainrot", record = record }, tr)
+            frame.Parent = sf
+            tr:Add((BrainrotCard.ObserveOneOfOne(record, function(v) BrainrotCard.ApplyOneOfOne(frame, v) end)))
+            Sim.otherCards[p.key] = { frame = frame, trove = tr }
+        else
+            c.frame.LayoutOrder = i
+        end
+    end
+    for k, c in Sim.otherCards do
+        if not seen[k] then
+            pcall(function() c.trove:Destroy() end)
+            Sim.otherCards[k] = nil
+        end
+    end
+end
+local function simSlots(gui)
+    local y, ymax, o, omax = simSlotsAfter()
+    local your = gui.Your:FindFirstChild("BaseSlots")
+    if your then
+        your.Text = ("%*/%*"):format(y, ymax)
+        your.TextColor3 = if not (ymax < y) then Color3.fromRGB(255, 255, 255) else Color3.fromRGB(255, 70, 70)
+    end
+    local other = gui.Other:FindFirstChild("BaseSlots")
+    if other then
+        other.Text = ("%*/%*"):format(o, omax)
+        other.TextColor3 = if not (omax < o) then Color3.fromRGB(255, 255, 255) else Color3.fromRGB(255, 70, 70)
+    end
+end
+
+-- ── chat da trade (TradingFlags.Sign*): desligado / frases prontas / livre ──
+local function simChatRows()
+    local gui = tradeGui()
+    local chat = gui and gui:FindFirstChild("Chat")
+    if not chat then return end
+    local mode = Sim.cfg.chat
+    local free = mode == "free"
+    local sf = (if free then chat.NormalChat else chat.RestrictedChat):FindFirstChild("ScrollingFrame")
+    if not sf then return end
+    if Sim.chatRows then Sim.chatRows:Destroy() end
+    local tr = Trove.new()
+    Sim.chatRows = tr
+    local tYou, tOther = sf:FindFirstChild("TemplateYou"), sf:FindFirstChild("TemplateOther")
+    if not (tYou and tOther) then return end
+    tYou.Visible, tOther.Visible = false, false
+    local max = flag(TradingFlags and TradingFlags.SignMaxMessages, 30)
+    local rows = {}
+    for i = math.max(1, #Sim.chat - max + 1), #Sim.chat do
+        local m = Sim.chat[i]
+        local row = tr:Clone(if m.u == LP.UserId then tYou else tOther)
+        row.Name = ("Message_%*"):format(i)
+        row.LayoutOrder = i
+        row.Label.Text = m.t
+        row.PlayerImage.Headshot.Image = ("rbxthumb://type=AvatarHeadShot&id=%*&w=100&h=100"):format(m.u)
+        row.Visible = true
+        row.Parent = sf
+        table.insert(rows, { frame = row, text = m.t })
+    end
+    -- fitChatRow
+    task.defer(function()
+        local params = Instance.new("GetTextBoundsParams")
+        params.RichText = false
+        for _, r in rows do
+            local lbl, parent = r.frame:FindFirstChild("Label"), r.frame.Parent
+            if lbl and parent and lbl.AbsoluteSize.X >= 1 then
+                local w = lbl.AbsoluteSize.X
+                local size = math.clamp(math.round(parent.AbsoluteSize.Y * flag(TradingFlags.SignTextSizeRatio, 0.1)),
+                    flag(TradingFlags.SignMinTextSize, 8), flag(TradingFlags.SignMaxTextSize, 30))
+                params.Font, params.Size, params.Width, params.Text = lbl.FontFace, size, w, r.text
+                local ok, b = pcall(TextService.GetTextBoundsAsync, TextService, params)
+                local h = if ok then b.Y else size
+                if ok and w < b.X and b.X > 0 then
+                    params.Size = math.max(1, math.floor(size * (w / b.X)))
+                    local ok2, b2 = pcall(TextService.GetTextBoundsAsync, TextService, params)
+                    if ok2 then h = b2.Y end
+                end
+                lbl.TextScaled, lbl.TextWrapped, lbl.TextSize = false, true, size
+                r.frame.Size = UDim2.new(r.frame.Size.X.Scale, r.frame.Size.X.Offset, 0, math.max(math.round(h + size), math.round(size * 2)))
+            end
+        end
+        params:Destroy()
+        sf.CanvasPosition = Vector2.new(0, sf.AbsoluteCanvasSize.Y)
+    end)
+end
+local function simChatSend(u, text, preset)
+    if Sim.state ~= "open" and Sim.state ~= "processing" then return false end
+    text = string.gsub(tostring(text or ""), "[\r\n]", "")
+    local maxLen = flag(TradingFlags and TradingFlags.SignMaxLength, 100)
+    if #text > maxLen then text = string.sub(text, 1, maxLen) end
+    if text == "" then return false end
+    if u == LP.UserId then
+        local left = math.ceil(Sim.chatCd - os.clock())
+        if left > 0 then
+            notifyError(("Please wait %*s before sending another message"):format(left))
+            return false
+        end
+        Sim.chatCd = os.clock() + (if preset then flag(TradingFlags.SignPresetCooldown, 5) else flag(TradingFlags.SignCooldown, 5))
+        sound("Sounds.Sfx.Activated")
+    end
+    table.insert(Sim.chat, { u = u, t = text })
+    simChatRows()
+    return true
+end
+local function simChatSetup()
+    local gui = tradeGui()
+    local chat = gui and gui:FindFirstChild("Chat")
+    if not chat then return end
+    if Sim.chatTrove then Sim.chatTrove:Destroy() end
+    local tr = Trove.new()
+    Sim.chatTrove = tr
+    local mode = Sim.cfg.chat
+    local on = mode ~= "off" and (Sim.state == "open" or Sim.state == "processing")
+    chat.Visible = on
+    chat.NormalChat.Visible = on and mode == "free"
+    chat.RestrictedChat.Visible = on and mode == "presets"
+    pcall(function() chat.Header.Txt1.Text = "Trade Chat" end)
+    if not on then return end
+    if mode == "presets" then
+        local presets = flag(TradingFlags.SignPresets, {})
+        local btns = {}
+        for _, b in chat.RestrictedChat.Presets:GetChildren() do
+            if b:IsA("GuiButton") then table.insert(btns, b) end
+        end
+        table.sort(btns, function(a, b) return a.Name < b.Name end)
+        for i, b in btns do
+            local txt = presets[i] or ""
+            local lbl = b:FindFirstChildWhichIsA("TextLabel")
+            if lbl then lbl.Text = txt else b.Text = txt end
+            b.Visible = txt ~= ""
+            tr:Add(b.Activated:Connect(function() simChatSend(LP.UserId, txt, true) end))
+        end
+    else
+        local box = chat.NormalChat.ChatBox.TextBox
+        box.ClearTextOnFocus = false
+        box.TextEditable, box.Active, box.Interactable = true, true, true
+        tr:Add(box:GetPropertyChangedSignal("Text"):Connect(function()
+            local v = string.gsub(box.Text, "[\r\n]", "")
+            local maxLen = flag(TradingFlags.SignMaxLength, 100)
+            if utf8.len(v) == nil then v = "" elseif #v > maxLen then v = string.sub(v, 1, maxLen) end
+            if box.Text ~= v then box.Text = v end
+        end))
+        tr:Add(box.Focused:Connect(function()
+            local left = math.ceil(Sim.chatCd - os.clock())
+            if left > 0 then
+                box:ReleaseFocus()
+                notifyError(("Please wait %*s before sending another message"):format(left))
+            end
+        end))
+        tr:Add(box.FocusLost:Connect(function(enter)
+            if enter and #box.Text > 0 then
+                local t = box.Text
+                if simChatSend(LP.UserId, t, false) then box.Text = "" end
+            end
+        end))
+    end
+    simChatRows()
+end
+
+function simRefresh()
+    if Sim.state ~= "open" and Sim.state ~= "processing" then return end
+    local gui = tradeGui()
+    if not gui then return end
+    local allReady, allAcc = simAllReady(), simAllAccepted()
+    local left = Sim.lastChange + 5 - workspace:GetServerTimeNow()
+    -- updateState
+    local green = left <= 0
+    if green then
+        if not allReady then
+            if not simHasOffer() or Sim.me.ready then green = false end
+        elseif Sim.me.accepted then
+            green = false
+        end
+    end
+    local other = gui.Other
+    pcall(function() Spr.target(other.ReadyButton, 1, 5, { BackgroundColor3 = if not green then Color3.fromRGB(112, 112, 112) else Color3.fromRGB(81, 158, 86) }) end)
+    other.Timer.Text = if allAcc or Sim.state == "processing" then "Processing..." elseif left > 0 then ("⏰%*s Left"):format((math.floor(left * 10)) / 10) else ""
+    other.ReadyButton.Txt.Text = if not allReady then "READY" else "ACCEPT"
+    gui.Your.Ready.Visible = if not Sim.me.accepted then (if not allReady then Sim.me.ready else false) else true
+    gui.Your.Ready.Label.Text = if not Sim.me.accepted then "Ready!" else "Confirmed!"
+    other.Ready.Visible = if not Sim.bot.accepted then (if not allReady then Sim.bot.ready else false) else true
+    other.Ready.Label.Text = if not Sim.bot.accepted then "Ready!" else "Confirmed!"
+    local sb = gui:FindFirstChild("Side Buttons")
+    if sb then sb.Visible = not allAcc end
+    for _, c in Sim.cards do simApplyCard(c) end
+    simSlots(gui)
+    -- o jogo mexe no Chat sozinho em outras telas: mantém o modo escolhido
+    local chat = gui:FindFirstChild("Chat")
+    if chat and chat.Visible ~= (Sim.cfg.chat ~= "off") then simChatSetup() end
+end
+local function simSetTab(t)
+    if not simTypeActive(t) then return end
+    Sim.tab = t
+    local gui = tradeGui()
+    local sb = gui and gui:FindFirstChild("Side Buttons")
+    for _, b in sb and sb:GetChildren() or {} do
+        if b:IsA("GuiButton") then
+            b.BackgroundColor3 = if SIM_TAB[b.Name] ~= t then Color3.fromRGB(64, 86, 97) else Color3.fromRGB(81, 158, 86)
+        end
+    end
+    simRefresh()
+end
+
+-- ── passos: READY (1º) → ACCEPT (2º) → Processing → concluída ──
+local simClose
+local function simComplete()
+    local token = Sim.n
+    Sim.state = "processing"
+    simRefresh()
+    simPush()
+    task.wait(2 + rtt())
+    if Sim.n ~= token or Sim.state ~= "processing" then return end
+    local err, why = simSpaceError()
+    if why then
+        -- a base mudou durante o Processing: o servidor recusaria
+        Sim.state = "open"
+        simChanged()
+        simRefresh()
+        simPush()
+        simError(err, why)
+        return
+    end
+    local gave = {}
+    for _, it in Sim.mine do
+        if it.selected and it.fake and Fakes[it.fake.uid] == it.fake then table.insert(gave, it.fake) end
+    end
+    local got = table.clone(Sim.partner)
+    -- entrada do histórico (mesmos campos que o TradeService/GetTradeHistory manda: you/other por OfferKey)
+    local function rec(r)
+        return { Index = r.Index, Mutation = r.Mutation, Traits = r.Traits and table.clone(r.Traits) or nil, OneOfOne = r.OneOfOne == true }
+    end
+    local you = { brainrots = {}, gears = {}, baseSkins = {} }
+    for _, it in Sim.mine do
+        if it.selected then
+            if it.type == "Brainrot" then table.insert(you.brainrots, rec(it.record))
+            elseif it.type == "Gear" then table.insert(you.gears, { GearName = it.record.GearName })
+            else table.insert(you.baseSkins, { SkinName = it.record.SkinName }) end
+        end
+    end
+    local other = { brainrots = {} }
+    for _, p in got do
+        table.insert(other.brainrots, rec({ Index = p.index, Mutation = p.mutation, Traits = cleanTraits(p.traits), OneOfOne = p.oneOfOne }))
+    end
+    table.insert(Sim.history, 1, {
+        id = HttpService:GenerateGUID(false), time = math.floor(workspace:GetServerTimeNow()),
+        otherUsername = simName(), otherUserId = simId(), you = you, other = other,
+    })
+    simClose(true)
+    for _, f in gave do try("trade sim saída", removeFake, f) end
+    for _, p in got do
+        try("trade sim entrada", spawnFake, { index = p.index, mutation = p.mutation, traits = p.traits, fromTrade = true })
+    end
+    sound("Sounds.Sfx.Activated")
+    simNotifyLearned("end:complete", simName()) -- "A troca com @<nome> foi concluída! 🎉"
+    pushList()
+    if Sim.renderHistory then try("histórico", Sim.renderHistory) end
+end
+-- mesmas condições do botão do jogo valem pra ele
+local function simBotCan(kind)
+    if Sim.state ~= "open" then return false, "sem trade aberta" end
+    if workspace:GetServerTimeNow() < Sim.lastChange + 5 then return false, "espere o contador de 5s" end
+    if kind == "ready" then
+        if Sim.bot.ready then return false, "ele já está pronto" end
+        if simAllReady() then return false, "os dois já estão prontos" end
+        if not simHasOffer() then return false, "a trade está vazia" end
+    else
+        if not simAllReady() then return false, "os dois precisam dar Ready antes" end
+        if Sim.bot.accepted then return false, "ele já aceitou" end
+    end
+    local _, why = simSpaceError()
+    if why then return false, why end
+    return true
+end
+-- Ready/Accept também mexem no lastChange: o outro só confirma depois de mais 5s (regra do jogo)
+local function simTouch()
+    Sim.lastChange = workspace:GetServerTimeNow()
+end
+local function simBotDo(kind)
+    local ok, why = simBotCan(kind)
+    if not ok then
+        bus.evt:Fire("simfail", why)
+        return
+    end
+    if kind == "ready" then Sim.bot.ready = true else Sim.bot.accepted = true end
+    if not simAllAccepted() then simTouch() end
+    simRefresh()
+    simPush()
+    if simAllAccepted() then simComplete() end
+end
+local function simBotFollow(kind)
+    local token = Sim.n
+    -- espera o contador de 5s acabar e mais o tempo de reação dele
+    while Sim.n == token and Sim.state == "open" and workspace:GetServerTimeNow() < Sim.lastChange + 5 do
+        task.wait(0.1)
+    end
+    task.wait(1 + math.random() * 1.5 + rtt())
+    if Sim.n ~= token or Sim.state ~= "open" then return end
+    if kind == "ready" and not Sim.me.ready then return end
+    if kind == "accept" and not Sim.me.accepted then return end
+    if simBotCan(kind) then simBotDo(kind) end
+end
+local function simReadyClick()
+    if Sim.state ~= "open" then return end
+    sound("Sounds.Sfx.Activated")
+    if workspace:GetServerTimeNow() < Sim.lastChange + 5 then return end
+    if not simAllReady() and (Sim.me.ready or not simHasOffer()) then return end
+    if simAllReady() and Sim.me.accepted then return end
+    task.wait(rtt())
+    if Sim.state ~= "open" then return end
+    local err, why = simSpaceError()
+    if why then simError(err, why) return end
+    if simAllReady() then
+        Sim.me.accepted = true
+        if simAllAccepted() then simRefresh() simPush() simComplete() return end
+        simTouch()
+        simRefresh()
+        simPush()
+        if Sim.cfg.botAccept == "auto" then task.spawn(try, "trade sim bot", simBotFollow, "accept") end
+    else
+        Sim.me.ready = true
+        simTouch()
+        simRefresh()
+        simPush()
+        if Sim.cfg.botReady == "auto" and not Sim.bot.ready then task.spawn(try, "trade sim bot", simBotFollow, "ready") end
+    end
+end
+function simClose(done)
+    local wasOpen = Sim.state == "open" or Sim.state == "processing"
+    Sim.n += 1
+    Sim.state = "idle"
+    Sim.inflight = false
+    bus.simOpen = false
+    for _, t in { Sim.trove, Sim.chatTrove, Sim.chatRows } do pcall(function() t:Destroy() end) end
+    Sim.trove, Sim.chatTrove, Sim.chatRows = nil, nil, nil
+    for _, c in Sim.cards do pcall(function() c.trove:Destroy() end) end
+    for _, c in Sim.otherCards do pcall(function() c.trove:Destroy() end) end
+    Sim.cards, Sim.otherCards, Sim.mine, Sim.partner, Sim.chat = {}, {}, {}, {}, {}
+    if wasOpen then
+        pcall(function() InterfaceController:SetState("TradeLiveTrade", false) end)
+        local gui = tradeGui()
+        if gui then
+            gui.Your.Ready.Visible = false
+            gui.Other.Ready.Visible = false
+        end
+    end
+    simPush()
+end
+local function simBusy()
+    if tradeData() or LP:GetAttribute("IsTrading") then
+        bus.evt:Fire("simfail", "você já está numa trade real")
+        return true
+    end
+    return false
+end
+local function simOpen()
+    if Sim.state == "open" or Sim.state == "processing" or simBusy() then return end
+    local gui = tradeGui()
+    if not gui then bus.evt:Fire("simfail", "tela de trade do jogo não encontrada") return end
+    Sim.state = "open"
+    bus.simOpen = true
+    Sim.n += 1
+    Sim.me, Sim.bot = { ready = false, accepted = false }, { ready = false, accepted = false }
+    Sim.lastChange = workspace:GetServerTimeNow() - 5
+    Sim.inflight, Sim.nextChange, Sim.chat, Sim.chatCd = false, 0, {}, 0
+    simComputeOther()
+    Sim.cards, Sim.otherCards, Sim.mine = {}, {}, {}
+    Sim.trove = Trove.new()
+    gui.Other.Username.Text = ("@%*'s Offer"):format(simName())
+    gui.Other.PlayerImage.Headshot.Image = ("rbxthumb://type=AvatarHeadShot&id=%*&w=100&h=100"):format(simId())
+    gui.Your.Username.Text = "Your Offer"
+    gui.Your.PlayerImage.Headshot.Image = ("rbxthumb://type=AvatarHeadShot&id=%*&w=100&h=100"):format(LP.UserId)
+    for _, n in { "YourSign", "OtherSign" } do
+        local s = gui:FindFirstChild(n)
+        if s then s.Visible = false end
+    end
+    gui.Other.ReadyButton.Txt.Text = "READY"
+    local sb = gui:FindFirstChild("Side Buttons")
+    for _, b in sb and sb:GetChildren() or {} do
+        if b:IsA("GuiButton") then
+            local t = SIM_TAB[b.Name]
+            b.Visible = t ~= nil and simTypeActive(t)
+            if t then Sim.trove:Add(b.Activated:Connect(function() sound("Sounds.Sfx.Activated") simSetTab(t) end)) end
+        end
+    end
+    local function cancel()
+        if Sim.state ~= "open" then return end
+        sound("Sounds.Sfx.Activated")
+        simClose(false)
+        simNotifyLearned("end:cancel")
+    end
+    Sim.trove:Add(gui.Other.Cancel.Activated:Connect(cancel))
+    Sim.trove:Add(gui.Header.Close.Activated:Connect(cancel))
+    Sim.trove:Add(gui.Other.ReadyButton.Activated:Connect(function() task.spawn(try, "trade sim ready", simReadyClick) end))
+    pcall(function() InterfaceController:SetState("TradePlayerList", false) end)
+    pcall(function() InterfaceController:SetState("TradeLiveTrade", true) end)
+    simRenderMine()
+    simRenderOther()
+    simChatSetup()
+    simSetTab("Brainrot")
+    simPush()
+end
+local function simReceiveInvite()
+    if Sim.state ~= "idle" or simBusy() then return end
+    local tp = PlayerGui:FindFirstChild("TradePrompts")
+    local tmpl = tp and tp:FindFirstChild("Prompt")
+    if not tmpl then bus.evt:Fire("simfail", "prompt de trade do jogo não encontrado") return end
+    Sim.state = "invite_in"
+    Sim.n += 1
+    local token = Sim.n
+    simPush()
+    local fr = tmpl:Clone()
+    fr.Username.Text = ("@%* wants to trade with you"):format(simName())
+    fr.Visible = true
+    local remove = CornerNotificationController:Add(fr)
+    local busy = false
+    local function gone()
+        pcall(remove)
+        if Sim.n == token and Sim.state == "invite_in" then
+            Sim.state = "idle"
+            simPush()
+        end
+    end
+    fr.Yes.Activated:Connect(function()
+        if busy then return end
+        busy = true
+        sound("Sounds.Sfx.Activated")
+        pcall(remove)
+        task.wait(rtt())
+        if Sim.n == token and Sim.state == "invite_in" then
+            Sim.state = "idle"
+            try("trade sim abrir", simOpen)
+        end
+    end)
+    fr.No.Activated:Connect(function()
+        if busy then return end
+        sound("Sounds.Sfx.Activated")
+        gone()
+    end)
+    task.delay(30, gone)
+end
+local function simSendInvite()
+    if Sim.state ~= "idle" or simBusy() then return end
+    Sim.state = "invite_out"
+    Sim.n += 1
+    local token = Sim.n
+    simPush()
+    sound("Sounds.Sfx.Activated")
+    task.wait(rtt())
+    -- no jogo o envio só muda o botão do jogador pra "SENT!" (sem notificação)
+    task.wait(1.5 + math.random() * 2)
+    if Sim.n == token and Sim.state == "invite_out" then
+        Sim.state = "idle"
+        try("trade sim abrir", simOpen)
+    end
+end
+local function simAddPartner(sel)
+    if Sim.state ~= "open" then bus.evt:Fire("simfail", "abra uma trade com o @Roblox primeiro") return end
+    if not (sel and AnimalsData[sel.index]) then return end
+    if simAllReady() then bus.evt:Fire("simfail", "os dois estão prontos: a oferta está travada") return end
+    -- ele só oferece o que tem na base dele
+    if simOfferCount("bot") + 1 > Sim.other.used then
+        bus.evt:Fire("simfail", ("ele só tem %d brainrot(s) na base (mude os slots dele no hub)"):format(Sim.other.used))
+        return
+    end
+    -- a SUA base precisa caber o que ele manda (contador "Your")
+    local y, ymax = simSlotsAfter()
+    if y + 1 > ymax then
+        bus.evt:Fire("simfail", ("sua base ficaria com %d/%d: ofereça um brainrot seu ou libere um slot"):format(y + 1, ymax))
+        return
+    end
+    -- o hub manda como se fosse o cliente dele: mesmo ida-e-volta, sem a trava de spam do seu lado
+    task.wait(rtt())
+    if Sim.state ~= "open" then return end
+    Sim.n += 1
+    table.insert(Sim.partner, {
+        key = ("P%*%*"):format(Sim.n, string.sub(HttpService:GenerateGUID(false), 1, 4)),
+        index = sel.index, mutation = sel.mutation,
+        traits = type(sel.traits) == "table" and table.clone(sel.traits) or {},
+        oneOfOne = autoOneOfOne(sel.index, sel.mutation),
+    })
+    simChanged()
+    simRenderOther()
+    simRefresh()
+    simPush()
+end
+local function simRemovePartner(key)
+    if Sim.state ~= "open" then return end
+    if simAllReady() then bus.evt:Fire("simfail", "os dois estão prontos: a oferta está travada") return end
+    task.wait(rtt())
+    if Sim.state ~= "open" then return end
+    for i, p in Sim.partner do
+        if p.key == key then
+            table.remove(Sim.partner, i)
+            simChanged()
+            simRenderOther()
+            simRefresh()
+            simPush()
+            return
+        end
+    end
+end
+local function simConfig(cfg)
+    if type(cfg) ~= "table" then return end
+    local prevName = simName()
+    for k in Sim.cfg do
+        if cfg[k] ~= nil then Sim.cfg[k] = cfg[k] end
+    end
+    if type(Sim.cfg.botName) ~= "string" or Sim.cfg.botName == "" then Sim.cfg.botName = SIM_NAME end
+    local nm = simName()
+    if nm ~= prevName and nm ~= SIM_NAME and not simIdCache[string.lower(nm)] and not Players:FindFirstChild(nm) then
+        -- nome digitado: descobre o userId pra foto (conta que não existe fica com a foto padrão)
+        task.spawn(function()
+            local ok, id = pcall(function() return Players:GetUserIdFromNameAsync(nm) end)
+            if ok and type(id) == "number" then
+                simIdCache[string.lower(nm)] = id
+                if simName() == nm and Sim.state == "open" then
+                    local gui = tradeGui()
+                    local img = gui and gui:FindFirstChild("Other") and gui.Other:FindFirstChild("PlayerImage")
+                    if img and img:FindFirstChild("Headshot") then
+                        img.Headshot.Image = ("rbxthumb://type=AvatarHeadShot&id=%*&w=100&h=100"):format(id)
+                    end
+                end
+            end
+        end)
+    end
+    if Sim.state == "open" or Sim.state == "processing" then
+        if nm ~= prevName then
+            local gui = tradeGui()
+            if gui and gui:FindFirstChild("Other") then
+                gui.Other.Username.Text = ("@%*'s Offer"):format(nm)
+                local img = gui.Other:FindFirstChild("PlayerImage")
+                if img and img:FindFirstChild("Headshot") then
+                    img.Headshot.Image = ("rbxthumb://type=AvatarHeadShot&id=%*&w=100&h=100"):format(simId())
+                end
+            end
+        end
+        simChatSetup()
+        simComputeOther()
+        simRefresh()
+    end
+    simPush()
+end
+local wasTimerOk = false
+local function simTick()
+    if Sim.state ~= "open" and Sim.state ~= "processing" then return end
+    if tradeData() then simClose(false) return end -- trade real começou: a simulada sai
+    simRefresh()
+    -- avisa o hub quando o contador de 5s acaba (libera os botões manuais)
+    local ok = Sim.lastChange + 5 - workspace:GetServerTimeNow() <= 0
+    if ok ~= wasTimerOk then
+        wasTimerOk = ok
+        simPush()
+    end
+end
+local function simTick1()
+    if Sim.state ~= "open" then return end
+    -- modo "jogador": a base dele muda ao vivo
+    if Sim.cfg.slotMode == "player" then
+        local before = Sim.other.used
+        simComputeOther()
+        if before ~= Sim.other.used then simPush() end
+    end
+    simRenderMine()
+    simRefresh()
+end
+local UIS = game:GetService("UserInputService")
+-- ── última trade real (só os números da base do outro, pro modo "última trade") ──
+-- Nada de mensagem do servidor é aprendido/salvo: as mensagens ficam fixas em LEARNED_DEFAULT.
+local Watch = { hooked = setmetatable({}, { __mode = "k" }) }
+-- chamado a cada 0,1s pelo loop do motor
+local function simWatchReal()
+    bus.learnNotify = nil -- desliga o aprendizado de versões antigas que ficou nesta sessão
+    local d = tradeData()
+    local gui = tradeGui()
+    if not (d and gui) then return end
+    local users = type(d.users) == "table" and d.users or {}
+    local players = type(d.players) == "table" and d.players or {}
+    for k, uid in users do
+        local p = players[k]
+        if uid ~= LP.UserId and type(p) == "table" and type(p.maxSlots) == "number" and type(p.emptySlots) == "number" then
+            local lr = Sim.lastReal
+            if not lr or lr.userId ~= uid or lr.maxSlots ~= p.maxSlots or lr.emptySlots ~= p.emptySlots then
+                Sim.lastReal = { name = tostring(p.username or "?"), userId = uid, maxSlots = p.maxSlots, emptySlots = p.emptySlots }
+                simPush()
+            end
+        end
+    end
+    -- cliques nos cards reais do jogo: os cards visuais da trade real respeitam o mesmo intervalo
+    local sf = gui.Your:FindFirstChild("ScrollingFrame")
+    for _, f in sf and sf:GetChildren() or {} do
+        local t, key = string.match(f.Name, "^Selection_(%a+)_(.+)$")
+        local sp = f:FindFirstChild("Spacer")
+        if t and sp and not Watch.hooked[sp] and string.sub(key, 1, 1) ~= "V" then
+            Watch.hooked[sp] = true
+            sp.Activated:Connect(function() bus.tradeClickAt = os.clock() end)
+        end
+    end
+end
+
+-- ── histórico de trades (TradePlayerList > History) ──
+-- Linhas do jogo: clones de ClosedTemplate/OpenedTemplate com LayoutOrder = posição na lista do servidor.
+-- As simuladas entram no lugar certo pela data e ficam com o atributo BRSHist (o jogo nunca mexe nelas).
+local Hist = { rows = {}, closedTmpl = nil, openedTmpl = nil, realTime = {} }
+local MONTHS = { Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6, Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12 }
+local function histFrame()
+    local g = PlayerGui:FindFirstChild("TradePlayerList")
+    local t = g and g:FindFirstChild("TradePlayerList")
+    local s = t and t:FindFirstChild("Sections")
+    local h = s and s:FindFirstChild("History")
+    return h and h:FindFirstChild("ScrollingFrame")
+end
+-- "Oct 24, 04:33 PM" (os.date do formatTradeTime) → unix
+local function parseTradeTime(txt)
+    local mo, d, h, mi, ap = string.match(txt or "", "^(%a+) (%d+), (%d+):(%d+) (%a+)$")
+    if not mo or not MONTHS[mo] then return nil end
+    h = tonumber(h) % 12 + (if ap == "PM" then 12 else 0)
+    -- o texto do jogo é HORA LOCAL (os.date sem "!"), mas os.time(tabela) no Roblox lê a tabela como
+    -- UTC: sem descontar o fuso, no Brasil (UTC-3) cada trade real ficava 3h "mais velha" e as
+    -- simuladas sempre apareciam por cima. off = diferença local↔UTC medida agora.
+    local nowT = os.time()
+    local off = os.time(os.date("*t", nowT)) - nowT
+    local now = os.date("*t", nowT)
+    local function mk(year)
+        return os.time({ year = year, month = MONTHS[mo], day = tonumber(d), hour = h, min = tonumber(mi), sec = 0 }) - off
+    end
+    local t = mk(now.year)
+    if t > nowT + 86400 then t = mk(now.year - 1) end
+    return t
+end
+local function rowLabels(btn)
+    local left, right
+    for _, c in btn:GetChildren() do
+        if c:IsA("TextLabel") then
+            if c.TextXAlignment ~= Enum.TextXAlignment.Right then left = c else right = c end
+        end
+    end
+    return left, right
+end
+local function histCapture(c)
+    if c:GetAttribute("BRSHist") then return end
+    if c.Name == "ClosedTemplate" and not Hist.closedTmpl then
+        Hist.closedTmpl = c:Clone()
+        Hist.closedTmpl:SetAttribute("BRSIdx", nil)
+    elseif c.Name == "OpenedTemplate" and not Hist.openedTmpl then
+        local o = c:Clone()
+        for _, side in { "You", "Other" } do
+            local sc = o:FindFirstChild("Btn") and o.Btn:FindFirstChild(side) and o.Btn[side]:FindFirstChild("ItemsScroll")
+            for _, x in sc and sc:GetChildren() or {} do
+                if x:IsA("GuiObject") then x:Destroy() end
+            end
+        end
+        o:SetAttribute("BRSIdx", nil)
+        Hist.openedTmpl = o
+    end
+end
+local function histFill(scroll, data, tr)
+    local tmpl = tradeGui() and tradeGui().Your.ScrollingFrame:FindFirstChild("Template")
+    if not (scroll and tmpl) then return end
+    local grid = scroll:FindFirstChildOfClass("UIGridLayout")
+    if grid then
+        local touch = UIS.TouchEnabled and not UIS.KeyboardEnabled
+        grid.CellSize = if not touch then UDim2.new(0.33, -2, 0.75, -2) else UDim2.new(0.5, -2, 0.8, -2)
+    end
+    for _, kind in { { "Brainrot", "brainrots" }, { "BaseSkin", "baseSkins" }, { "Gear", "gears" } } do
+        for _, r in type(data) == "table" and type(data[kind[2]]) == "table" and data[kind[2]] or {} do
+            local card = tr:Clone(tmpl)
+            card.Visible = true
+            simRenderCard(card, { type = kind[1], record = r }, tr, "TradeHistory")
+            card.Parent = scroll
+        end
+    end
+end
+local histLayout
+local function histDraw(entry)
+    local sf = histFrame()
+    local row = Hist.rows[entry.id]
+    if row then pcall(function() row.trove:Destroy() end) end
+    if not sf then Hist.rows[entry.id] = nil return end
+    local tmpl = if row and row.open and Hist.openedTmpl then Hist.openedTmpl else Hist.closedTmpl
+    if not tmpl then Hist.rows[entry.id] = nil return end
+    local open = tmpl == Hist.openedTmpl
+    local tr = Trove.new()
+    local f = tr:Clone(tmpl)
+    f:SetAttribute("BRSHist", entry.id)
+    f.Visible = true
+    local btn = f:FindFirstChild("Btn")
+    local headshot = "rbxthumb://type=AvatarHeadShot&id=%*&w=100&h=100"
+    if btn and not open then
+        local l, r = rowLabels(btn)
+        if l then l.Text = ("Trade with @%*"):format(entry.otherUsername or "?") end
+        if r then r.Text = os.date("%b %d, %I:%M %p", math.floor(entry.time)) end
+        pcall(function() btn.PlayerImage.Headshot.Image = headshot:format(entry.otherUserId) end)
+    elseif btn then
+        pcall(function() btn.You.PlayerImage.Headshot.Image = headshot:format(LP.UserId) end)
+        histFill(btn.You and btn.You:FindFirstChild("ItemsScroll"), entry.you, tr)
+        pcall(function() btn.Other.Label.Text = ("@%*"):format(entry.otherUsername or "?") end)
+        pcall(function() btn.Other.PlayerImage.Headshot.Image = headshot:format(entry.otherUserId) end)
+        histFill(btn.Other and btn.Other:FindFirstChild("ItemsScroll"), entry.other, tr)
+    end
+    local r = { inst = f, trove = tr, open = open, entry = entry }
+    Hist.rows[entry.id] = r
+    if btn then
+        tr:Add(btn.Activated:Connect(function()
+            sound("Sounds.Sfx.Activated")
+            if not Hist.openedTmpl and not r.open then
+                bus.evt:Fire("simfail", "abra uma trade real do histórico uma vez pra o script copiar a tela aberta")
+                return
+            end
+            r.open = not r.open
+            histDraw(entry)
+            histLayout()
+        end))
+    end
+    f.Parent = sf
+end
+-- ordem final: reais na ordem do servidor; cada simulada antes da 1ª real mais antiga que ela
+function histLayout()
+    local sf = histFrame()
+    if not sf then return end
+    local real = {}
+    for _, c in sf:GetChildren() do
+        if c:IsA("GuiObject") and not c:GetAttribute("BRSHist") then
+            local idx = c:GetAttribute("BRSIdx")
+            if idx then
+                local t = Hist.realTime[idx]
+                local btn = c:FindFirstChild("Btn")
+                if btn and c.Name == "ClosedTemplate" then
+                    local _, r = rowLabels(btn)
+                    t = parseTradeTime(r and r.Text) or t
+                    Hist.realTime[idx] = t
+                end
+                table.insert(real, { inst = c, idx = idx, t = t })
+            end
+        end
+    end
+    table.sort(real, function(a, b) return a.idx < b.idx end)
+    local ours = {}
+    for _, e in Sim.history do
+        local r = Hist.rows[e.id]
+        if r and r.inst.Parent == sf then table.insert(ours, { inst = r.inst, t = e.time }) end
+    end
+    table.sort(ours, function(a, b) return a.t > b.t end)
+    local order, ri = 0, 1
+    for _, o in ours do
+        local minute = o.t - o.t % 60
+        while real[ri] and (real[ri].t or math.huge) > minute do
+            order += 1
+            real[ri].inst.LayoutOrder = order
+            ri += 1
+        end
+        order += 1
+        o.inst.LayoutOrder = order
+    end
+    while real[ri] do
+        order += 1
+        real[ri].inst.LayoutOrder = order
+        ri += 1
+    end
+end
+local function histRenderAll()
+    local sf = histFrame()
+    if not sf then return end
+    for _, c in sf:GetChildren() do if c:IsA("GuiObject") then histCapture(c) end end
+    local keep = {}
+    for _, e in Sim.history do
+        keep[e.id] = true
+        local r = Hist.rows[e.id]
+        if not r or not r.inst.Parent then histDraw(e) end
+    end
+    for id, r in Hist.rows do
+        if not keep[id] then
+            pcall(function() r.trove:Destroy() end)
+            Hist.rows[id] = nil
+        end
+    end
+    histLayout()
+end
+Sim.renderHistory = histRenderAll
+local function histHook()
+    local sf = histFrame()
+    if not sf or Hist.hookedFrame == sf then return end
+    Hist.hookedFrame = sf
+    Global:Add(sf.ChildAdded:Connect(function(c)
+        if not c:IsA("GuiObject") or c:GetAttribute("BRSHist") then return end
+        -- o jogo põe LayoutOrder = posição antes de parentear: guarda antes de reordenar
+        c:SetAttribute("BRSIdx", c.LayoutOrder)
+        histCapture(c)
+        task.defer(function() try("histórico", histRenderAll) end)
+    end))
+    for _, c in sf:GetChildren() do
+        if c:IsA("GuiObject") and c:GetAttribute("BRSHist") then
+            c:Destroy() -- sobra de uma execução anterior do script
+        elseif c:IsA("GuiObject") and not c:GetAttribute("BRSIdx") then
+            c:SetAttribute("BRSIdx", c.LayoutOrder)
+        end
+    end
+    histRenderAll()
+end
+-- fallback: copia os templates pela função do próprio jogo (bus.histTemplates vem do hub)
+local function histTemplatesFromGame()
+    if Hist.closedTmpl and Hist.openedTmpl then return end
+    local sf = histFrame()
+    if not sf or not bus.histTemplates then return end
+    for _, c in sf:GetChildren() do
+        if c:IsA("GuiObject") and not c:GetAttribute("BRSHist") and c:FindFirstChild("Btn") then
+            local ok, closed, opened = pcall(bus.histTemplates, c.Btn)
+            if ok then
+                if closed and not Hist.closedTmpl then Hist.closedTmpl = closed:Clone() end
+                if opened and not Hist.openedTmpl then histCapture(opened) end
+            end
+            break
+        end
+    end
+end
+
+-- ── save ──
+bus.simSave = function()
+    return { history = Sim.history, lastReal = Sim.lastReal } -- mensagens do servidor NÃO vão pro arquivo
+end
+bus.simLoad = function(t)
+    if type(t.history) == "table" then
+        local seen = {}
+        Sim.history = {}
+        for _, e in t.history do
+            if type(e) == "table" and type(e.id) == "string" and type(e.time) == "number" and not seen[e.id] then
+                seen[e.id] = true
+                table.insert(Sim.history, e)
+            end
+        end
+        table.sort(Sim.history, function(a, b) return a.time > b.time end)
+    end
+    if type(t.lastReal) == "table" and type(t.lastReal.maxSlots) == "number" then Sim.lastReal = t.lastReal end
+    histRenderAll()
+    simPush()
+end
+bus.simLearned = simLearned
+local histAcc = 0
+local function simHistTick()
+    histHook()
+    histAcc += 1
+    if histAcc >= 10 then -- 1x por segundo
+        histAcc = 0
+        histTemplatesFromGame()
+        local sf = histFrame()
+        if sf then
+            local missing = false
+            for _, e in Sim.history do
+                local r = Hist.rows[e.id]
+                if not r or r.inst.Parent ~= sf then missing = true break end
+            end
+            if missing then histRenderAll() end
+        end
+    end
+end
+
+SimAPI.receiveInvite, SimAPI.sendInvite = simReceiveInvite, simSendInvite
+SimAPI.addPartner, SimAPI.removePartner = simAddPartner, simRemovePartner
+SimAPI.close, SimAPI.tick, SimAPI.tick1 = simClose, simTick, simTick1
+SimAPI.botDo, SimAPI.config = simBotDo, simConfig
+SimAPI.chatAs = function(text) simChatSend(simId(), text, false) end
+SimAPI.state = function() return Sim.state end
+SimAPI.notifyLearned = simNotifyLearned
+SimAPI.partnerName = simName
+SimAPI.watch = function()
+    try("trade real", simWatchReal)
+    try("histórico", simHistTick)
+end
+SimAPI.clearHistory = function(id)
+    for i, e in Sim.history do
+        if id == nil or e.id == id then table.remove(Sim.history, i) if id then break end end
+    end
+    if id == nil then Sim.history = {} end
+    histRenderAll()
+    simPush()
+end
+-- ao desligar o script: tira as linhas simuladas do histórico do jogo (inclusive de execuções antigas)
+SimAPI.shutdown = function()
+    for _, r in Hist.rows do pcall(function() r.trove:Destroy() end) end
+    Hist.rows = {}
+    local sf = histFrame()
+    for _, c in sf and sf:GetChildren() or {} do
+        if c:GetAttribute("BRSHist") then c:Destroy() end
+    end
+end
+SimAPI.debug = function() return Sim end
+SimAPI.players = function()
+    local list = {}
+    for _, pl in Players:GetPlayers() do
+        if pl ~= LP then
+            local max, used = simPlayerBase(pl.UserId)
+            if max then table.insert(list, { id = pl.UserId, name = pl.Name, max = max, used = used }) end
+        end
+    end
+    bus.simPlayers = list
+    bus.evt:Fire("simPlayers")
+end
+end)()
+
+-- ── Fuse Machine (visual) ───────────────────────────────────────────
+-- Réplica do FuseMachineController para os brainrots visuais:
+--   • depósito: o HRP encosta num Hitbox da máquina carregando (Touched, igual o original) → som Deposit,
+--     VFX.emit(Vfx.emitfuse), rig Haunted toca "HauntedInsert" e a língua puxa a cópia do brainrot
+--   • na máquina: o pódio fica transparente com "IN FUSE" azul e o prompt vira "Return" (PlotClient)
+--   • tela FuseMachine: o visual ocupa um dos 4 slots (FuseMachineData.FuseSlots) no lugar de um "Empty",
+--     com nome, raridade (Gradients), mutação (MutationText), viewport e o botão Return
+--   • contador "x/4" do overhead (tag FuseMachineCountdown) conta os visuais também
+-- As chances/custo/resultado da fusão são calculados no servidor e só existem pros reais — não são inventados.
+bus.fuseReturn = nil
+;(function()
+local CS = game:GetService("CollectionService")
+local FuseData = req("Datas.FuseMachineData")
+local VFX = req("Shared.VFX")
+local Gradients = req("Packages.Gradients")
+local MutationText = req("Shared.MutationText")
+local FUSE_SLOTS = (FuseData and FuseData.FuseSlots) or 4
+local TONGUE_BONES = { "Bone.003", "Bone.004", "Bone.005", "Bone.006" }
+local Fuse = { hooked = setmetatable({}, { __mode = "k" }), rows = {}, labels = {}, busy = false }
+
+local function machine() return CS:GetTagged("FuseMachine")[1] end
+local function fakesInFuse()
+    local list = {}
+    for _, f in Fakes do if f.fuse then table.insert(list, f) end end
+    table.sort(list, function(a, b) return (a.fuseAt or 0) < (b.fuseAt or 0) end)
+    return list
+end
+local function realInFuse()
+    local plot = getPlot()
+    local n = 0
+    for _, e in plot and realList(plot) or {} do
+        if type(e) == "table" and e.Machine and e.Machine.Type == "Fuse" then n += 1 end
+    end
+    return n
+end
+local function fuseRunning()
+    local ok, st = pcall(function() return bus.chan and bus.chan:Get("FuseMachine.StartTime") end)
+    return ok and st and st ~= 0
+end
+
+-- rig assombrado (getHauntedRootPart) + a língua (grabWithHauntedTongue), mesma conta do jogo
+local function hauntedRig()
+    for _, rig in CS:GetTagged("HauntedFuseRig") do
+        local p = rig.Parent
+        if p and not p:GetAttribute("Hidden") then return rig end
+    end
+    return nil
+end
+local function rotationBetween(a, b)
+    local axis = a:Cross(b)
+    local d = math.clamp(a:Dot(b), -1, 1)
+    if axis.Magnitude >= 1e-05 then return CFrame.fromAxisAngle(axis.Unit, math.acos(d)) end
+    if d > 0 then return CFrame.identity end
+    local o = a:Cross(Vector3.new(1, 0, 0))
+    if o.Magnitude < 0.001 then o = a:Cross(Vector3.new(0, 0, 1)) end
+    return CFrame.fromAxisAngle(o.Unit, math.pi)
+end
+local function grabWithTongue(model)
+    local rig = hauntedRig()
+    local root = rig and rig:FindFirstChild("RootPart")
+    local bones = {}
+    if root then
+        for _, n in TONGUE_BONES do
+            local b = root:FindFirstChild(n, true)
+            if b and b:IsA("Bone") then table.insert(bones, b) end
+        end
+    end
+    if not root or #bones ~= #TONGUE_BONES then model:Destroy() return end
+    local rest = table.create(#bones)
+    local cf = root.CFrame
+    for _, b in bones do
+        cf = cf * b.CFrame
+        table.insert(rest, cf)
+    end
+    local along = table.create(#bones, 0)
+    local total = 0
+    for i = 2, #bones do
+        total += (rest[i].Position - rest[i - 1].Position).Magnitude
+        along[i] = total
+    end
+    for i, v in along do along[i] = v / total end
+    local base = rest[1].Position
+    local dir = (rest[2].Position - base).Unit
+    local right = root.CFrame.RightVector
+    local mouth = base + dir * (total * 0.5)
+    local bb, size = model:GetBoundingBox()
+    local center = bb.Position
+    local wrapR = math.clamp(math.min(size.X, size.Z) * 0.4, 1, 3)
+    local toward = (center - base).Unit
+    local side = (right - toward * right:Dot(toward)).Unit
+    local up = side:Cross(toward)
+    if up.Y < 0 then up = -up end
+    local tip = center + side * wrapR
+    local pivot = model:GetPivot()
+    local pivotOff = pivot.Position - center
+    local scale = model:GetScale()
+    local pts = table.create(#bones)
+    local t0 = os.clock()
+    local conn
+    conn = RunService.PreSimulation:Connect(function()
+        local t = os.clock() - t0
+        if t >= 0.68 or not root.Parent then
+            conn:Disconnect()
+            model:Destroy()
+            return
+        end
+        local target, grip, pull, shrink = tip, 1, center, 1
+        if t < 0.18 then
+            target = mouth:Lerp(tip, TweenService:GetValue(t / 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out))
+            grip = 0
+        elseif t < 0.3 then
+            grip = TweenService:GetValue((t - 0.18) / 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        elseif t >= 0.36 then
+            local k = (t - 0.36) / 0.32
+            pull = center:Lerp(mouth, TweenService:GetValue(k, Enum.EasingStyle.Quad, Enum.EasingDirection.In))
+            shrink = 1 - 0.75 * k
+        end
+        if t >= 0.36 then
+            model:ScaleTo(scale * shrink)
+            model:PivotTo(CFrame.new(pull + pivotOff * shrink) * pivot.Rotation)
+        end
+        local r = wrapR * shrink
+        local ang = grip * 3.839724354387525
+        local dist = (target - base).Magnitude
+        local ctrl = base + dir * (dist * 0.5) + right * (dist * 0.2)
+        for i, a in along do
+            local u = 1 - a
+            local onCurve = base * (u * u) + ctrl * (u * 2 * a) + target * (a * a)
+            if i == 1 then
+                pts[i] = onCurve
+            elseif grip ~= 0 then
+                local th = ang * (i - 2) / (#bones - 2)
+                local wrap = pull + (side * math.cos(th) + toward * math.sin(th)) * r
+                pts[i] = if i ~= #bones then onCurve:Lerp(wrap, grip) else wrap
+            else
+                pts[i] = onCurve
+            end
+        end
+        local endDir = (target - ctrl).Unit
+        local curl = toward * math.cos(ang) - side * math.sin(ang)
+        local blend = math.clamp(math.min(t, 0.68 - t) / 0.08, 0, 1)
+        local acc = root.CFrame
+        for k, b in bones do
+            local dirK = if k < #bones then pts[k + 1] - pts[k] else endDir:Lerp(curl, grip)
+            if dirK.Magnitude < 0.0001 then dirK = rest[k].UpVector end
+            dirK = dirK.Unit
+            local rot = rotationBetween(rest[k].UpVector, dirK) * rest[k].Rotation
+            local roll = -1.0995574287564276
+            local proj = up - dirK * up:Dot(dirK)
+            if grip > 0 and proj.Magnitude > 0.001 then
+                local rv = rot.RightVector
+                roll += (math.atan2(rv:Cross(proj.Unit):Dot(dirK), rv:Dot(proj.Unit)) - roll) * grip
+            end
+            local want = CFrame.new(pts[k]) * CFrame.fromAxisAngle(dirK, roll) * rot
+            local parentCf = acc * b.CFrame
+            b.Transform = b.Transform:Lerp(parentCf:Inverse() * want, blend)
+            acc = parentCf * b.Transform
+        end
+    end)
+end
+
+-- mensagens do jogo ao entrar/sair da fuse: vêm do servidor, então são copiadas de um depósito REAL.
+-- Quando um real entra (a contagem de Machine.Fuse sobe), a notificação que aparece junto vira o modelo;
+-- o nome do brainrot vira {name} e o visual usa o mesmo texto com o nome dele.
+local Msg = { recent = {}, lastNames = nil, pending = nil, selfUntil = 0, deposit = nil, ret = nil, hooked = false }
+local function msgCheck()
+    local p = Msg.pending
+    if not p then return end
+    local lname = string.lower(p.name)
+    for _, n in Msg.recent do
+        if math.abs(n.t - p.t) <= 3 then
+            local s, e = string.find(string.lower(n.text), lname, 1, true)
+            if s then
+                Msg[p.kind] = { msg = string.sub(n.text, 1, s - 1) .. "{name}" .. string.sub(n.text, e + 1), ok = n.ok }
+                Msg.pending = nil
+                log(("mensagem real da fuse (%s): %s"):format(p.kind, Msg[p.kind].msg))
+                return
+            end
+        end
+    end
+    if os.clock() - p.t > 3 then
+        -- sem o nome no texto: só aceita se veio exatamente uma notificação junto
+        local near = {}
+        for _, n in Msg.recent do if math.abs(n.t - p.t) <= 3 then table.insert(near, n) end end
+        if #near == 1 then
+            Msg[p.kind] = { msg = near[1].text, ok = near[1].ok }
+            log(("mensagem real da fuse (%s): %s"):format(p.kind, near[1].text))
+        end
+        Msg.pending = nil
+    end
+end
+local function msgHook()
+    if Msg.hooked then return end
+    local ng = PlayerGui:FindFirstChild("Notification")
+    local fr = ng and ng:FindFirstChild("Notification")
+    if not fr then return end
+    Msg.hooked = true
+    Global:Add(fr.ChildAdded:Connect(function(c)
+        if not c:IsA("TextLabel") then return end
+        task.defer(function()
+            local raw = c.Text
+            if raw == "" or os.clock() < Msg.selfUntil then return end
+            local txt = string.gsub(string.gsub(raw, "<[^>]->", ""), "^%s+", "")
+            table.insert(Msg.recent, { t = os.clock(), text = txt, ok = string.find(raw, "FA0103", 1, true) == nil })
+            if #Msg.recent > 12 then table.remove(Msg.recent, 1) end
+            msgCheck()
+        end)
+    end))
+end
+-- olha a lista real: quem entrou/saiu da fuse agora
+local function msgWatch()
+    msgHook()
+    local plot = getPlot()
+    if not plot then return end
+    local names = {}
+    for i, e in realList(plot) do
+        if type(e) == "table" and e.Machine and e.Machine.Type == "Fuse" then names[i] = e.Index end
+    end
+    local last = Msg.lastNames
+    Msg.lastNames = names
+    if last then
+        for i, idx in names do
+            if last[i] ~= idx then Msg.pending = { kind = "deposit", name = SA:GetDisplayName(idx) or idx, t = os.clock() } end
+        end
+        for i, idx in last do
+            if names[i] ~= idx then Msg.pending = { kind = "ret", name = SA:GetDisplayName(idx) or idx, t = os.clock() } end
+        end
+    end
+    msgCheck()
+end
+local function msgShow(kind, f)
+    local m = Msg[kind]
+    if not m then return end
+    local name = SA:GetDisplayName(f.index) or f.index
+    local text = string.gsub(m.msg, "{name}", function() return name end)
+    Msg.selfUntil = os.clock() + 0.5
+    if m.ok then notifyOk(text) else notifyError(text) end
+end
+
+local refreshGui
+local function deposit(hitbox)
+    local c = Carry
+    if not c or Fuse.busy then return end
+    local f = c.fake
+    if not f or Fakes[f.uid] ~= f then return end
+    -- a máquina tem 4 vagas (reais + visuais) e não aceita durante uma fusão
+    if realInFuse() + #fakesInFuse() >= FUSE_SLOTS or fuseRunning() then return end
+    Fuse.busy = true
+    -- cópia do que você carrega (snapshotBrainrot): sem overhead, só a raiz ancorada
+    local snap, idlePos
+    if c.model and hauntedRig() then
+        snap = c.model:Clone()
+        for _, g in snap:GetDescendants() do
+            if g:IsA("BillboardGui") then g:Destroy() end
+        end
+        local an = c.model:FindFirstChild("AnimationController")
+        an = an and an:FindFirstChildOfClass("Animator")
+        for _, tk in an and an:GetPlayingAnimationTracks() or {} do idlePos = tk.TimePosition end
+    end
+    endCarry()
+    f.fuse, f.fuseAt = true, workspace:GetServerTimeNow()
+    f.stolen = false
+    if f.updateVisibility then f.updateVisibility() end
+    pcall(function() SoundController:PlaySound(RS.Sounds.Sfx["Fuse Machine"].Deposit) end)
+    msgShow("deposit", f)
+    local m = machine()
+    pcall(function() VFX.emit(m.Vfx.emitfuse) end)
+    local rig = hauntedRig()
+    local ac = rig and rig:FindFirstChild("AnimationController")
+    local animator = ac and ac:FindFirstChildOfClass("Animator")
+    if animator then
+        pcall(function()
+            local tk = animator:LoadAnimation(RS.Animations.FuseMachine.HauntedInsert)
+            tk.Looped = false
+            tk:Play(0.1)
+            tk.Stopped:Once(function() tk:Destroy() end)
+        end)
+    end
+    if snap then
+        snap.Parent = workspace
+        local an = snap:FindFirstChild("AnimationController")
+        an = an and an:FindFirstChildOfClass("Animator")
+        local idle = AnimAnimals and AnimAnimals:FindFirstChild(f.index)
+        idle = idle and idle:FindFirstChild("Idle")
+        if an and idle then
+            local tk = an:LoadAnimation(idle)
+            tk.Looped = true
+            tk:Play(0)
+            if idlePos and tk.Length > 0 then tk.TimePosition = idlePos % tk.Length end
+        end
+        task.delay(0.1, function() try("língua da fuse", grabWithTongue, snap) end)
+    end
+    updatePrompts()
+    pushList()
+    refreshGui()
+    Fuse.busy = false
+end
+
+local function returnFromFuse(f)
+    if not f or Fakes[f.uid] ~= f or not f.fuse then return end
+    f.fuse, f.fuseAt = nil, nil
+    if f.updateVisibility then f.updateVisibility() end
+    sound("Sounds.Sfx.Activated")
+    msgShow("ret", f)
+    updatePrompts()
+    pushList()
+    refreshGui()
+end
+bus.fuseReturn = returnFromFuse
+
+-- tela da máquina: cada visual entra no lugar de um "Empty.N" do jogo (que fica escondido)
+local function guiList()
+    local g = PlayerGui:FindFirstChild("FuseMachine")
+    local fm = g and g:FindFirstChild("FuseMachine")
+    return fm and fm:FindFirstChild("Brainrots")
+end
+function refreshGui()
+    local box = guiList()
+    local tmpl = box and box:FindFirstChild("Template")
+    if not tmpl then return end
+    local fakes = fakesInFuse()
+    local empties = {}
+    for _, c in box:GetChildren() do
+        if c:IsA("GuiObject") and string.match(c.Name, "^Empty%.%d+$") then table.insert(empties, c) end
+    end
+    table.sort(empties, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
+    local keep = {}
+    for i, f in fakes do
+        local slotFrame = empties[i]
+        keep[f.uid] = true
+        local row = Fuse.rows[f.uid]
+        if not row or not row.frame.Parent then
+            if row then pcall(function() row.trove:Destroy() end) end
+            local tr = Trove.new()
+            local fr = tr:Clone(tmpl)
+            local def = AnimalsData[f.index]
+            local rar = def and RaritiesData[def.Rarity]
+            fr.Name = ("BRSFuse.%*"):format(f.uid)
+            fr.BrainrotName.Text = SA:GetDisplayName(f.index)
+            if f.mutation then pcall(function() MutationText.apply(fr.Mutation, f.mutation, "Auto") end) end
+            fr.Rarity.Text = def and def.Rarity or ""
+            if rar and rar.GradientPreset then
+                fr.Rarity.TextColor3 = Color3.fromRGB(255, 255, 255)
+                pcall(function() Gradients.apply(fr.Rarity, rar.GradientPreset) end)
+            elseif rar then
+                fr.Rarity.TextColor3 = rar.Color
+            end
+            fr.Visible = true
+            fr.Parent = box
+            local ok, ab = pcall(function() return AnimatedButton.new(fr.Return) end)
+            if ok and ab then
+                tr:Add(ab)
+                pcall(function() ab:Animate() end)
+                tr:Add(ab.OnActivated:Connect(function() try("fuse return", returnFromFuse, f) end))
+            else
+                tr:Add(fr.Return.Activated:Connect(function() try("fuse return", returnFromFuse, f) end))
+            end
+            local okV, clean = pcall(function() return SA:AttachOnViewport(f.index, fr.ViewportFrame, true, f.mutation) end)
+            if okV and clean then tr:Add(clean) end
+            row = { frame = fr, trove = tr }
+            Fuse.rows[f.uid] = row
+        end
+        -- ocupa a posição do "Empty" correspondente
+        if slotFrame then
+            row.frame.LayoutOrder = slotFrame.LayoutOrder
+            if slotFrame.Visible then slotFrame.Visible = false end
+        else
+            row.frame.LayoutOrder = 100 + i
+        end
+    end
+    for uid, row in Fuse.rows do
+        if not keep[uid] then
+            pcall(function() row.trove:Destroy() end)
+            Fuse.rows[uid] = nil
+        end
+    end
+    -- "Empty" que não é mais usado por visual volta a aparecer
+    for i = #fakes + 1, #empties do
+        if not empties[i].Visible then empties[i].Visible = true end
+    end
+end
+
+-- contador "x/4" do overhead: o jogo escreve a quantidade real a cada 1s; soma os visuais por cima
+local function hookCounter(lbl)
+    if Fuse.labels[lbl] then return end
+    local st = { mine = nil }
+    Fuse.labels[lbl] = st
+    local function apply()
+        local a, b = string.match(lbl.Text, "^(%d+)/(%d+)$")
+        if not a or lbl.Text == st.mine then return end
+        local n = #fakesInFuse()
+        if n == 0 then return end
+        st.mine = ("%*/%*"):format(math.min(tonumber(a) + n, tonumber(b)), b)
+        lbl.Text = st.mine
+    end
+    st.apply = apply
+    Global:Add(lbl:GetPropertyChangedSignal("Text"):Connect(apply))
+    apply()
+end
+
+-- ── chances da fusão ──
+-- O servidor calcula FuseMachine.OutputRarityOdds / OutputTraitsOdds / OutputMutationOdds a partir do que
+-- está na máquina; o cliente não tem a fórmula. Então cada combinação REAL que passa pela máquina fica
+-- gravada (chave = brainrot|mutação|traits de cada um, em ordem) com as chances exatas que o servidor mandou.
+-- Quando visuais + reais formam uma combinação já vista, a tela mostra essas chances reais (mesmo desenho do
+-- UpdateOdds do jogo). Combinação nunca vista: não mostra número nenhum.
+local Odds = { samples = {}, shownKey = nil, hidden = false }
+local function recKey(idx, mut, traits)
+    local t = type(traits) == "table" and table.clone(traits) or {}
+    table.sort(t)
+    return ("%s|%s|%s"):format(tostring(idx), tostring(mut or "None"), table.concat(t, ","))
+end
+local function comboKey(list)
+    table.sort(list)
+    return table.concat(list, ";")
+end
+local function realRecords()
+    local plot = getPlot()
+    local out = {}
+    for _, e in plot and realList(plot) or {} do
+        if type(e) == "table" and e.Machine and e.Machine.Type == "Fuse" then
+            table.insert(out, recKey(e.Index, e.Mutation, e.Traits))
+        end
+    end
+    return out
+end
+local function chanGet(path)
+    local ok, v = pcall(function() return bus.chan and bus.chan:Get(path) end)
+    return ok and v or nil
+end
+local function cloneOdds(t)
+    if type(t) ~= "table" then return nil end
+    local o = {}
+    for k, v in t do if type(k) == "string" and type(v) == "number" then o[k] = v end end
+    return o
+end
+-- grava o que o servidor mostra agora pros reais (só quando não há visual misturado na conta)
+local function recordReal()
+    local recs = realRecords()
+    if #recs == 0 then return end
+    local rar = cloneOdds(chanGet("FuseMachine.OutputRarityOdds"))
+    if not rar or next(rar) == nil then return end
+    local key = comboKey(recs)
+    local s = { rarity = rar, traits = cloneOdds(chanGet("FuseMachine.OutputTraitsOdds")) or {},
+        mutation = cloneOdds(chanGet("FuseMachine.OutputMutationOdds")) or {}, cost = chanGet("FuseMachine.Cost"), at = os.time() }
+    local old = Odds.samples[key]
+    if not old or HttpService:JSONEncode(old.rarity) ~= HttpService:JSONEncode(rar) or HttpService:JSONEncode(old.traits) ~= HttpService:JSONEncode(s.traits) then
+        Odds.samples[key] = s
+        log(("chances reais gravadas pra %d brainrot(s) na fuse"):format(#recs))
+    end
+end
+local function fmtPct(v)
+    local _, frac = math.modf(v)
+    return (if frac ~= 0 then "%.2f" else "%d"):format(v) .. "%"
+end
+-- mesmo desenho do UpdateOdds do FuseMachineController
+local function renderOdds(s)
+    local g = PlayerGui:FindFirstChild("FuseMachine")
+    local fm = g and g:FindFirstChild("FuseMachine")
+    if not fm then return end
+    local Fusions, FusionsOld, Lists = fm.Fusions, fm.FusionsOld, fm.Lists
+    for _, c in Fusions:GetChildren() do if c:IsA("Frame") and c.Name ~= "Template" then c:Destroy() end end
+    for _, c in FusionsOld:GetChildren() do if c:IsA("TextLabel") and c.Name ~= "Template" then c:Destroy() end end
+    for _, c in Lists.Mutations.ScrollingFrame:GetChildren() do if c:IsA("Frame") and c.Name ~= "Template" then c:Destroy() end end
+    for _, c in Lists.Traits.ScrollingFrame:GetChildren() do if c:IsA("Frame") and c.Name ~= "Template" then c:Destroy() end end
+    local anyMut = false
+    for key, v in s.mutation do
+        local d = MutationsData[key]
+        if d then
+            local fr = Lists.Mutations.ScrollingFrame.Template:Clone()
+            fr.Name = key
+            fr.LayoutOrder = -v
+            fr.Vector.Image = d.Icon or ""
+            pcall(function() MutationText.apply(fr.Title, key, "Auto") end)
+            fr.Chance.Text = fmtPct(v)
+            fr.Visible = true
+            fr:SetAttribute("BRSOdds", true)
+            fr.Parent = Lists.Mutations.ScrollingFrame
+            anyMut = true
+        end
+    end
+    Lists.Mutations.Visible = anyMut
+    local anyTrait = false
+    for key, v in s.traits do
+        local d = TraitsData[key]
+        if d then
+            local fr = Lists.Traits.ScrollingFrame.Template:Clone()
+            fr.Name = key
+            fr.LayoutOrder = -v
+            fr.Vector.Image = d.Icon or ""
+            fr.Title.Text = d.DisplayWithRichText or d.Display or key
+            fr.Title.TextColor3 = d.Color or Color3.new(1, 1, 1)
+            fr.Title.RichText = true
+            fr.Chance.Text = fmtPct(v)
+            fr.Visible = true
+            fr:SetAttribute("BRSOdds", true)
+            fr.Parent = Lists.Traits.ScrollingFrame
+            anyTrait = true
+        end
+    end
+    Lists.Traits.Visible = anyTrait
+    local old = false
+    for key, v in s.rarity do
+        if v ~= 0 then
+            local r = RaritiesData[key]
+            if r then
+                old = true
+                local lb = FusionsOld.Template:Clone()
+                lb.Name = key
+                lb.Text = ("%* (%*)"):format(key, fmtPct(v))
+                if r.GradientPreset then
+                    lb.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    pcall(function() Gradients.apply(lb, r.GradientPreset) end)
+                else
+                    lb.TextColor3 = r.Color
+                end
+                lb.LayoutOrder = -v
+                lb.Visible = true
+                lb:SetAttribute("BRSOdds", true)
+                lb.Parent = FusionsOld
+            elseif AnimalsData[key] then
+                local def = AnimalsData[key]
+                local rr = RaritiesData[def.Rarity]
+                local fr = Fusions.Template:Clone()
+                fr.Name = ("%*.%*"):format(key, def.Rarity)
+                fr.BrainrotName.Text = SA:GetDisplayName(key)
+                fr.Weight.Text = fmtPct(v)
+                if rr and rr.GradientPreset then
+                    fr.Weight.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    pcall(function() Gradients.apply(fr.Weight, rr.GradientPreset) end)
+                elseif rr then
+                    fr.Weight.TextColor3 = rr.Color
+                end
+                fr.LayoutOrder = -v
+                fr.Visible = true
+                fr:SetAttribute("BRSOdds", true)
+                fr.Parent = Fusions
+                pcall(function() SA:AttachOnViewport(key, fr.ViewportFrame, true, nil) end)
+            end
+        end
+    end
+    Fusions.Visible = not old
+    FusionsOld.Visible = old
+    fm.PossibleFusions.Visible = true
+end
+-- tira o que desenhamos e devolve a tela pro estado dos dados reais (mesmo resultado do UpdateOdds)
+local function restoreReal(fm)
+    local had = false
+    for _, box in { fm.Fusions, fm.FusionsOld, fm.Lists.Mutations.ScrollingFrame, fm.Lists.Traits.ScrollingFrame } do
+        for _, c in box:GetChildren() do
+            if c:GetAttribute("BRSOdds") then had = true c:Destroy() end
+        end
+    end
+    if not had and not Odds.hidden then return end
+    Odds.hidden = false
+    local rar = cloneOdds(chanGet("FuseMachine.OutputRarityOdds"))
+    if rar and next(rar) then
+        renderOdds({ rarity = rar, traits = cloneOdds(chanGet("FuseMachine.OutputTraitsOdds")) or {},
+            mutation = cloneOdds(chanGet("FuseMachine.OutputMutationOdds")) or {} })
+    else
+        fm.Fusions.Visible, fm.FusionsOld.Visible, fm.PossibleFusions.Visible = false, false, false
+    end
+end
+local function oddsTick()
+    local fakes = fakesInFuse()
+    if #fakes == 0 then
+        recordReal()
+        if Odds.shownKey or Odds.hidden then
+            local g = PlayerGui:FindFirstChild("FuseMachine")
+            local fm = g and g:FindFirstChild("FuseMachine")
+            if fm then restoreReal(fm) end
+        end
+        Odds.shownKey = nil
+        return
+    end
+    local recs = realRecords()
+    for _, f in fakes do table.insert(recs, recKey(f.index, f.mutation, f.traits)) end
+    local key = comboKey(recs)
+    local s = Odds.samples[key]
+    local g = PlayerGui:FindFirstChild("FuseMachine")
+    local fm = g and g:FindFirstChild("FuseMachine")
+    if not fm then return end
+    -- o jogo redesenha (e apaga os nossos) quando os dados reais mudam: redesenha por cima
+    local ours = false
+    for _, c in fm.Fusions:GetChildren() do if c:GetAttribute("BRSOdds") then ours = true break end end
+    if not ours then for _, c in fm.FusionsOld:GetChildren() do if c:GetAttribute("BRSOdds") then ours = true break end end end
+    if s then
+        if Odds.shownKey ~= key or not ours then
+            Odds.shownKey = key
+            renderOdds(s)
+        end
+    else
+        -- combinação nunca vista: sem número inventado (o painel de possíveis fusões fica escondido)
+        if Odds.shownKey then
+            -- saiu de uma combinação conhecida: apaga as chances antigas na hora
+            for _, box in { fm.Fusions, fm.FusionsOld, fm.Lists.Mutations.ScrollingFrame, fm.Lists.Traits.ScrollingFrame } do
+                for _, c in box:GetChildren() do if c:GetAttribute("BRSOdds") then c:Destroy() end end
+            end
+        end
+        Odds.shownKey = nil
+        Odds.hidden = true
+        if fm.PossibleFusions.Visible then
+            fm.PossibleFusions.Visible = false
+            fm.Fusions.Visible = false
+            fm.FusionsOld.Visible = false
+            fm.Lists.Mutations.Visible = false
+            fm.Lists.Traits.Visible = false
+        end
+    end
+end
+bus.fuseSave = function() return { samples = Odds.samples, deposit = Msg.deposit, ret = Msg.ret } end
+bus.fuseLoad = function(t)
+    if type(t) ~= "table" then return end
+    for _, k in { "deposit", "ret" } do
+        if type(t[k]) == "table" and type(t[k].msg) == "string" then Msg[k] = t[k] end
+    end
+    if type(t.samples) == "table" then
+        for k, v in t.samples do
+            if type(k) == "string" and type(v) == "table" and type(v.rarity) == "table" then Odds.samples[k] = v end
+        end
+    end
+end
+
+local function tick()
+    local m = machine()
+    if m and m:FindFirstChild("Hitboxes") then
+        for _, hb in m.Hitboxes:GetChildren() do
+            if hb:IsA("BasePart") and not Fuse.hooked[hb] then
+                Fuse.hooked[hb] = true
+                Global:Add(hb.Touched:Connect(function(hit)
+                    if hit.Name ~= "HumanoidRootPart" or not Carry then return end
+                    if Players:GetPlayerFromCharacter(hit.Parent) ~= LP then return end
+                    try("fuse depósito", deposit, hb)
+                end))
+            end
+        end
+    end
+    for _, lbl in CS:GetTagged("FuseMachineCountdown") do
+        if lbl:IsA("TextLabel") then
+            hookCounter(lbl)
+            Fuse.labels[lbl].apply()
+        end
+    end
+    refreshGui()
+    oddsTick()
+    msgWatch()
+end
+bus.fuseTick = function() try("fuse", tick) end
+bus.fuseShutdown = function()
+    for _, row in Fuse.rows do pcall(function() row.trove:Destroy() end) end
+    Fuse.rows = {}
+    local box = guiList()
+    for _, c in box and box:GetChildren() or {} do
+        if c:IsA("GuiObject") and string.match(c.Name, "^Empty%.%d+$") then c.Visible = true end
+    end
+end
+end)()
+
+local function shutdown()
+    bus.dead = true
+    endCarry()
+    for _, f in Fakes do unrender(f) end
+    table.clear(Fakes)
+    table.clear(SlotFake)
+    clearAllCards()
+    pcall(SimAPI.close, false)
+    pcall(SimAPI.shutdown)
+    if bus.fuseShutdown then pcall(bus.fuseShutdown) end
+    -- prompts reais que mudamos pra "Place" durante a troca voltam ao normal
+    for pp, o in bus.swapPatched or {} do
+        pcall(function()
+            local st = pp:GetAttribute("State")
+            if st == "Grab" and pp.ActionText == "Place" then pp.ActionText = o.text end
+            if st == "Grab" or st == "Sell" then pp.Enabled = true end
+        end)
+    end
+    bus.swapPatched = nil
+    for i, pair in TempPlace do
+        for _, p in pair do killPrompt(p) end
+        TempPlace[i] = nil
+    end
+    if Trade.blocker then pcall(function() Trade.blocker:Destroy() end) end
+    Money.offset = 0
+    Money.dirty = true
+    pcall(refreshMoney)
+    pcall(function() Global:Destroy() end)
+end
+
+Global:Add(bus.cmd.Event:Connect(function(name, data)
+    if bus.dead then return end
+    if name == "preview" then
+        task.spawn(try, "preview", buildPreview, data)
+    elseif name == "spawn" then
+        task.spawn(function()
+            local before = {}
+            for uid in Fakes do before[uid] = true end
+            if not try("spawn", spawnFake, data) then
+                -- erro no meio do render: desfaz o que ficou pela metade
+                for uid, f in Fakes do
+                    if not before[uid] then try("desfazer", removeFake, f) end
+                end
+                bus.evt:Fire("spawnfail", "erro (veja BrainrotSpawner/log.txt)")
+            end
+        end)
+    elseif name == "grab" then
+        -- data = uid → o visual vai pra sua mão de qualquer lugar (mesmo Grab do pódio)
+        task.spawn(try, "grab", function()
+            local f = Fakes[data]
+            if f and not f.fuse and not Carry then startCarry(f) end
+        end)
+    elseif name == "delete" then
+        task.spawn(try, "delete", deleteFake, data)
+    elseif name == "deleteAll" then
+        task.spawn(try, "deleteAll", deleteAll)
+    elseif name == "restore" then
+        task.spawn(function()
+            try("restore", restoreState, data)
+            bus.restoreDone = true
+        end)
+    elseif name == "simReceiveInvite" then
+        task.spawn(try, "simReceiveInvite", SimAPI.receiveInvite)
+    elseif name == "simSendInvite" then
+        task.spawn(try, "simSendInvite", SimAPI.sendInvite)
+    elseif name == "simAddPartner" then
+        -- data = { index, mutation, traits } → entra na oferta do TradeBot
+        task.spawn(try, "simAddPartner", SimAPI.addPartner, data)
+    elseif name == "simRemovePartner" then
+        task.spawn(try, "simRemovePartner", SimAPI.removePartner, data)
+    elseif name == "simBot" then
+        -- data = "ready" | "accept" (modo manual: você manda ele dar o passo)
+        task.spawn(try, "simBot", SimAPI.botDo, data)
+    elseif name == "simConfig" then
+        task.spawn(try, "simConfig", SimAPI.config, data)
+    elseif name == "simChatAs" then
+        task.spawn(try, "simChatAs", SimAPI.chatAs, data)
+    elseif name == "simPlayers" then
+        task.spawn(try, "simPlayers", SimAPI.players)
+    elseif name == "simClearHistory" then
+        task.spawn(try, "simClearHistory", SimAPI.clearHistory, data)
+    elseif name == "simCancel" then
+        task.spawn(try, "simCancel", function()
+            -- botão do HUB = quem cancela é ELE (o parceiro): "@Roblox canceled", com o som de erro
+            -- do jogo. O Cancel da tela do jogo continua sendo você ("@SeuNome canceled").
+            local was = SimAPI.state()
+            if was ~= "open" and was ~= "processing" then return end
+            task.wait(rtt()) -- o cancelamento dele chega pelo servidor
+            if SimAPI.state() ~= was then return end
+            SimAPI.close(false)
+            SimAPI.notifyLearned("end:cancel", SimAPI.partnerName())
+        end)
+    elseif name == "hubVisible" then
+        bus.hubVisible = data == true
+        try("botão config", SettingsUI.ensureRow)
+    elseif name == "resetMoney" then
+        task.spawn(try, "resetMoney", function()
+            local d = -Money.offset
+            Money.offset = 0
+            Money.dirty = true
+            refreshMoney()
+            bus.money = 0
+            if d ~= 0 then cashoutPopup(d) end
+        end)
+    elseif name == "set1of1" then
+        -- data = { uid = ..., mode = "auto" | "on" | "off" }
+        task.spawn(try, "set1of1", function()
+            local f = data and Fakes[data.uid]
+            if not f then return end
+            f.forceOne = if data.mode == "on" then true elseif data.mode == "off" then false else nil
+            refreshOneOfOne(f)
+            pushList()
+        end)
+    elseif name == "claimAll" then
+        -- (não existe no jogo; não usado)
+    elseif name == "shutdown" then
+        try("shutdown", shutdown)
+    end
+end))
+
+-- loops (Timer de 1s do PlotClient + checagens rápidas)
+local acc1, acc01 = 0, 0
+Global:Add(RunService.Heartbeat:Connect(function(dt)
+    if bus.dead then return end
+    acc1 += dt
+    acc01 += dt
+    if acc01 >= 0.1 then
+        acc01 = 0
+        try("trade", syncTrade)
+        try("trade sim", SimAPI.tick)
+        SimAPI.watch()
+        if bus.fuseTick then bus.fuseTick() end
+    end
+    if acc1 >= 1 then
+        acc1 = 0
+        try("tick", function()
+            local plot = getPlot()
+            local list = plot and realList(plot) or {}
+            for _, f in Fakes do
+                if plot then
+                    local rg = bus.realGrab
+                    -- entrada com Steal = você: o real está na sua mão (troca visual→real), o pódio é do visual
+                    local e = list[f.slot]
+                    local taken = type(e) == "table" and e.Steal ~= LP.UserId
+                    if taken and not f.stolen and rg and os.clock() - rg.at < 3
+                        and rg.slot ~= f.slot and isSlotFree(plot, rg.slot, list) then
+                        -- troca: você colocou o real no pódio do visual → o visual vai pro pódio de onde o real saiu
+                        bus.realGrab = nil
+                        moveFake(f, rg.slot)
+                        pushList()
+                    elseif taken and not f.stolen then
+                        -- o servidor botou um brainrot de verdade nesse slot: muda o visual de lugar
+                        local free = findFreeSlot(plot)
+                        if free then
+                            moveFake(f, free)
+                        else
+                            removeFake(f)
+                        end
+                        pushList()
+                    elseif f.model and f.model.Parent == nil and f.trove then
+                        unrender(f)
+                        render(f)
+                    elseif f.model and f.spawnPart and f.spawnPart.Parent then
+                        local pv = f.spawnPart:GetPivot()
+                        if (f.model:GetPivot().Position - pv.Position).Magnitude > 0.05 then f.model:PivotTo(pv) end
+                    end
+                end
+                if f.updateOverhead then f.updateOverhead() end
+                if f.updateClaim then f.updateClaim() end
+            end
+            -- 1 of 1 automático acompanha as contagens do servidor
+            -- e o "existem N" do hub acompanha qualquer mudança da contagem (não só quando o 1 of 1 muda)
+            local changed = false
+            for _, f in Fakes do
+                if refreshOneOfOne(f) then changed = true end
+                local ex = bus.existCount and bus.existCount(f.index, f.mutation) or nil
+                if ex ~= f.lastExist then
+                    f.lastExist = ex
+                    changed = true
+                end
+            end
+            if changed then pushList() end
+            updatePrompts()
+            if Money.offset ~= 0 then hookMoney() refreshMoney() end
+            -- (skins de base visuais foram removidas a pedido: o menu Base Skin do jogo fica original)
+            SettingsUI.ensureRow()
+            SimAPI.tick1()
+            buildState()
+        end)
+    end
+end))
+Global:Add(LP:GetAttributeChangedSignal("IsTrading"):Connect(function() try("prompts", updatePrompts) end))
+Global:Add(LP:GetAttributeChangedSignal("Stealing"):Connect(function() try("prompts", updatePrompts) end))
+Global:Add(LP:GetAttributeChangedSignal("IsDuelSelecting"):Connect(function() try("prompts", updatePrompts) end))
+
+bus.fakesList = {}
+if bus.hubVisible == nil then bus.hubVisible = true end
+try("botão config", SettingsUI.ensureRow)
+bus.ready = true
+bus.evt:Fire("ready")
+log("motor pronto (" .. #bus.catalog.animals .. " brainrots, " .. #bus.catalog.mutations .. " mutações, " .. #bus.catalog.traits .. " traits)")
+]=]
+local v = getrenv and getrenv()
+if not (v and (setfenv and loadstring)) then
+  warn("[Brainrot Spawner] executor sem getrenv/setfenv/loadstring")
+  return
+end
+local function fn()
+  local v2, v3 = pcall(require, (ReplicatedStorage:WaitForChild("Controllers")):WaitForChild("DataController"))
+  local debugFn = debug and debug.getupvalues or getupvalues
+  if not (v2 and (type(v3) == "table" and (type(v3.Load) == "function" and debugFn))) then
+    return nil
+  end
+  local v4, v5 = pcall(require, (ReplicatedStorage:WaitForChild("Packages")):WaitForChild("Synchronizer"))
+  for key, value in debugFn(v3.Load) do
+    if type(value) == "table" and (not (v4 and rawequal(value, v5)) and (rawget(value, "CacheTable") ~= nil and rawget(value, "Listeners") ~= nil)) then
+      return value
+    end
+  end
+  return nil
+end
+local bus = {
+  logs = {},
+  cmd = Instance.new("BindableEvent"),
+  evt = Instance.new("BindableEvent"),
+  chan = fn(),
+  previewWant = 0
+}
+if not bus.chan then
+  task.spawn(function()
+    for i = 1, 120, 1 do
+      task.wait(1)
+      local v2 = fn()
+      if v2 then
+        bus.chan = v2
+        return
+      end
+    end
+    warn("[Brainrot Spawner] canal do jogador não encontrado (dinheiro do claim usa x1)")
+  end)
+end
+local function fn2()
+  local debugFn = debug and debug.getupvalues or getupvalues
+  local v2, v3 = pcall(require, (ReplicatedStorage:WaitForChild("Controllers")):WaitForChild("IndexController"))
+  if not (v2 and (type(v3) == "table" and (type(v3.Start) == "function" and debugFn))) then
+    return nil
+  end
+  local v4, v5 = pcall(debugFn, v3.Start)
+  for key, value in v4 and v5 or {} do
+    if type(value) == "function" then
+      local v6, v7 = pcall(debug.info, value, "n")
+      if v6 and v7 == "Setup" then
+        return value
+      end
+    end
+  end
+  return nil
+end
+bus.indexSetup = fn2()
+local function fn3()
+  local __BRAntiKick = env.__BRAntiKick
+  if not __BRAntiKick then
+    __BRAntiKick = { blocked = 0, watchUntil = 0 }
+    env.__BRAntiKick = __BRAntiKick
+  end
+  __BRAntiKick.core = bus
+  __BRAntiKick.bus = nil
+  __BRAntiKick.watchUntil = 0
+  __BRAntiKick.existStarter = nil
+  if type(bus.indexSetup) == "function" and (getfenv and (setfenv and loadstring)) then
+    pcall(function()
+      local v2 = loadstring("local f = ... ; setfenv(0, getfenv(f)) ; f()", "=ReplicatedStorage.Controllers.IndexController")
+      setfenv(v2, getfenv(bus.indexSetup))
+      __BRAntiKick.existStarter = v2
+    end)
+  end
+  local checkcallerFn = checkcaller and function()
+    return not checkcaller()
+  end or function()
+    return false
+  end
+  local function noop(arg1)
+  end
+  local data = {
+    ["c85a2323-36b2-4121-968a-c064a6168aff"] = "AddBrainrot",
+    ["4677f337-8006-49ac-b68d-9cd485140425"] = "RemoveBrainrot",
+    ["6786cce9-00d8-41e9-8beb-d96e0412b78b"] = "AddItem",
+    ["a76f153f-d0cd-4fe4-ba26-a2755f3ec266"] = "RemoveItem",
+    ["23f15b0b-b633-4f6b-888f-5924b7425522"] = "Ready",
+    ["86eea964-f19e-4ac6-b401-a71ecc89e596"] = "Accept",
+    ["171b5ced-5729-49c0-8d80-9c1897ff1ea3"] = "CancelTrade",
+    ["a3b27b3c-4b9b-4a41-af45-7eea6cb59d86"] = "SendChatMessage"
+  }
+  local function fn4(arg1)
+    local core = __BRAntiKick.core
+    return core ~= nil and (core.simOpen == true and (type(arg1) == "string" and data[arg1])) or nil
+  end
+  local function fn5()
+    return false
+  end
+  local v2 = utf8.char(65279)
+  local function fn6(...)
+    local v3 = select("#", ...)
+    for i = 1, v3, 1 do
+      local v4 = select(i, ...)
+      if type(v4) == "string" then
+        if string.sub(v4, 1, 3) == "LTO" or string.find(v4, v2, 1, true) then
+          return true
+        end
+      elseif type(v4) == "number" and v4 ~= v4 then
+        return true
+      end
+    end
+    return false
+  end
+  local function fn7(...)
+    local tbl = {}
+    for i = 1, math.min(select("#", ...), 4), 1 do
+      local v3 = select(i, ...)
+      local v4 = type(v3) == "string" and ("%q"):format(string.sub(v3, 1, 40)) or tostring(v3)
+      table.insert(tbl, v4)
+    end
+    return table.concat(tbl, ", ")
+  end
+  local newcclosureFn = newcclosure or function(arg1)
+    return arg1
+  end
+  local function noop2(arg1)
+  end
+  local function fn8()
+    if not getcallingscript then
+      return "?"
+    end
+    local v3, v4 = pcall(getcallingscript)
+    return v3 and (v4 and tostring(v4:GetFullName())) or "?"
+  end
+  function __BRAntiKick.nc(arg1, arg2, ...)
+    local core = __BRAntiKick.core
+    if core and (core.wantExist and (__BRAntiKick.existStarter and checkcallerFn())) then
+      core.wantExist = false
+      task.spawn(__BRAntiKick.existStarter, core.indexSetup)
+    end
+    if arg2 == "Kick" or arg2 == "kick" then
+      __BRAntiKick.blocked += 1
+      noop2("ANTI-KICK: Kick local bloqueado ← " .. fn8())
+      return true
+    end
+    if arg2 ~= "FireServer" and arg2 ~= "InvokeServer" then
+      return false
+    end
+    if fn6(...) then
+      __BRAntiKick.blocked += 1
+      noop2(("ANTI-KICK: reporte bloqueado em %s (%s) ← %s"):format(tostring(arg1), fn7(...), fn8()))
+      return true
+    end
+    local v3 = fn4(...)
+    if v3 then
+      __BRAntiKick.blocked += 1
+      noop2(("ANTI-KICK: TradeService/%s bloqueado (trade falsa aberta) ← %s"):format(v3, fn8()))
+      return true
+    end
+    if fn5() and (tostring(arg1) ~= "Ping" and ... ~= "m") then
+      local core2 = __BRAntiKick.core
+      local v4 = core2 and (core2.simOpen and "trade falsa") or core2 and (core2.carrying and "carry") or "pós-spawn"
+      noop2(("remote [%s]: %s:%s(%s) ← %s"):format(v4, tostring(arg1), arg2, fn7(...), fn8()))
+    end
+    return false
+  end
+  function __BRAntiKick.direct(arg1, arg2, ...)
+    if arg1 == "Kick" then
+      __BRAntiKick.blocked += 1
+      noop2("ANTI-KICK: Kick local bloqueado (direto) ← " .. fn8())
+      return true
+    end
+    return __BRAntiKick.nc(arg2, arg1, ...)
+  end
+  local function fn9()
+    local core = __BRAntiKick.core
+    local v3 = core and (core.carrying and core.carryC)
+    if not v3 then
+      return nil
+    end
+    local tbl = {}
+    for key, value in { "ws", "jp", "jh" } do
+      local v4, v5 = v3[value .. "Set"], v3[value]
+      if type(v4) == "number" and (type(v5) == "number" and math.abs(v4 - v5) > .01) then
+        table.insert(tbl, { v4, v5 })
+      end
+    end
+    return #tbl > 0 and tbl or nil
+  end
+  local function fn10(arg1, arg2)
+    for key, value in arg2 do
+      if math.abs(arg1 - value[1]) < .02 then
+        return value[2], true
+      end
+    end
+    return arg1, false
+  end
+  local function fn11(arg1, arg2)
+    local v3 = #arg1
+    if v3 < 4 or v3 > 256 or v3 % 4 ~= 0 then
+      return nil
+    end
+    local v4 = buffer.fromstring(arg1)
+    local flag = false
+    for i = 0, v3 - 4, 4 do
+      local v5 = buffer.readf32(v4, i)
+      if v5 == v5 then
+        local v6, v7 = fn10(v5, arg2)
+        if v7 then
+          buffer.writef32(v4, i, v6)
+          flag = true
+        end
+      end
+    end
+    return flag and buffer.tostring(v4) or nil
+  end
+  function __BRAntiKick.spoof(arg1, ...)
+    local v3 = fn9()
+    if not v3 then
+      return nil
+    end
+    local tbl = table.pack(...)
+    local flag = false
+    for i = 1, tbl.n, 1 do
+      local v4 = tbl[i]
+      if type(v4) == "number" then
+        local v5, v6 = fn10(v4, v3)
+        if v6 then
+          tbl[i] = v5
+          flag = true
+        end
+      elseif type(v4) == "string" then
+        local v5 = fn11(v4, v3)
+        if v5 then
+          tbl[i] = v5
+          flag = true
+        end
+      end
+    end
+    if not flag then
+      return nil
+    end
+    if not __BRAntiKick.spoofLogged then
+      __BRAntiKick.spoofLogged = true
+      noop2(("ANTI-KICK: velocidade reduzida do carry escondida em %s (servidor vê a normal)"):format(tostring(arg1)))
+    end
+    return tbl
+  end
+  function __BRAntiKick.ni(arg1, arg2, arg3)
+    if arg2 ~= "Health" or type(arg3) ~= "number" or arg3 > 0 then
+      return false
+    end
+    local core = __BRAntiKick.core
+    if not (core and core.carrying) then
+      return false
+    end
+    local character = localPlayer.Character
+    if character and (typeof(arg1) == "Instance" and (arg1.Parent == character and arg1:IsA("Humanoid"))) then
+      __BRAntiKick.blocked += 1
+      noop2("ANTI-KICK: Health = 0 bloqueado durante o carry ← " .. fn8())
+      return true
+    end
+    return false
+  end
+  if not __BRAntiKick.hookV3 and (hookmetamethod and getnamecallmethod) then
+    __BRAntiKick.hookV3 = true
+    __BRAntiKick.hookV2 = true
+    __BRAntiKick.hooked = true
+    local v3
+    v3 = hookmetamethod(game, "__namecall", newcclosureFn(function(arg1, ...)
+      local nc = __BRAntiKick.nc
+      if nc then
+        local v4 = getnamecallmethod()
+        local v5, v6 = pcall(nc, arg1, v4, ...)
+        if v5 and v6 then
+          return nil
+        end
+        if (v4 == "FireServer" or v4 == "InvokeServer") and __BRAntiKick.spoof then
+          local v7, v8 = pcall(__BRAntiKick.spoof, arg1, ...)
+          if v7 and v8 then
+            return v3(arg1, table.unpack(v8, 1, v8.n))
+          end
+        end
+      end
+      return v3(arg1, ...)
+    end))
+    if hookfunction then
+      local function fn12(arg1, arg2)
+        pcall(function()
+          local v4
+          v4 = hookfunction(arg1, newcclosureFn(function(arg12, ...)
+            local direct = __BRAntiKick.direct
+            if direct then
+              local v5, v6 = pcall(direct, arg2, arg12, ...)
+              if v5 and v6 then
+                return nil
+              end
+              if arg2 ~= "Kick" and __BRAntiKick.spoof then
+                local v7, v8 = pcall(__BRAntiKick.spoof, arg12, ...)
+                if v7 and v8 then
+                  return v4(arg12, table.unpack(v8, 1, v8.n))
+                end
+              end
+            end
+            return v4(arg12, ...)
+          end))
+        end)
+      end
+      pcall(function()
+        fn12(localPlayer.Kick, "Kick")
+      end)
+      pcall(function()
+        fn12((Instance.new("RemoteEvent")).FireServer, "FireServer")
+      end)
+      pcall(function()
+        fn12((Instance.new("UnreliableRemoteEvent")).FireServer, "FireServer")
+      end)
+      pcall(function()
+        fn12((Instance.new("RemoteFunction")).InvokeServer, "InvokeServer")
+      end)
+    end
+  elseif not __BRAntiKick.hookV3 then
+    warn("[Brainrot Spawner] executor sem hookmetamethod — anti-kick só pelo ambiente limpo")
+  end
+  if not __BRAntiKick.hookNIV2 and hookmetamethod then
+    __BRAntiKick.hookNIV2 = true
+    local v3
+    v3 = hookmetamethod(game, "__newindex", newcclosureFn(function(arg1, arg2, arg3)
+      local ni = __BRAntiKick.ni
+      if ni and arg2 == "Health" then
+        local v4, v5 = pcall(ni, arg1, arg2, arg3)
+        if v4 and v5 then
+          return
+        end
+      end
+      return v3(arg1, arg2, arg3)
+    end))
+  end
+  function __BRAntiKick.onChar(arg1)
+    local humanoid = arg1:WaitForChild("Humanoid", 10)
+    if not humanoid then
+      return
+    end
+    humanoid.Died:Connect(function()
+      local core = __BRAntiKick.core
+      noop2(("morte do personagem%s (vida 0 pelo servidor/física)"):format(core and (core.carrying and " DURANTE O CARRY") or ""))
+    end)
+  end
+  function __BRAntiKick.onRemoving()
+    local core = __BRAntiKick.core
+    noop2(("personagem removido%s"):format(core and (core.carrying and " DURANTE O CARRY (servidor recriou o personagem)") or ""))
+  end
+  if not __BRAntiKick.removeConn then
+    if localPlayer.Character then
+      task.spawn(function()
+        __BRAntiKick.onChar(localPlayer.Character)
+      end)
+    end
+    __BRAntiKick.deathConn = localPlayer.CharacterAdded:Connect(function(arg1)
+      __BRAntiKick.onChar(arg1)
+    end)
+    __BRAntiKick.removeConn = localPlayer.CharacterRemoving:Connect(function()
+      __BRAntiKick.onRemoving()
+    end)
+  end
+  if not __BRAntiKick.gravityConn then
+    __BRAntiKick.gravityConn = (workspace:GetPropertyChangedSignal("Gravity")):Connect(function()
+      if workspace.Gravity == 1000 then
+        workspace.Gravity = 196.2
+        noop("ANTI-KICK: Gravity 1000 do detector revertida")
+      end
+    end)
+  end
+  local tbl = {}
+  for key, value in {
+    "writefile",
+    "readfile",
+    "appendfile",
+    "isfile",
+    "isfolder",
+    "makefolder",
+    "delfile",
+    "delfolder",
+    "listfiles",
+    "cloneref",
+    "getrenv",
+    "getgenv",
+    "getupvalues",
+    "getupvalue",
+    "setupvalue",
+    "getnamecallmethod",
+    "hookmetamethod",
+    "hookfunction",
+    "newcclosure",
+    "checkcaller",
+    "getrawmetatable",
+    "setrawmetatable",
+    "gethui",
+    "getconnections",
+    "firesignal",
+    "fireproximityprompt",
+    "identifyexecutor",
+    "getexecutorname",
+    "syn",
+    "protect_gui",
+    "Drawing",
+    "request",
+    "http_request",
+    "getsenv",
+    "getgc",
+    "getreg",
+    "setreadonly",
+    "isreadonly",
+    "getinstances",
+    "getnilinstances",
+    "decompile"
+  } do
+    tbl[value] = true
+  end
+  local v3 = setmetatable({}, {
+    __index = function(arg1, arg2)
+      if tbl[arg2] then
+        return nil
+      end
+      return v[arg2]
+    end
+  })
+  return v3
+end
+local v2 = fn3()
+local v3, v4 = loadstring(str, "=ReplicatedStorage.Controllers.AnimalController")
+if not v3 then
+  warn("[Brainrot Spawner] erro compilando o motor: " .. tostring(v4))
+  return
+end
+setfenv(v3, v2)
+local v5 = loadstring("local fn, env, b = ... ; setfenv(0, env) ; fn(b)", "=ReplicatedStorage.Controllers.AnimalController")
+setfenv(v5, v2)
+local tbl = {}
+local function fn4(arg1)
+  table.insert(tbl, arg1)
+  return arg1
+end
+local str2, str3 = "BrainrotSpawner", "BrainrotSpawner/config.json"
+local config = {
+  key = "F",
+  autoSave = true,
+  offline = true,
+  simChat = "off",
+  simBotReady = "auto",
+  simBotAccept = "auto",
+  simSlotMode = "bot",
+  simBotMax = 10,
+  simBotUsed = 4,
+  simPlayerId = 0,
+  simBotName = "Roblox",
+  openOnStart = true,
+  lang = "auto"
+}
+local v6 = nil
+pcall(function()
+  if isfile and (readfile and isfile(str3)) then
+    local v7 = HttpService:JSONDecode(readfile(str3))
+    if type(v7) == "table" then
+      v6 = v7
+      if type(v7.config) == "table" then
+        for key, value in v7.config do
+          config[key] = value
+        end
+      end
+    end
+  end
+end)
+local v7 = nil
+local function save(arg1)
+  if not (writefile and bus.state) then
+    return false
+  end
+  if not config.autoSave and not arg1 then
+    return false
+  end
+  if v6 and not bus.restoreDone then
+    return false
+  end
+  local data = {
+    version = version,
+    savedAt = (DateTime.now()).UnixTimestamp,
+    config = config,
+    offlineEnabled = config.offline,
+    fakes = bus.state.fakes,
+    money = bus.state.money,
+    index = bus.state.index,
+    trade = bus.state.trade,
+    fuse = bus.state.fuse
+  }
+  local v8, v9 = pcall(function()
+    return HttpService:JSONEncode(data)
+  end)
+  if not v8 then
+    return false
+  end
+  local ok = pcall(function()
+    if makefolder and (isfolder and not isfolder(str2)) then
+      makefolder(str2)
+    end
+    writefile(str3, v9)
+  end)
+  if ok then
+    v7 = os.date("%H:%M:%S")
+  end
+  return ok
+end
+local data = {
+  Bg = Color3.fromRGB(12, 13, 18),
+  Side = Color3.fromRGB(16, 18, 25),
+  Panel = Color3.fromRGB(21, 24, 33),
+  Panel2 = Color3.fromRGB(28, 32, 44),
+  Panel3 = Color3.fromRGB(38, 43, 58),
+  Stroke = Color3.fromRGB(45, 51, 69),
+  Text = Color3.fromRGB(238, 240, 248),
+  Sub = Color3.fromRGB(134, 142, 164),
+  Accent = Color3.fromRGB(139, 92, 246),
+  Accent2 = Color3.fromRGB(34, 211, 238),
+  Green = Color3.fromRGB(52, 211, 153),
+  Danger = Color3.fromRGB(248, 82, 105),
+  Gold = Color3.fromRGB(251, 191, 36)
+}
+local color3, color32, color33 = Color3.fromRGB(200, 50, 50), Color3.fromRGB(220, 160, 0), Color3.fromRGB(255, 230, 150)
+local Image = "rbxassetid://139326264265904"
+local function create(arg1, arg2, arg3)
+  local instance = Instance.new(arg1)
+  for key, value in arg2 or {} do
+    if key ~= "Parent" then
+      instance[key] = value
+    end
+  end
+  for key, value in arg3 or {} do
+    value.Parent = instance
+  end
+  if arg2 and arg2.Parent then
+    instance.Parent = arg2.Parent
+  end
+  return instance
+end
+local function fn5(arg1)
+  return create("UICorner", { CornerRadius = UDim.new(0, arg1 or 8) })
+end
+local function fn6(arg1, arg2, arg3)
+  return create("UIStroke", {
+    Color = arg1 or data.Stroke,
+    Thickness = arg2 or 1,
+    Transparency = arg3 or 0,
+    ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+  })
+end
+local function fn7(arg1, arg2, arg3, arg4)
+  return create("UIPadding", {
+    PaddingTop = UDim.new(0, arg1),
+    PaddingRight = UDim.new(0, arg2 or arg1),
+    PaddingBottom = UDim.new(0, arg3 or arg1),
+    PaddingLeft = UDim.new(0, arg4 or arg2 or arg1)
+  })
+end
+local function fn8(arg1, arg2, arg3)
+  return create("UIGradient", { Rotation = arg3 or 90, Color = ColorSequence.new(arg1, arg2) })
+end
+local function fn9(arg1, arg2, arg3)
+  local v8 = TweenService:Create(arg1, TweenInfo.new(arg2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), arg3)
+  v8:Play()
+  return v8
+end
+local function fn10(arg1, arg2)
+  for key, value in arg1:GetChildren() do
+    if not (value:IsA("UIListLayout") or value:IsA("UIGridLayout") or value:IsA("UIPadding") or arg2 and arg2[value]) then
+      value:Destroy()
+    end
+  end
+end
+local data2 = {
+  "",
+  "K",
+  "M",
+  "B",
+  "T",
+  "Qa",
+  "Qi",
+  "Sx",
+  "Sp",
+  "Oc",
+  "No",
+  "Dc",
+  "Ud",
+  "Dd",
+  "Td",
+  "Qad",
+  "Qid",
+  "Sxd",
+  "Spd",
+  "Ocd",
+  "Nod",
+  "Vg",
+  "Uvg",
+  "Dvg",
+  "Tvg"
+}
+local function fn11(arg1, arg2)
+  local arg22 = arg2 or 1
+  local num = math.floor(math.log(math.max(1, math.abs(arg1)), 1000))
+  local v8 = data2[num + 1] or "e+" .. num
+  local v9 = math.floor(arg1 * (10 ^ arg22 / 1000 ^ num)) / 10 ^ arg22
+  return (("%." .. arg22 .. "f"):format(v9)):gsub("%.?0+$", "") .. v8
+end
+local function fn12()
+  if gethui then
+    local v8, v9 = pcall(gethui)
+    if v8 and typeof(v9) == "Instance" then
+      return v9
+    end
+  end
+  local v8, v9 = pcall(function()
+    local v8 = clonerefFn(game:GetService("CoreGui"))
+    local folder = Instance.new("Folder")
+    folder.Parent = v8
+    folder:Destroy()
+    return v8
+  end)
+  if v8 and v9 then
+    return v9
+  end
+  return localPlayer:WaitForChild("PlayerGui")
+end
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = ((HttpService:GenerateGUID(false)):gsub("-", "")):sub(1, 14)
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 70
+pcall(function()
+  screenGui.AutoLocalize = false
+end)
+local data3 = { orig = setmetatable({}, { __mode = "k" }), wrote = setmetatable({}, { __mode = "k" }) }
+data3.DICT = {
+  ["DINHEIRO VISUAL"] = { "VISUAL MONEY", "DINERO VISUAL" },
+  ["SPAWNER VISUAL"] = { "VISUAL SPAWNER", "SPAWNER VISUAL" },
+  ["carregando dados do jogo..."] = { "loading game data...", "cargando datos del juego..." },
+  ["escolha um brainrot pra spawnar"] = { "pick a brainrot to spawn", "elige un brainrot para spawnear" },
+  ["Mutação"] = { "Mutation", "Mutación" },
+  ["uma mutação por brainrot"] = { "one mutation per brainrot", "una mutación por brainrot" },
+  ["pode marcar vários"] = { "you can pick several", "puedes marcar varios" },
+  ["Na base"] = { "In base", "En la base" },
+  ["brainrots visuais que estão na sua base"] = { "visual brainrots in your base", "brainrots visuales en tu base" },
+  ["automático pelo jogo ou forçado"] = { "automatic by the game or forced", "automático por el juego o forzado" },
+  ["simulação com parceiro fictício (@TradeBot)"] = {
+    "simulation with a fake partner (@TradeBot)",
+    "simulación con un compañero ficticio (@TradeBot)"
+  },
+  ["Configurações"] = { "Settings", "Configuración" },
+  ["tecla, salvamento e dinheiro offline"] = { "key, saving and offline money", "tecla, guardado y dinero offline" },
+  ["nenhum brainrot"] = { "no brainrot", "ningún brainrot" },
+  selecionado = { "selected", "seleccionado" },
+  ["sem foto"] = { "no photo", "sin foto" },
+  ["escolha um brainrot"] = { "pick a brainrot", "elige un brainrot" },
+  ["sem mutação"] = { "no mutation", "sin mutación" },
+  ["Pesquisar brainrot..."] = { "Search brainrot...", "Buscar brainrot..." },
+  ["carregando modelo..."] = { "loading model...", "cargando modelo..." },
+  Todas = { "All", "Todas" },
+  SPAWNAR = { "SPAWN", "SPAWNEAR" },
+  ["SPAWNANDO..."] = { "SPAWNING...", "SPAWNEANDO..." },
+  ["Nenhum brainrot visual na base."] = { "No visual brainrot in your base.", "Ningún brainrot visual en la base." },
+  ["Perto do pódio: Grab (E) • Sell (F). Pise no Claim pra coletar."] = {
+    "Near the podium: Grab (E) • Sell (F). Step on Claim to collect.",
+    "Cerca del podio: Grab (E) • Sell (F). Pisa el Claim para cobrar."
+  },
+  ["Excluir todos"] = { "Delete all", "Borrar todos" },
+  Excluir = { "Delete", "Borrar" },
+  Pegar = { "Grab", "Agarrar" },
+  ["Auto: vira 1 of 1 quando o jogo conta 1 existente dessa combinação. Sim/Não força."] = {
+    "Auto: becomes 1 of 1 when the game counts 1 existing of this combo. Yes/No forces it.",
+    "Auto: se vuelve 1 of 1 cuando el juego cuenta 1 existente de esa combinación. Sí/No lo fuerza."
+  },
+  ["forçado"] = { "forced", "forzado" },
+  ["sem contagem pública"] = { "no public count", "sin conteo público" },
+  Sim = { "Yes", "Sí" },
+  ["Não"] = { "No", "No" },
+  ["Nenhuma trade aberta."] = { "No trade open.", "Ningún trade abierto." },
+  ["Pedido de trade do @Roblox no canto da tela: aceite ou recuse por lá."] = {
+    "Trade request from @Roblox in the corner of the screen: accept or decline there.",
+    "Solicitud de trade de @Roblox en la esquina de la pantalla: acepta o rechaza ahí."
+  },
+  ["Pedido enviado pro @Roblox, esperando ele aceitar..."] = {
+    "Request sent to @Roblox, waiting for him to accept...",
+    "Solicitud enviada a @Roblox, esperando que acepte..."
+  },
+  ["Trade aberta. 1º passo: os dois dão READY. 2º passo: os dois dão ACCEPT."] = {
+    "Trade open. Step 1: both press READY. Step 2: both press ACCEPT.",
+    "Trade abierto. Paso 1: los dos dan READY. Paso 2: los dos dan ACCEPT."
+  },
+  ["Processing... a troca está sendo concluída."] = {
+    "Processing... the trade is being completed.",
+    "Processing... el intercambio se está completando."
+  },
+  ["Simulação local com a conta @Roblox (não é ninguém do servidor). Só você vê."] = {
+    "Local simulation with the @Roblox account (not anyone in the server). Only you see it.",
+    "Simulación local con la cuenta @Roblox (no es nadie del servidor). Solo tú la ves."
+  },
+  ["Receber invite"] = { "Receive invite", "Recibir invite" },
+  ["Enviar invite"] = { "Send invite", "Enviar invite" },
+  Cancelar = { "Cancel", "Cancelar" },
+  ["Ready dele"] = { "His Ready", "Su Ready" },
+  ["Accept dele"] = { "His Accept", "Su Accept" },
+  ["Auto: ele dá Ready 1-2s depois de você. Manual: só quando você apertar \"Ele: Ready\"."] = {
+    "Auto: he presses Ready 1-2s after you. Manual: only when you press \"Him: Ready\".",
+    "Auto: él da Ready 1-2s después de ti. Manual: solo cuando pulses \"Él: Ready\"."
+  },
+  ["Auto: ele aceita 1-2s depois de você. Manual: só quando você apertar \"Ele: Accept\"."] = {
+    "Auto: he accepts 1-2s after you. Manual: only when you press \"Him: Accept\".",
+    "Auto: él acepta 1-2s después de ti. Manual: solo cuando pulses \"Él: Accept\"."
+  },
+  ["Ele: Ready"] = { "Him: Ready", "Él: Ready" },
+  ["Ele: Accept"] = { "Him: Accept", "Él: Accept" },
+  ["Chat da trade"] = { "Trade chat", "Chat del trade" },
+  ["Desligado = igual ao jogo hoje. Frases = Add More, L Trade, Deal?... Livre = caixa de texto."] = {
+    "Off = same as the game today. Phrases = Add More, L Trade, Deal?... Free = text box.",
+    "Apagado = igual al juego hoy. Frases = Add More, L Trade, Deal?... Libre = caja de texto."
+  },
+  Desligado = { "Off", "Apagado" },
+  Frases = { "Phrases", "Frases" },
+  Livre = { "Free", "Libre" },
+  ["Mensagem do @Roblox no chat"] = { "@Roblox message in chat", "Mensaje de @Roblox en el chat" },
+  ["escreva como ele..."] = { "write as him...", "escribe como él..." },
+  Enviar = { "Send", "Enviar" },
+  ["Escolha um brainrot na aba Brainrots"] = { "Pick a brainrot in the Brainrots tab", "Elige un brainrot en la pestaña Brainrots" },
+  ["Colocar na oferta dele"] = { "Add to his offer", "Poner en su oferta" },
+  ["abra uma trade com o @Roblox primeiro"] = { "open a trade with @Roblox first", "abre un trade con @Roblox primero" },
+  ["escolha um brainrot primeiro"] = { "pick a brainrot first", "elige un brainrot primero" },
+  ["Nome do bot  @"] = { "Bot name  @", "Nombre del bot  @" },
+  ["Oferta do @Roblox"] = { "@Roblox's offer", "Oferta de @Roblox" },
+  Tirar = { "Remove", "Quitar" },
+  ["Slots da base dele"] = { "His base slots", "Slots de su base" },
+  ["Bot = você define. Jogador = a base de alguém do servidor. Última trade = a base de quem você trocou por último (trade real)."] = {
+    "Bot = you set it. Player = the base of someone in the server. Last trade = the base of who you last traded with (real trade).",
+    "Bot = tú lo defines. Jugador = la base de alguien del servidor. Último trade = la base de con quien hiciste el último trade (real)."
+  },
+  Jogador = { "Player", "Jugador" },
+  ["Última"] = { "Last", "Último" },
+  ["Slots da base"] = { "Base slots", "Slots de la base" },
+  ["Brainrots dele"] = { "His brainrots", "Sus brainrots" },
+  ["Nenhum jogador com base carregada (ou aperte Atualizar)."] = {
+    "No player with a loaded base (or press Refresh).",
+    "Ningún jugador con base cargada (o pulsa Actualizar)."
+  },
+  ["Atualizar lista"] = { "Refresh list", "Actualizar lista" },
+  ["Nenhuma trade real ainda: faça uma trade de verdade e a base da pessoa fica salva aqui. Até lá vale o modo Bot."] = {
+    "No real trade yet: do a real trade and that person's base gets saved here. Until then Bot mode is used.",
+    "Ningún trade real todavía: haz un trade de verdad y la base de esa persona queda guardada aquí. Hasta entonces vale el modo Bot."
+  },
+  ["Limpar histórico"] = { "Clear history", "Limpiar historial" },
+  ["Tecla pra mostrar / esconder"] = { "Key to show / hide", "Tecla para mostrar / ocultar" },
+  ["Esconde o hub inteiro e mostra de novo. No celular use o botão \"Brainrot Spawner\" nas Configurações do jogo."] = {
+    "Hides the whole hub and shows it again. On mobile use the \"Brainrot Spawner\" button in the game Settings.",
+    "Oculta todo el hub y lo muestra otra vez. En el celular usa el botón \"Brainrot Spawner\" en la Configuración del juego."
+  },
+  ["aperte..."] = { "press...", "pulsa..." },
+  ["Salvar automático"] = { "Auto save", "Guardado automático" },
+  ["Grava brainrots, posições, dinheiro pendente, Index e opções em BrainrotSpawner/config.json."] = {
+    "Saves brainrots, positions, pending money, Index and options to BrainrotSpawner/config.json.",
+    "Guarda brainrots, posiciones, dinero pendiente, Index y opciones en BrainrotSpawner/config.json."
+  },
+  ["Dinheiro offline"] = { "Offline money", "Dinero offline" },
+  ["Ao voltar, cada brainrot ganha o tempo que você ficou fora (até o limite do jogo) no Claim, como no original."] = {
+    "When you come back, each brainrot earns the time you were away (up to the game limit) on the Claim, like the original.",
+    "Al volver, cada brainrot gana el tiempo que estuviste fuera (hasta el límite del juego) en el Claim, como el original."
+  },
+  ["Salvar agora"] = { "Save now", "Guardar ahora" },
+  ["Grava o estado atual na hora."] = { "Saves the current state right now.", "Guarda el estado actual ahora mismo." },
+  Salvar = { "Save", "Guardar" },
+  ["executor sem writefile"] = { "executor without writefile", "executor sin writefile" },
+  ["Zerar dinheiro visual"] = { "Reset visual money", "Reiniciar dinero visual" },
+  ["Remove do HUD todo o dinheiro que veio dos brainrots visuais."] = {
+    "Removes from the HUD all the money that came from visual brainrots.",
+    "Quita del HUD todo el dinero que vino de los brainrots visuales."
+  },
+  Zerar = { "Reset", "Reiniciar" },
+  ["Apagar save"] = { "Delete save", "Borrar save" },
+  ["Apaga o config.json (os brainrots atuais continuam até sair do jogo)."] = {
+    "Deletes config.json (current brainrots stay until you leave the game).",
+    "Borra el config.json (los brainrots actuales siguen hasta salir del juego)."
+  },
+  Apagar = { "Delete", "Borrar" },
+  ["save apagado (salvar automático desligado)"] = { "save deleted (auto save off)", "save borrado (guardado automático apagado)" },
+  ["Hub aberto ao iniciar"] = { "Hub open on start", "Hub abierto al iniciar" },
+  ["Ligado: o hub já aparece aberto quando você executa o script. Desligado: começa escondido (abre pela tecla)."] = {
+    "On: the hub shows up open when you run the script. Off: it starts hidden (open it with the key).",
+    "Encendido: el hub aparece abierto al ejecutar el script. Apagado: empieza oculto (ábrelo con la tecla)."
+  },
+  ["Idioma do hub"] = { "Hub language", "Idioma del hub" },
+  ["Só os textos do hub. A trade e o resto do jogo o Roblox traduz sozinho."] = {
+    "Only the hub texts. The trade and the rest of the game are translated by Roblox.",
+    "Solo los textos del hub. El trade y el resto del juego los traduce Roblox."
+  },
+  ["base não encontrada"] = { "base not found", "base no encontrada" },
+  ["base cheia"] = { "base full", "base llena" },
+  ["pódio não encontrado"] = { "podium not found", "podio no encontrado" },
+  ["modelo não carregou"] = { "model didn't load", "el modelo no cargó" },
+  cancelado = { "canceled", "cancelado" },
+  ["erro (veja BrainrotSpawner/log.txt)"] = { "error (see BrainrotSpawner/log.txt)", "error (mira BrainrotSpawner/log.txt)" },
+  ["você já está numa trade real"] = { "you're already in a real trade", "ya estás en un trade real" },
+  ["tela de trade do jogo não encontrada"] = { "game trade screen not found", "pantalla de trade del juego no encontrada" },
+  ["prompt de trade do jogo não encontrado"] = { "game trade prompt not found", "aviso de trade del juego no encontrado" },
+  ["os dois estão prontos: a oferta está travada"] = { "both are ready: the offer is locked", "los dos están listos: la oferta está bloqueada" },
+  ["sem trade aberta"] = { "no trade open", "sin trade abierto" },
+  ["espere o contador de 5s"] = { "wait for the 5s timer", "espera el contador de 5s" },
+  ["ele já está pronto"] = { "he's already ready", "él ya está listo" },
+  ["os dois já estão prontos"] = { "both are already ready", "los dos ya están listos" },
+  ["a trade está vazia"] = { "the trade is empty", "el trade está vacío" },
+  ["os dois precisam dar Ready antes"] = { "both need to press Ready first", "los dos deben dar Ready antes" },
+  ["ele já aceitou"] = { "he already accepted", "él ya aceptó" },
+  ["abra uma trade real do histórico uma vez pra o script copiar a tela aberta"] = {
+    "open a real trade in the history once so the script can copy the opened view",
+    "abre un trade real del historial una vez para que el script copie la vista abierta"
+  }
+}
+data3.RULES = {
+  { "^Na base %((%d+)%)$", "In base (%1)", "En la base (%1)" },
+  { "^(.+)  • carregando$", "%1  • carrying", "%1  • cargando" },
+  { "^existem (%d+)$", "%1 exist", "existen %1" },
+  { "^Você: (.-)  •  Ele: (.-)$", "You: %1  •  Him: %2", "Tú: %1  •  Él: %2" },
+  {
+    "^Agora: ele tem (%d+) brainrot%(s%) numa base de (%d+) slots(.*)$",
+    "Now: he has %1 brainrot(s) in a %2-slot base%3",
+    "Ahora: tiene %1 brainrot(s) en una base de %2 slots%3"
+  },
+  { "^ %(base de @(.+)%)$", " (@%1's base)", " (base de @%1)" },
+  {
+    "^Última trade real: @(.+), base (%d+)/(%d+)$",
+    "Last real trade: @%1, base %2/%3",
+    "Último trade real: @%1, base %2/%3"
+  },
+  {
+    "^Histórico: (%d+) trade%(s%) simulada%(s%)%. Aparecem em Trade > History do jogo, na posição da data, e ficam salvas%.$",
+    "History: %1 simulated trade(s). They show in the game's Trade > History, in date order, and are saved.",
+    "Historial: %1 trade(s) simulado(s). Aparecen en Trade > History del juego, en el orden de la fecha, y quedan guardados."
+  },
+  {
+    "^(%d+) brainrots • (%d+) mutações • (%d+) traits$",
+    "%1 brainrots • %2 mutations • %3 traits",
+    "%1 brainrots • %2 mutaciones • %3 traits"
+  },
+  {
+    "^(%d+) brainrots restaurados • offline (.+)$",
+    "%1 brainrots restored • offline %2",
+    "%1 brainrots restaurados • offline %2"
+  },
+  { "^(.+) colocado no slot #(%d+)$", "%1 placed in slot #%2", "%1 colocado en el slot #%2" },
+  { "^não deu pra spawnar: (.+)$", "couldn't spawn: %1", "no se pudo spawnear: %1" },
+  {
+    "^arquivo: workspace/(%S+)  •  último save (.+)$",
+    "file: workspace/%1  •  last save %2",
+    "archivo: workspace/%1  •  último guardado %2"
+  },
+  { "^arquivo: workspace/(%S+)$", "file: workspace/%1", "archivo: workspace/%1" },
+  { "^salvo em (.+)$", "saved to %1", "guardado en %1" },
+  {
+    "^ele só tem (%d+) brainrot%(s%) na base %(mude os slots dele no hub%)$",
+    "he only has %1 brainrot(s) in his base (change his slots in the hub)",
+    "solo tiene %1 brainrot(s) en su base (cambia sus slots en el hub)"
+  },
+  {
+    "^sua base ficaria com (%d+)/(%d+): ofereça um brainrot seu ou libere um slot$",
+    "your base would be %1/%2: offer one of your brainrots or free a slot",
+    "tu base quedaría con %1/%2: ofrece un brainrot tuyo o libera un slot"
+  },
+  { "^sua base ficaria com (%d+)/(%d+)$", "your base would be %1/%2", "tu base quedaría con %1/%2" },
+  {
+    "^a base dele ficaria com (%d+)/(%d+)$",
+    "his base would be %1/%2",
+    "su base quedaría con %1/%2"
+  },
+  {
+    "^espere um pouco antes de mexer na oferta %((.+)%)$",
+    "wait a bit before changing the offer (%1)",
+    "espera un poco antes de cambiar la oferta (%1)"
+  }
+}
+function data3.detect()
+  local v8, v9 = pcall(function()
+    return (game:GetService("LocalizationService")).RobloxLocaleId
+  end)
+  v9 = v8 and (type(v9) == "string" and string.lower(v9)) or ""
+  if string.sub(v9, 1, 2) == "pt" then
+    return "pt"
+  end
+  if string.sub(v9, 1, 2) == "es" then
+    return "es"
+  end
+  return "en"
+end
+data3.lang = (config.lang == "pt" or config.lang == "en" or config.lang == "es") and config.lang or data3.detect()
+function data3.one(arg1)
+  local v8 = if data3.lang == "en" then 1 else 2
+  local v9 = data3.DICT[arg1]
+  if v9 then
+    return v9[v8]
+  end
+  for key, value in data3.RULES do
+    local tbl2 = table.pack(string.match(arg1, value[1]))
+    if tbl2[1] ~= nil then
+      local v10 = value[v8 + 1]
+      return string.gsub(v10, "%%(%d)", function(arg12)
+        local v11 = tbl2[tonumber(arg12)]
+        return v11 and data3.one(v11) or ""
+      end)
+    end
+  end
+  return arg1
+end
+function data3.trRaw(arg1)
+  if data3.lang == "pt" or type(arg1) ~= "string" or arg1 == "" then
+    return arg1
+  end
+  if not string.find(arg1, "\n", 1, true) then
+    return data3.one(arg1)
+  end
+  local tbl2 = {}
+  for item in string.gmatch(arg1 .. "\n", "(.-)\n") do
+    table.insert(tbl2, data3.one(item))
+  end
+  return table.concat(tbl2, "\n")
+end
+function data3.tr(arg1)
+  local v8 = data3.trRaw(arg1)
+  local simBotName = config.simBotName
+  if type(v8) == "string" and (simBotName and (simBotName ~= "Roblox" and string.find(v8, "@Roblox", 1, true))) then
+    v8 = string.gsub(v8, "@Roblox", function()
+      return "@" .. simBotName
+    end)
+  end
+  return v8
+end
+function data3.apply(arg1, arg2)
+  local v8 = arg1[arg2]
+  local v9 = data3.wrote[arg1]
+  if v9 and v9[arg2] == v8 then
+    return
+  end
+  data3.orig[arg1] = data3.orig[arg1] or {}
+  data3.orig[arg1][arg2] = v8
+  local v10 = data3.tr(v8)
+  data3.wrote[arg1] = v9 or {}
+  data3.wrote[arg1][arg2] = v10
+  if v10 ~= v8 then
+    arg1[arg2] = v10
+  end
+end
+function data3.watch(arg1)
+  if not (arg1:IsA("TextLabel") or arg1:IsA("TextButton") or arg1:IsA("TextBox")) then
+    return
+  end
+  local v8 = if arg1:IsA("TextBox") then { "PlaceholderText" } else { "Text" }
+  for key, value in v8 do
+    data3.apply(arg1, value)
+    fn4((arg1:GetPropertyChangedSignal(value)):Connect(function()
+      data3.apply(arg1, value)
+    end))
+  end
+end
+function data3.set(arg1)
+  data3.lang = arg1
+  for key, value in data3.orig do
+    if key.Parent then
+      for key2, value2 in value do
+        local v8 = data3.tr(value2)
+        data3.wrote[key][key2] = v8
+        key[key2] = v8
+      end
+    end
+  end
+end
+fn4(screenGui.DescendantAdded:Connect(function(arg1)
+  if arg1:IsA("GuiBase2d") then
+    pcall(function()
+      arg1.AutoLocalize = false
+    end)
+  end
+  pcall(data3.watch, arg1)
+end))
+local synFn = syn and syn.protect_gui or protect_gui
+if synFn then
+  pcall(synFn, screenGui)
+end
+screenGui.Parent = fn12()
+local n, n2 = 900, 560
+local n3 = 196
+local frame = create("Frame", {
+  Name = "W",
+  Size = UDim2.fromOffset(n, n2),
+  AnchorPoint = Vector2.new(.5, .5),
+  Position = UDim2.fromScale(.5, .5),
+  BackgroundColor3 = data.Bg,
+  BorderSizePixel = 0,
+  ClipsDescendants = true,
+  Parent = screenGui
+}, { fn5(22), fn6(data.Stroke, 1), fn8(Color3.fromRGB(17, 18, 26), Color3.fromRGB(10, 11, 15)) })
+local uIScale = create("UIScale", { Scale = 1, Parent = frame })
+local frame2 = create("Frame", {
+  Size = UDim2.new(0, n3 - 10, 1, -20),
+  Position = UDim2.fromOffset(10, 10),
+  BackgroundColor3 = data.Side,
+  BorderSizePixel = 0,
+  Parent = frame
+}, { fn5(18), fn6(data.Stroke, 1), fn8(Color3.fromRGB(22, 23, 34), Color3.fromRGB(14, 15, 21)) })
+local frame3 = create("Frame", {
+  Size = UDim2.fromOffset(40, 40),
+  Position = UDim2.fromOffset(16, 16),
+  BackgroundColor3 = data.Panel2,
+  Parent = frame2
+}, {
+  fn5(12),
+  fn6(data.Accent, 1, .35),
+  fn8(Color3.fromRGB(70, 45, 140), Color3.fromRGB(25, 90, 110), 45)
+})
+local imageLabel = create("ImageLabel", {
+  Size = UDim2.fromOffset(28, 28),
+  Position = UDim2.fromOffset(6, 6),
+  BackgroundTransparency = 1,
+  Image = Image,
+  ScaleType = Enum.ScaleType.Fit,
+  Parent = frame3
+})
+create("TextLabel", {
+  Size = UDim2.fromOffset(130, 20),
+  Position = UDim2.fromOffset(64, 17),
+  BackgroundTransparency = 1,
+  Text = "Brainrot",
+  Font = Enum.Font.GothamBlack,
+  TextSize = 17,
+  TextColor3 = data.Text,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame2
+})
+create("TextLabel", {
+  Size = UDim2.fromOffset(130, 16),
+  Position = UDim2.fromOffset(64, 36),
+  BackgroundTransparency = 1,
+  Text = "SPAWNER VISUAL",
+  Font = Enum.Font.GothamBold,
+  TextSize = 10,
+  TextColor3 = data.Accent2,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame2
+})
+local frame4 = create("Frame", {
+  Size = UDim2.new(1, -24, 0, 294),
+  Position = UDim2.fromOffset(12, 76),
+  BackgroundTransparency = 1,
+  Parent = frame2
+}, { create("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }) })
+local frame5 = create("Frame", {
+  Size = UDim2.new(1, -24, 0, 62),
+  Position = UDim2.new(0, 12, 1, -100),
+  BackgroundColor3 = data.Panel,
+  Parent = frame2
+}, { fn5(12), fn6(data.Stroke, 1) })
+create("TextLabel", {
+  Size = UDim2.new(1, -20, 0, 14),
+  Position = UDim2.fromOffset(10, 9),
+  BackgroundTransparency = 1,
+  Text = "DINHEIRO VISUAL",
+  Font = Enum.Font.GothamBold,
+  TextSize = 10,
+  TextColor3 = data.Sub,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame5
+})
+local textLabel = create("TextLabel", {
+  Size = UDim2.new(1, -20, 0, 24),
+  Position = UDim2.fromOffset(10, 26),
+  BackgroundTransparency = 1,
+  Text = "+$0",
+  Font = Enum.Font.GothamBlack,
+  TextSize = 19,
+  TextColor3 = data.Green,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame5
+})
+local textLabel2 = create("TextLabel", {
+  Size = UDim2.new(1, -24, 0, 16),
+  Position = UDim2.new(0, 12, 1, -28),
+  BackgroundTransparency = 1,
+  Text = "v" .. version,
+  Font = Enum.Font.Gotham,
+  TextSize = 10,
+  TextColor3 = data.Sub,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame2
+})
+local frame6 = create("Frame", {
+  Size = UDim2.new(1, -n3, 0, 62),
+  Position = UDim2.fromOffset(n3, 0),
+  BackgroundTransparency = 1,
+  Parent = frame
+})
+local textLabel3 = create("TextLabel", {
+  Size = UDim2.new(1, -140, 0, 24),
+  Position = UDim2.fromOffset(20, 13),
+  BackgroundTransparency = 1,
+  Text = "Brainrots",
+  Font = Enum.Font.GothamBlack,
+  TextSize = 20,
+  TextColor3 = data.Text,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame6
+})
+local textLabel4 = create("TextLabel", {
+  Size = UDim2.new(1, -140, 0, 16),
+  Position = UDim2.fromOffset(20, 37),
+  BackgroundTransparency = 1,
+  Text = "carregando dados do jogo...",
+  Font = Enum.Font.Gotham,
+  TextSize = 12,
+  TextColor3 = data.Sub,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame6
+})
+local function fn13(arg1, arg2)
+  local textButton = create("TextButton", {
+    Size = UDim2.fromOffset(32, 32),
+    Position = UDim2.new(1, arg1, 0, 15),
+    BackgroundColor3 = data.Panel2,
+    AutoButtonColor = false,
+    Text = "",
+    Parent = frame6
+  }, { fn5(9), fn6(data.Stroke, 1) })
+  fn4(textButton.MouseEnter:Connect(function()
+    fn9(textButton, .15, { BackgroundColor3 = arg2 and Color3.fromRGB(90, 30, 42) or data.Panel3 })
+  end))
+  fn4(textButton.MouseLeave:Connect(function()
+    fn9(textButton, .15, { BackgroundColor3 = data.Panel2 })
+  end))
+  return textButton
+end
+local Parent = fn13(-48, true)
+for key, value in { 45, -45 } do
+  create("Frame", {
+    Size = UDim2.fromOffset(15, 2),
+    AnchorPoint = Vector2.new(.5, .5),
+    Position = UDim2.fromScale(.5, .5),
+    Rotation = value,
+    BackgroundColor3 = data.Danger,
+    BorderSizePixel = 0,
+    Parent = Parent
+  }, { fn5(1) })
+end
+local Parent2 = fn13(-88)
+create("Frame", {
+  Size = UDim2.fromOffset(13, 2),
+  AnchorPoint = Vector2.new(.5, .5),
+  Position = UDim2.fromScale(.5, .5),
+  BackgroundColor3 = data.Sub,
+  BorderSizePixel = 0,
+  Parent = Parent2
+}, { fn5(1) })
+create("Frame", {
+  Size = UDim2.new(1, -n3 - 40, 0, 1),
+  Position = UDim2.fromOffset(n3 + 20, 62),
+  BackgroundColor3 = data.Stroke,
+  BorderSizePixel = 0,
+  Parent = frame
+})
+local function fn14(arg1, arg2)
+  local v8, v9, v10
+  fn4(arg1.InputBegan:Connect(function(arg12)
+    if arg12.UserInputType == Enum.UserInputType.MouseButton1 or arg12.UserInputType == Enum.UserInputType.Touch then
+      v8, v9, v10 = true, arg12.Position, arg2.Position
+      local v11
+      v11 = arg12.Changed:Connect(function()
+        if arg12.UserInputState == Enum.UserInputState.End then
+          v8 = false
+          v11:Disconnect()
+        end
+      end)
+    end
+  end))
+  fn4(UserInputService.InputChanged:Connect(function(arg12)
+    if v8 and (arg12.UserInputType == Enum.UserInputType.MouseMovement or arg12.UserInputType == Enum.UserInputType.Touch) then
+      local v11 = arg12.Position - v9
+      arg2.Position = UDim2.new(v10.X.Scale, v10.X.Offset + v11.X, v10.Y.Scale, v10.Y.Offset + v11.Y)
+    end
+  end))
+end
+fn14(frame6, frame)
+fn14(frame3, frame)
+local v8, n4 = n3 + 16, 76
+local v9 = n - v8 - 16
+local v10 = n2 - n4 - 16
+local n5 = 228
+local v11 = v9 - n5 - 12
+local tbl2, tbl3 = {}, {}
+local data4 = {
+  { id = "brainrots", title = "Brainrots", sub = "escolha um brainrot pra spawnar", card = true },
+  { id = "mutation", title = "Mutação", sub = "uma mutação por brainrot", card = true },
+  { id = "traits", title = "Traits", sub = "pode marcar vários", card = true },
+  { id = "base", title = "Na base", sub = "brainrots visuais que estão na sua base", card = false },
+  { id = "one", title = "1 of 1", sub = "automático pelo jogo ou forçado", card = false },
+  {
+    id = "trade",
+    title = "Trade",
+    sub = "simulação com parceiro fictício (@TradeBot)",
+    card = true
+  },
+  {
+    id = "config",
+    title = "Configurações",
+    sub = "tecla, salvamento e dinheiro offline",
+    card = false
+  }
+}
+local function fn15(arg1)
+  local arg12 = arg1 and v11 or v9
+  return create("Frame", {
+    Size = UDim2.fromOffset(arg12, v10),
+    Position = UDim2.fromOffset(v8, n4),
+    BackgroundTransparency = 1,
+    Visible = false,
+    Parent = frame
+  })
+end
+local function fn16(arg1, arg2, arg3, arg4)
+  local scrollingFrame = create("ScrollingFrame", {
+    Size = UDim2.new(1, 0, 0, arg3 or v10 - arg2),
+    Position = UDim2.fromOffset(0, arg2),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 4,
+    ScrollBarImageColor3 = data.Stroke,
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    CanvasSize = UDim2.new(),
+    Parent = arg1
+  })
+  if arg4 then
+    arg4.Parent = scrollingFrame
+  end
+  return scrollingFrame
+end
+local frame7 = create("Frame", {
+  Size = UDim2.fromOffset(n5, v10),
+  Position = UDim2.fromOffset(v8 + v11 + 12, n4),
+  BackgroundColor3 = data.Panel,
+  Parent = frame
+}, { fn5(14), fn6(data.Stroke, 1) })
+local frame8 = create("Frame", {
+  Size = UDim2.new(1, -20, 0, 196),
+  Position = UDim2.fromOffset(10, 10),
+  BackgroundColor3 = data.Panel2,
+  ClipsDescendants = true,
+  Parent = frame7
+}, { fn5(12), fn6(data.Stroke, 1), fn8(Color3.fromRGB(46, 40, 78), Color3.fromRGB(20, 24, 34)) })
+local viewportFrame = create("ViewportFrame", {
+  Size = UDim2.fromScale(1, 1),
+  BackgroundTransparency = 1,
+  Ambient = Color3.fromRGB(200, 200, 200),
+  LightColor = Color3.new(1, 1, 1),
+  LightDirection = Vector3.new(-1, -1, -1),
+  Parent = frame8
+}, { fn5(12) })
+local textLabel5 = create("TextLabel", {
+  Size = UDim2.fromScale(1, 1),
+  BackgroundTransparency = 1,
+  Text = "nenhum brainrot\nselecionado",
+  Font = Enum.Font.GothamMedium,
+  TextSize = 13,
+  TextColor3 = data.Sub,
+  Parent = frame8
+})
+local textLabel6 = create("TextLabel", {
+  Size = UDim2.fromOffset(58, 20),
+  Position = UDim2.new(1, -66, 0, 8),
+  BackgroundColor3 = color3,
+  Text = "1 OF 1",
+  Visible = false,
+  Font = Enum.Font.GothamBlack,
+  TextSize = 11,
+  TextColor3 = color33,
+  Parent = frame8
+}, { fn5(6), fn6(color32, 1) })
+local textLabel7 = create("TextLabel", {
+  Size = UDim2.new(1, -20, 0, 22),
+  Position = UDim2.fromOffset(12, 214),
+  BackgroundTransparency = 1,
+  Text = "—",
+  Font = Enum.Font.GothamBlack,
+  TextSize = 16,
+  TextColor3 = data.Text,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  TextTruncate = Enum.TextTruncate.AtEnd,
+  Parent = frame7
+})
+local textLabel8 = create("TextLabel", {
+  Size = UDim2.new(1, -20, 0, 16),
+  Position = UDim2.fromOffset(12, 236),
+  BackgroundTransparency = 1,
+  Text = "",
+  Font = Enum.Font.GothamBlack,
+  TextSize = 12,
+  TextColor3 = data.Sub,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame7
+})
+local textLabel9 = create("TextLabel", {
+  Size = UDim2.new(1, -20, 0, 26),
+  Position = UDim2.fromOffset(12, 256),
+  BackgroundTransparency = 1,
+  Text = "",
+  Font = Enum.Font.GothamBlack,
+  TextSize = 22,
+  TextColor3 = data.Accent2,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = frame7
+})
+local frame9 = create("Frame", {
+  Size = UDim2.new(1, -24, 0, 26),
+  Position = UDim2.fromOffset(12, 290),
+  BackgroundTransparency = 1,
+  Parent = frame7
+}, {
+  create("UIListLayout", {
+    FillDirection = Enum.FillDirection.Horizontal,
+    Padding = UDim.new(0, 6),
+    VerticalAlignment = Enum.VerticalAlignment.Center,
+    SortOrder = Enum.SortOrder.LayoutOrder
+  })
+})
+local frame10 = create("Frame", {
+  Size = UDim2.new(1, -24, 0, 76),
+  Position = UDim2.fromOffset(12, 322),
+  BackgroundTransparency = 1,
+  Parent = frame7
+}, {
+  create("UIGridLayout", {
+    CellSize = UDim2.fromOffset(24, 24),
+    CellPadding = UDim2.fromOffset(5, 5),
+    SortOrder = Enum.SortOrder.LayoutOrder
+  })
+})
+local textButton = create("TextButton", {
+  Size = UDim2.new(1, -20, 0, 46),
+  Position = UDim2.new(0, 10, 1, -56),
+  BackgroundColor3 = data.Green,
+  AutoButtonColor = false,
+  Text = "SPAWNAR",
+  Font = Enum.Font.GothamBlack,
+  TextSize = 16,
+  TextColor3 = Color3.fromRGB(6, 32, 24),
+  Parent = frame7
+}, { fn5(12), fn8(Color3.fromRGB(72, 230, 170), Color3.fromRGB(28, 180, 130), 0) })
+local textLabel10 = create("TextLabel", {
+  Size = UDim2.fromOffset(380, 36),
+  AnchorPoint = Vector2.new(.5, 0),
+  Position = UDim2.new(.5, n3 / 2, 1, 12),
+  BackgroundColor3 = data.Panel2,
+  Text = "",
+  Font = Enum.Font.GothamBold,
+  TextSize = 13,
+  TextColor3 = data.Text,
+  Parent = frame,
+  ZIndex = 30
+}, { fn5(10), fn6(data.Stroke, 1) })
+local n6 = 0
+local function fn17(arg1, arg2)
+  textLabel10.Text = arg1
+  textLabel10.TextColor3 = arg2 or data.Text
+  n6 = os.clock() + 2.6
+  fn9(textLabel10, .25, { Position = UDim2.new(.5, n3 / 2, 1, -52) })
+end
+local imageButton = create("ImageButton", {
+  Size = UDim2.fromOffset(46, 46),
+  Position = UDim2.new(0, 18, .5, -23),
+  BackgroundColor3 = data.Panel2,
+  Visible = false,
+  AutoButtonColor = false,
+  Image = Image,
+  ScaleType = Enum.ScaleType.Fit,
+  Parent = screenGui
+}, { fn5(23), fn6(data.Accent, 2), fn7(8) })
+fn14(imageButton, imageButton)
+local v12
+local tbl4, tbl5, tbl6 = {}, {}, {}
+local data5 = { index = nil, mutation = nil, traits = {} }
+local tbl7, tbl8, tbl9 = {}, {}, {}
+local v13 = nil
+local token = 0
+local v14 = nil
+local n7 = 1
+local data6 = {
+  Rainbow = {
+    Color3.fromRGB(255, 0, 0),
+    Color3.fromRGB(255, 200, 0),
+    Color3.fromRGB(0, 255, 80),
+    Color3.fromRGB(0, 170, 255),
+    Color3.fromRGB(200, 0, 255)
+  },
+  Zebra = {
+    Color3.fromRGB(30, 30, 30),
+    Color3.fromRGB(255, 255, 255),
+    Color3.fromRGB(30, 30, 30),
+    Color3.fromRGB(255, 255, 255)
+  },
+  OG = { Color3.fromRGB(255, 220, 120), Color3.fromRGB(255, 255, 255), Color3.fromRGB(255, 180, 60) },
+  YellowRed = { Color3.fromRGB(255, 230, 0), Color3.fromRGB(255, 60, 0) },
+  GreenRed = { Color3.fromRGB(40, 220, 60), Color3.fromRGB(255, 50, 50) }
+}
+local function fn18(arg1)
+  local tbl10 = {}
+  for key, value in arg1 do
+    table.insert(tbl10, ColorSequenceKeypoint.new((key - 1) / math.max(#arg1 - 1, 1), value))
+  end
+  return ColorSequence.new(tbl10)
+end
+local function fn19(arg1, arg2)
+  local v15 = v12 and v12.rarities[arg2]
+  local uIGradient = arg1:FindFirstChildOfClass("UIGradient")
+  if uIGradient then
+    uIGradient:Destroy()
+  end
+  if v15 and (v15.preset and data6[v15.preset]) then
+    arg1.TextColor3 = Color3.new(1, 1, 1)
+    create("UIGradient", { Color = fn18(data6[v15.preset]), Parent = arg1 })
+  else
+    arg1.TextColor3 = v15 and v15.color or data.Text
+    if arg2 == "Secret" then
+      arg1.TextColor3 = Color3.fromRGB(200, 200, 200)
+    end
+  end
+end
+local function fn20(arg1, arg2, arg3)
+  if not arg1 then
+    return 0
+  end
+  local n8 = 1
+  if arg2 and tbl5[arg2] then
+    n8 += tbl5[arg2].modifier
+  end
+  local flag = false
+  for key, value in arg3 do
+    local v15 = tbl6[value]
+    if v15 then
+      if value ~= "Sleepy" then
+        n8 += v15.modifier
+      else
+        flag = true
+      end
+    end
+  end
+  local v15 = arg1.gen * n8
+  if flag then
+    v15 *= .5
+  end
+  return math.round(v15)
+end
+local function fn21(arg1, arg2, arg3, arg4)
+  return create("ImageLabel", {
+    Size = UDim2.fromOffset(arg2, arg2),
+    BackgroundTransparency = 1,
+    Image = arg1 or "",
+    ScaleType = Enum.ScaleType.Fit,
+    LayoutOrder = arg4 or 0,
+    Parent = arg3
+  })
+end
+local function fn22(arg1, arg2, arg3, arg4, arg5, arg6)
+  return create("TextLabel", {
+    Size = UDim2.fromOffset(0, 20),
+    AutomaticSize = Enum.AutomaticSize.X,
+    BackgroundColor3 = arg3,
+    Text = arg2,
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    TextColor3 = arg4,
+    LayoutOrder = arg5 or 0,
+    Parent = arg1
+  }, { fn5(6), fn7(0, 8), arg6 and fn6(arg6, 1) or nil })
+end
+local function fn23(arg1)
+  n7 = arg1
+  local v15 = data4[arg1]
+  for key, value in tbl2 do
+    value.Visible = key == arg1
+  end
+  frame7.Visible = v15.card
+  if v15.onShow then
+    pcall(v15.onShow)
+  end
+  textLabel3.Text = v15.title
+  textLabel4.Text = v15.sub
+  for key, value in tbl3 do
+    local flag = key == arg1
+    fn9(value.btn, .18, {
+      BackgroundColor3 = flag and Color3.fromRGB(42, 34, 74) or data.Side,
+      BackgroundTransparency = flag and 0 or 1
+    })
+    fn9(value.label, .18, { TextColor3 = flag and data.Text or data.Sub })
+    value.bar.Visible = flag
+  end
+end
+for key, value in data4 do
+  local textButton2 = create("TextButton", {
+    Size = UDim2.new(1, 0, 0, 38),
+    BackgroundColor3 = data.Side,
+    BackgroundTransparency = 1,
+    AutoButtonColor = false,
+    Text = "",
+    LayoutOrder = key,
+    Parent = frame4
+  }, { fn5(10) })
+  local frame11 = create("Frame", {
+    Size = UDim2.fromOffset(3, 18),
+    Position = UDim2.fromOffset(0, 10),
+    BackgroundColor3 = data.Accent,
+    Visible = false,
+    Parent = textButton2
+  }, { fn5(2) })
+  local textLabel11 = create("TextLabel", {
+    Size = UDim2.new(1, -28, 1, 0),
+    Position = UDim2.fromOffset(18, 0),
+    BackgroundTransparency = 1,
+    Text = value.title,
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = textButton2
+  })
+  tbl3[key] = { btn = textButton2, label = textLabel11, bar = frame11 }
+  tbl2[key] = fn15(value.card)
+  fn4(textButton2.MouseButton1Click:Connect(function()
+    fn23(key)
+  end))
+  fn4(textButton2.MouseEnter:Connect(function()
+    if n7 ~= key then
+      fn9(textButton2, .12, { BackgroundTransparency = .5, BackgroundColor3 = data.Panel2 })
+    end
+  end))
+  fn4(textButton2.MouseLeave:Connect(function()
+    if n7 ~= key then
+      fn9(textButton2, .12, { BackgroundTransparency = 1 })
+    end
+  end))
+end
+local Parent3 = tbl2[1]
+local textBox = create("TextBox", {
+  Size = UDim2.new(1, 0, 0, 38),
+  BackgroundColor3 = data.Panel2,
+  PlaceholderText = "Pesquisar brainrot...",
+  PlaceholderColor3 = data.Sub,
+  Text = "",
+  ClearTextOnFocus = false,
+  Font = Enum.Font.GothamMedium,
+  TextSize = 14,
+  TextColor3 = data.Text,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = Parent3
+}, { fn5(10), fn6(data.Stroke, 1), fn7(0, 14) })
+local scrollingFrame = create("ScrollingFrame", {
+  Size = UDim2.new(1, 0, 0, 28),
+  Position = UDim2.fromOffset(0, 46),
+  BackgroundTransparency = 1,
+  BorderSizePixel = 0,
+  ScrollBarThickness = 0,
+  ScrollingDirection = Enum.ScrollingDirection.X,
+  AutomaticCanvasSize = Enum.AutomaticSize.X,
+  CanvasSize = UDim2.new(),
+  Parent = Parent3
+}, {
+  create("UIListLayout", {
+    FillDirection = Enum.FillDirection.Horizontal,
+    Padding = UDim.new(0, 6),
+    SortOrder = Enum.SortOrder.LayoutOrder
+  })
+})
+local textLabel11 = create("TextLabel", {
+  Size = UDim2.new(1, 0, 0, 16),
+  Position = UDim2.fromOffset(2, 80),
+  BackgroundTransparency = 1,
+  Text = "",
+  Font = Enum.Font.Gotham,
+  TextSize = 11,
+  TextColor3 = data.Sub,
+  TextXAlignment = Enum.TextXAlignment.Left,
+  Parent = Parent3
+})
+local Parent4 = fn16(Parent3, 100, nil, create("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }))
+fn7(2, 8, 6, 2).Parent = Parent4
+local v15 = fn16(tbl2[2], 0, nil, create("UIGridLayout", {
+  CellSize = UDim2.fromOffset(98, 92),
+  CellPadding = UDim2.fromOffset(9, 9),
+  SortOrder = Enum.SortOrder.LayoutOrder
+}))
+fn7(2, 4, 8, 2).Parent = v15
+local v16 = fn16(tbl2[3], 0, nil, create("UIGridLayout", {
+  CellSize = UDim2.fromOffset(98, 92),
+  CellPadding = UDim2.fromOffset(9, 9),
+  SortOrder = Enum.SortOrder.LayoutOrder
+}))
+fn7(2, 4, 8, 2).Parent = v16
+local Parent5 = fn16(tbl2[4], 0, nil, create("UIListLayout", { Padding = UDim.new(0, 7), SortOrder = Enum.SortOrder.LayoutOrder }))
+fn7(2, 8, 8, 2).Parent = Parent5
+local Parent6 = fn16(tbl2[5], 0, nil, create("UIListLayout", { Padding = UDim.new(0, 7), SortOrder = Enum.SortOrder.LayoutOrder }))
+fn7(2, 8, 8, 2).Parent = Parent6
+local Parent7 = fn16(tbl2[6], 0, nil, create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }))
+fn7(2, 8, 8, 2).Parent = Parent7
+local Parent8 = fn16(tbl2[7], 0, nil, create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }))
+fn7(2, 8, 8, 2).Parent = Parent8
+local tbl10 = {}
+local data7 = { base = nil, focus = nil, yaw = 0 }
+local function fn24()
+  for key, value in tbl10 do
+    pcall(function()
+      value:Stop(0)
+      value:Destroy()
+    end)
+  end
+  table.clear(tbl10)
+  if v14 then
+    pcall(function()
+      v14:Destroy()
+    end)
+  end
+  v14 = nil
+end
+local function fn25(arg1, arg2)
+  local v17 = arg1:LoadAnimation(arg2)
+  v17.Looped = true
+  v17:Play(0)
+  table.insert(tbl10, v17)
+end
+local function fn26(arg1)
+  pcall(function()
+    local animations = ReplicatedStorage:FindFirstChild("Animations")
+    animations = animations and animations:FindFirstChild("Animals")
+    local v17 = animations and animations:FindFirstChild(arg1.index)
+    local v18 = v17 and v17:FindFirstChild("Idle")
+    if not v18 then
+      return
+    end
+    local model = arg1.model
+    local Parent9 = model:FindFirstChild("AnimationController") or model:FindFirstChildWhichIsA("Humanoid", true)
+    if not Parent9 then
+      Parent9 = create("AnimationController", { Parent = model })
+    end
+    local v19 = Parent9:FindFirstChildOfClass("Animator") or create("Animator", { Parent = Parent9 })
+    fn25(v19, v18)
+  end)
+  for key, value in arg1.model:GetDescendants() do
+    local v17 = value:IsA("Animator") and value:GetAttribute("Animation")
+    if type(v17) == "string" then
+      pcall(function()
+        local ReplicatedStorage2 = ReplicatedStorage
+        for item in string.gmatch(v17, "[^%.]+") do
+          ReplicatedStorage2 = ReplicatedStorage2 and ReplicatedStorage2:FindFirstChild(item)
+        end
+        if ReplicatedStorage2 and ReplicatedStorage2:IsA("Animation") then
+          fn25(value, ReplicatedStorage2)
+        end
+      end)
+    end
+  end
+end
+do
+  local flag, v17 = false, nil
+  fn4(viewportFrame.InputBegan:Connect(function(arg1)
+    if arg1.UserInputType == Enum.UserInputType.MouseButton1 or arg1.UserInputType == Enum.UserInputType.Touch then
+      flag, v17 = true, arg1.Position
+    end
+  end))
+  fn4(UserInputService.InputEnded:Connect(function(arg1)
+    if arg1.UserInputType == Enum.UserInputType.MouseButton1 or arg1.UserInputType == Enum.UserInputType.Touch then
+      flag = false
+    end
+  end))
+  fn4(UserInputService.InputChanged:Connect(function(arg1)
+    if flag and ((arg1.UserInputType == Enum.UserInputType.MouseMovement or arg1.UserInputType == Enum.UserInputType.Touch) and data7.base) then
+      local v18 = arg1.Position - v17
+      v17 = arg1.Position
+      data7.yaw += v18.X * .012
+      local currentCamera = viewportFrame.CurrentCamera
+      if currentCamera then
+        local focus = data7.focus
+        local v19 = data7.base.Position - focus
+        currentCamera.CFrame = CFrame.new(focus + (CFrame.Angles(0, -data7.yaw, 0)):VectorToWorldSpace(v19), focus)
+      end
+    end
+  end))
+end
+local function fn27()
+  local preview = bus.preview
+  if not preview or preview.token ~= token then
+    return
+  end
+  fn24()
+  if not data5.index then
+    return
+  end
+  if preview.err or not preview.world then
+    textLabel5.Text = preview.err or "sem foto"
+    textLabel5.Visible = true
+    return
+  end
+  textLabel5.Visible = false
+  local v17 = viewportFrame:FindFirstChildOfClass("Camera") or create("Camera", { FieldOfView = 50, Parent = viewportFrame })
+  v17.FieldOfView = 50
+  viewportFrame.CurrentCamera = v17
+  v17.CFrame = preview.cam
+  data7.base, data7.focus, data7.yaw = preview.cam, preview.focus, 0
+  preview.world.Parent = viewportFrame
+  v14 = preview.world
+  fn26(preview)
+end
+local function fn28()
+  fn10(frame9)
+  fn10(frame10)
+  local v17 = data5.index and tbl4[data5.index]
+  if not v17 then
+    textLabel7.Text = "—"
+    textLabel8.Text = "escolha um brainrot"
+    textLabel8.TextColor3 = data.Sub
+    local uIGradient = textLabel8:FindFirstChildOfClass("UIGradient")
+    if uIGradient then
+      uIGradient:Destroy()
+    end
+    textLabel9.Text = ""
+    textLabel5.Text = "nenhum brainrot\nselecionado"
+    textLabel5.Visible = true
+    textLabel6.Visible = false
+    fn9(textButton, .2, { BackgroundTransparency = .65, TextTransparency = .5 })
+    return
+  end
+  local v18 = data5.mutation and tbl5[data5.mutation]
+  textLabel7.Text = v17.display
+  textLabel8.Text = v17.rarity
+  fn19(textLabel8, v17.rarity)
+  textLabel9.Text = "$" .. fn11(fn20(v17, data5.mutation, data5.traits)) .. "/s"
+  fn21(v18 and v18.icon or Image, 22, frame9, 1)
+  create("TextLabel", {
+    Size = UDim2.fromOffset(0, 22),
+    AutomaticSize = Enum.AutomaticSize.X,
+    BackgroundTransparency = 1,
+    Text = v18 and v18.display or "Normal",
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextColor3 = v18 and v18.color or data.Text,
+    LayoutOrder = 2,
+    Parent = frame9
+  })
+  for key, value in data5.traits do
+    local v19 = tbl6[value]
+    if v19 then
+      fn21(v19.icon, 24, frame10, key)
+    end
+  end
+  fn9(textButton, .2, { BackgroundTransparency = 0, TextTransparency = 0 })
+end
+local function fn29()
+  token += 1
+  bus.previewWant = token
+  fn24()
+  if data5.index then
+    textLabel5.Text = "carregando modelo..."
+    textLabel5.Visible = true
+  end
+  bus.cmd:Fire("preview", { token = token, index = data5.index, mutation = data5.mutation, traits = data5.traits })
+end
+local function fn30()
+  fn28()
+  fn29()
+end
+local function fn31(arg1, arg2)
+  fn9(arg1, .18, { BackgroundColor3 = arg2 and Color3.fromRGB(42, 34, 74) or data.Panel2 })
+  local uIStroke = arg1:FindFirstChildOfClass("UIStroke")
+  if uIStroke then
+    fn9(uIStroke, .18, { Color = arg2 and data.Accent or data.Stroke })
+  end
+end
+local function fn32()
+  for key, value in v12.animals do
+    local textButton2 = create("TextButton", {
+      Name = "R",
+      Size = UDim2.new(1, 0, 0, 46),
+      BackgroundColor3 = data.Panel2,
+      AutoButtonColor = false,
+      Text = "",
+      LayoutOrder = key,
+      Parent = Parent4
+    }, { fn5(12), fn6(data.Stroke, 1) })
+    local frame11 = create("Frame", {
+      Size = UDim2.fromOffset(4, 28),
+      Position = UDim2.fromOffset(9, 9),
+      BackgroundColor3 = Color3.new(1, 1, 1),
+      Parent = textButton2
+    }, { fn5(2) })
+    local v17 = v12.rarities[value.rarity]
+    if v17 and (v17.preset and data6[v17.preset]) then
+      create("UIGradient", { Rotation = 90, Color = fn18(data6[v17.preset]), Parent = frame11 })
+    else
+      frame11.BackgroundColor3 = v17 and v17.color or data.Sub
+    end
+    create("TextLabel", {
+      Size = UDim2.new(1, -130, 0, 18),
+      Position = UDim2.fromOffset(22, 6),
+      BackgroundTransparency = 1,
+      Text = value.display,
+      Font = Enum.Font.GothamBold,
+      TextSize = 13,
+      TextColor3 = data.Text,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      TextTruncate = Enum.TextTruncate.AtEnd,
+      Parent = textButton2
+    })
+    local textLabel12 = create("TextLabel", {
+      Size = UDim2.new(1, -130, 0, 14),
+      Position = UDim2.fromOffset(22, 25),
+      BackgroundTransparency = 1,
+      Text = value.rarity,
+      Font = Enum.Font.GothamBold,
+      TextSize = 11,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      Parent = textButton2
+    })
+    fn19(textLabel12, value.rarity)
+    create("TextLabel", {
+      Size = UDim2.fromOffset(110, 46),
+      Position = UDim2.new(1, -120, 0, 0),
+      BackgroundTransparency = 1,
+      Text = "$" .. fn11(value.gen) .. "/s",
+      Font = Enum.Font.GothamBold,
+      TextSize = 12,
+      TextColor3 = data.Accent2,
+      TextXAlignment = Enum.TextXAlignment.Right,
+      Parent = textButton2
+    })
+    tbl7[value.name] = { row = textButton2, a = value, search = string.lower(value.display .. " " .. value.name) }
+    fn4(textButton2.MouseEnter:Connect(function()
+      if data5.index ~= value.name then
+        fn9(textButton2, .12, { BackgroundColor3 = data.Panel3 })
+      end
+    end))
+    fn4(textButton2.MouseLeave:Connect(function()
+      if data5.index ~= value.name then
+        fn9(textButton2, .12, { BackgroundColor3 = data.Panel2 })
+      end
+    end))
+    fn4(textButton2.MouseButton1Click:Connect(function()
+      local index = data5.index
+      if index == value.name then
+        data5.index = nil
+        fn31(textButton2, false)
+      else
+        if index and tbl7[index] then
+          fn31(tbl7[index].row, false)
+        end
+        data5.index = value.name
+        fn31(textButton2, true)
+      end
+      fn30()
+    end))
+  end
+end
+local function fn33()
+  local str4 = string.lower(textBox.Text or "")
+  local n8 = 0
+  for key, value in tbl7 do
+    local v17 = (str4 == "" or string.find(value.search, str4, 1, true) ~= nil) and (v13 == nil or value.a.rarity == v13)
+    value.row.Visible = v17
+    if v17 then
+      n8 += 1
+    end
+  end
+  textLabel11.Text = n8 .. " brainrots" .. (v13 and " • " .. v13 or "")
+end
+fn4((textBox:GetPropertyChangedSignal("Text")):Connect(function()
+  if v12 then
+    fn33()
+  end
+end))
+local tbl11 = {}
+local function fn34()
+  local data8 = { { name = nil, label = "Todas" } }
+  local tbl12 = {}
+  for key, value in v12.animals do
+    if not tbl12[value.rarity] then
+      tbl12[value.rarity] = true
+      table.insert(data8, { name = value.rarity, label = value.rarity })
+    end
+  end
+  for key, value in data8 do
+    local textButton2 = create("TextButton", {
+      Size = UDim2.fromOffset(0, 26),
+      AutomaticSize = Enum.AutomaticSize.X,
+      BackgroundColor3 = key == 1 and data.Accent or data.Panel2,
+      AutoButtonColor = false,
+      Text = value.label,
+      Font = Enum.Font.GothamBold,
+      TextSize = 11,
+      TextColor3 = data.Text,
+      LayoutOrder = key,
+      Parent = scrollingFrame
+    }, { fn5(13), fn6(data.Stroke, 1), fn7(0, 11) })
+    tbl11[key] = { b = textButton2, name = value.name }
+    fn4(textButton2.MouseButton1Click:Connect(function()
+      v13 = value.name
+      for key2, value2 in tbl11 do
+        fn9(value2.b, .15, { BackgroundColor3 = value2.name == value.name and data.Accent or data.Panel2 })
+      end
+      fn33()
+    end))
+  end
+end
+local function fn35(arg1, arg2, arg3)
+  fn9(arg1, .18, { BackgroundColor3 = arg2 and Color3.fromRGB(40, 34, 70) or data.Panel2 })
+  local uIStroke = arg1:FindFirstChildOfClass("UIStroke")
+  if uIStroke then
+    uIStroke.Thickness = arg2 and 2 or 1
+    fn9(uIStroke, .18, { Color = arg2 and (arg3 or data.Accent) or data.Stroke })
+  end
+  local chk = arg1:FindFirstChild("Chk")
+  if chk then
+    chk.Visible = arg2
+  end
+end
+local function fn36(arg1, arg2, arg3, arg4, arg5, arg6)
+  local textButton2 = create("TextButton", {
+    Size = UDim2.fromOffset(98, 92),
+    BackgroundColor3 = data.Panel2,
+    AutoButtonColor = false,
+    Text = "",
+    LayoutOrder = arg2,
+    Parent = arg1
+  }, { fn5(12), fn6(data.Stroke, 1) })
+  create("ImageLabel", {
+    Size = UDim2.fromOffset(40, 40),
+    Position = UDim2.new(.5, -20, 0, 9),
+    BackgroundTransparency = 1,
+    Image = arg3 or Image,
+    ScaleType = Enum.ScaleType.Fit,
+    Parent = textButton2
+  })
+  create("TextLabel", {
+    Size = UDim2.new(1, -8, 0, 14),
+    Position = UDim2.fromOffset(4, 53),
+    BackgroundTransparency = 1,
+    Text = arg4,
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    TextColor3 = arg5 or data.Text,
+    TextTruncate = Enum.TextTruncate.AtEnd,
+    Parent = textButton2
+  })
+  create("TextLabel", {
+    Size = UDim2.new(1, -8, 0, 12),
+    Position = UDim2.fromOffset(4, 70),
+    BackgroundTransparency = 1,
+    Text = arg6 or "",
+    Font = Enum.Font.Gotham,
+    TextSize = 10,
+    TextColor3 = data.Sub,
+    Parent = textButton2
+  })
+  create("TextLabel", {
+    Name = "Chk",
+    Size = UDim2.fromOffset(16, 16),
+    Position = UDim2.new(1, -22, 0, 6),
+    BackgroundColor3 = data.Accent,
+    Text = "",
+    Visible = false,
+    Font = Enum.Font.GothamBlack,
+    TextSize = 11,
+    TextColor3 = data.Text,
+    Parent = textButton2
+  }, {
+    fn5(8),
+    create("Frame", {
+      Size = UDim2.fromOffset(6, 6),
+      Position = UDim2.fromOffset(5, 5),
+      BackgroundColor3 = Color3.new(1, 1, 1),
+      BorderSizePixel = 0
+    }, { fn5(3) })
+  })
+  return textButton2
+end
+local function fn37()
+  local v17 = fn36(v15, 0, Image, "Normal", data.Text, "x1")
+  tbl8.__none = v17
+  fn35(v17, true)
+  fn4(v17.MouseButton1Click:Connect(function()
+    if data5.mutation and tbl8[data5.mutation] then
+      fn35(tbl8[data5.mutation], false)
+    end
+    data5.mutation = nil
+    fn35(v17, true)
+    fn30()
+  end))
+  for key, value in v12.mutations do
+    tbl5[value.key] = value
+    local v18 = fn36(v15, key, value.icon ~= "" and value.icon or Image, value.display, value.color, "+" .. tostring(value.modifier) .. "x")
+    tbl8[value.key] = v18
+    fn4(v18.MouseButton1Click:Connect(function()
+      local mutation = data5.mutation
+      fn35(mutation and tbl8[mutation] or v17, false)
+      if mutation == value.key then
+        data5.mutation = nil
+        fn35(v17, true)
+      else
+        data5.mutation = value.key
+        fn35(v18, true, value.color)
+      end
+      fn30()
+    end))
+  end
+  for key, value in v12.traits do
+    tbl6[value.key] = value
+    local v18 = fn36(v16, key, value.icon, value.display, value.color, value.key == "Sleepy" and "x0.5" or "+" .. tostring(value.modifier) .. "x")
+    tbl9[value.key] = v18
+    fn4(v18.MouseButton1Click:Connect(function()
+      local tbl12 = table.find(data5.traits, value.key)
+      if tbl12 then
+        table.remove(data5.traits, tbl12)
+        fn35(v18, false)
+      else
+        table.insert(data5.traits, value.key)
+        fn35(v18, true, value.color)
+      end
+      fn30()
+    end))
+  end
+  if tbl5.Rainbow and tbl5.Rainbow.icon ~= "" then
+    imageLabel.Image = tbl5.Rainbow.icon
+    imageButton.Image = tbl5.Rainbow.icon
+  end
+end
+local function fn38()
+  if data5.index and tbl7[data5.index] then
+    fn31(tbl7[data5.index].row, false)
+  end
+  if data5.mutation and tbl8[data5.mutation] then
+    fn35(tbl8[data5.mutation], false)
+  end
+  if tbl8.__none then
+    fn35(tbl8.__none, true)
+  end
+  for key, value in data5.traits do
+    if tbl9[value] then
+      fn35(tbl9[value], false)
+    end
+  end
+  data5.index, data5.mutation, data5.traits = nil, nil, {}
+  fn30()
+end
+local function fn39(arg1, arg2, arg3, arg4, arg5, arg6)
+  local textButton2 = create("TextButton", {
+    Size = UDim2.fromOffset(arg3, 30),
+    BackgroundColor3 = arg4 or data.Panel3,
+    AutoButtonColor = false,
+    Text = arg2,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextColor3 = arg5 or data.Text,
+    Parent = arg1
+  }, { fn5(8), fn6(arg6 or data.Stroke, 1) })
+  local backgroundColor3 = textButton2.BackgroundColor3
+  fn4(textButton2.MouseEnter:Connect(function()
+    fn9(textButton2, .12, { BackgroundColor3 = backgroundColor3:Lerp(Color3.new(1, 1, 1), .08) })
+  end))
+  fn4(textButton2.MouseLeave:Connect(function()
+    fn9(textButton2, .12, { BackgroundColor3 = backgroundColor3 })
+  end))
+  return textButton2
+end
+local color34 = Color3.fromRGB(60, 24, 34)
+local function fn40()
+  fn10(Parent5)
+  local v17 = bus.fakesList or {}
+  tbl3[4].label.Text = "Na base (" .. #v17 .. ")"
+  local frame11 = create("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 0, Parent = Parent5 })
+  create("TextLabel", {
+    Size = UDim2.new(1, -130, 1, 0),
+    BackgroundTransparency = 1,
+    TextWrapped = true,
+    Text = #v17 == 0 and "Nenhum brainrot visual na base." or "Perto do pódio: Grab (E) • Sell (F). Pise no Claim pra coletar.",
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = frame11
+  })
+  if #v17 > 0 then
+    local v18 = fn39(frame11, "Excluir todos", 118, color34, data.Danger, data.Danger)
+    v18.Position = UDim2.new(1, -118, 0, 0)
+    fn4(v18.MouseButton1Click:Connect(function()
+      bus.cmd:Fire("deleteAll")
+    end))
+  end
+  for key, value in v17 do
+    local frame12 = create("Frame", {
+      Size = UDim2.new(1, 0, 0, 56),
+      BackgroundColor3 = data.Panel2,
+      LayoutOrder = key,
+      Parent = Parent5
+    }, { fn5(12), fn6(value.oneOfOne and color32 or data.Stroke, 1) })
+    create("TextLabel", {
+      Size = UDim2.fromOffset(40, 40),
+      Position = UDim2.fromOffset(8, 8),
+      BackgroundColor3 = data.Panel3,
+      Text = "#" .. value.slot,
+      Font = Enum.Font.GothamBlack,
+      TextSize = 13,
+      TextColor3 = data.Text,
+      Parent = frame12
+    }, { fn5(10) })
+    create("TextLabel", {
+      Size = UDim2.new(1, -190, 0, 18),
+      Position = UDim2.fromOffset(58, 8),
+      BackgroundTransparency = 1,
+      Text = value.display .. (value.stolen and "  • carregando" or ""),
+      Font = Enum.Font.GothamBold,
+      TextSize = 13,
+      TextColor3 = data.Text,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      TextTruncate = Enum.TextTruncate.AtEnd,
+      Parent = frame12
+    })
+    local frame13 = create("Frame", {
+      Size = UDim2.new(1, -190, 0, 20),
+      Position = UDim2.fromOffset(58, 28),
+      BackgroundTransparency = 1,
+      Parent = frame12
+    }, {
+      create("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, 5),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder
+      })
+    })
+    local textLabel12 = create("TextLabel", {
+      Size = UDim2.fromOffset(0, 16),
+      AutomaticSize = Enum.AutomaticSize.X,
+      BackgroundTransparency = 1,
+      Text = value.rarity,
+      Font = Enum.Font.GothamBlack,
+      TextSize = 11,
+      LayoutOrder = 1,
+      Parent = frame13
+    })
+    fn19(textLabel12, value.rarity)
+    create("TextLabel", {
+      Size = UDim2.fromOffset(0, 16),
+      AutomaticSize = Enum.AutomaticSize.X,
+      BackgroundTransparency = 1,
+      Text = "$" .. fn11(value.gen) .. "/s",
+      Font = Enum.Font.GothamBold,
+      TextSize = 11,
+      TextColor3 = data.Accent2,
+      LayoutOrder = 2,
+      Parent = frame13
+    })
+    if value.oneOfOne then
+      fn22(frame13, "1 OF 1", color3, color33, 3)
+    end
+    local v18 = value.mutation and tbl5[value.mutation]
+    fn21(v18 and v18.icon or Image, 16, frame13, 4)
+    for key2, value2 in value.traits do
+      local v19 = tbl6[value2]
+      if v19 then
+        fn21(v19.icon, 16, frame13, 10 + key2)
+      end
+    end
+    local v19 = fn39(frame12, "Excluir", 96, color34, data.Danger, data.Danger)
+    v19.Position = UDim2.new(1, -106, 0, 13)
+    fn4(v19.MouseButton1Click:Connect(function()
+      bus.cmd:Fire("delete", value.uid)
+    end))
+    if not value.stolen and not value.fuse then
+      local v20 = fn39(frame12, "Pegar", 76, data.Panel3, data.Text, data.Accent)
+      v20.Position = UDim2.new(1, -188, 0, 13)
+      fn4(v20.MouseButton1Click:Connect(function()
+        bus.cmd:Fire("grab", value.uid)
+      end))
+    elseif value.fuse then
+      fn22(frame12, "IN FUSE", Color3.fromRGB(0, 70, 130), Color3.fromRGB(150, 210, 255)).Position = UDim2.new(1, -180, 0, 18)
+    end
+  end
+end
+local function fn41()
+  fn10(Parent6)
+  local v17 = bus.fakesList or {}
+  local n8 = 0
+  for key, value in v17 do
+    if value.oneOfOne then
+      n8 += 1
+    end
+  end
+  tbl3[5].label.Text = "1 of 1 (" .. n8 .. ")"
+  create("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 30),
+    BackgroundTransparency = 1,
+    LayoutOrder = 0,
+    TextWrapped = true,
+    Text = #v17 == 0 and "Nenhum brainrot visual na base." or "Auto: vira 1 of 1 quando o jogo conta 1 existente dessa combinação. Sim/Não força.",
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = Parent6
+  })
+  for key, value in v17 do
+    local frame11 = create("Frame", {
+      Size = UDim2.new(1, 0, 0, 56),
+      BackgroundColor3 = value.oneOfOne and Color3.fromRGB(58, 26, 30) or data.Panel2,
+      LayoutOrder = key,
+      Parent = Parent6
+    }, { fn5(12), fn6(value.oneOfOne and color32 or data.Stroke, 1) })
+    local v18 = value.mutation and tbl5[value.mutation]
+    fn21(v18 and v18.icon or Image, 30, frame11).Position = UDim2.fromOffset(12, 13)
+    create("TextLabel", {
+      Size = UDim2.new(1, -280, 0, 18),
+      Position = UDim2.fromOffset(52, 9),
+      BackgroundTransparency = 1,
+      Text = ("#%d  %s"):format(value.slot, value.display),
+      Font = Enum.Font.GothamBold,
+      TextSize = 13,
+      TextColor3 = data.Text,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      TextTruncate = Enum.TextTruncate.AtEnd,
+      Parent = frame11
+    })
+    local v19 = value.oneMode ~= "auto" and "forçado" or value.exist and "existem " .. tostring(value.exist) or "sem contagem pública"
+    create("TextLabel", {
+      Size = UDim2.new(1, -280, 0, 16),
+      Position = UDim2.fromOffset(52, 29),
+      BackgroundTransparency = 1,
+      Text = (value.oneOfOne and "1 OF 1" or "normal") .. "  •  " .. v19,
+      Font = Enum.Font.GothamBold,
+      TextSize = 11,
+      TextColor3 = value.oneOfOne and color33 or data.Sub,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      Parent = frame11
+    })
+    local data8 = { { "auto", "Auto" }, { "on", "Sim" }, { "off", "Não" } }
+    for key2, value2 in data8 do
+      local flag = value.oneMode == value2[1]
+      local v20 = fn39(frame11, value2[2], 62, flag and (value2[1] == "on" and color3 or data.Accent) or data.Panel3, flag and data.Text or data.Sub, flag and (value2[1] == "on" and color32 or data.Accent) or data.Stroke)
+      v20.Position = UDim2.new(1, -210 + (key2 - 1) * 68, 0, 13)
+      fn4(v20.MouseButton1Click:Connect(function()
+        if value.oneMode ~= value2[1] then
+          bus.cmd:Fire("set1of1", { uid = value.uid, mode = value2[1] })
+        end
+      end))
+    end
+  end
+end
+local data8 = {
+  idle = "Nenhuma trade aberta.",
+  invite_in = "Pedido de trade do @Roblox no canto da tela: aceite ou recuse por lá.",
+  invite_out = "Pedido enviado pro @Roblox, esperando ele aceitar...",
+  open = "Trade aberta. 1º passo: os dois dão READY. 2º passo: os dois dão ACCEPT.",
+  processing = "Processing... a troca está sendo concluída."
+}
+local v17
+local flag = false
+local function fn42()
+  bus.cmd:Fire("simConfig", {
+    chat = config.simChat,
+    botReady = config.simBotReady,
+    botAccept = config.simBotAccept,
+    slotMode = config.simSlotMode,
+    botMax = config.simBotMax,
+    botUsed = config.simBotUsed,
+    playerId = config.simPlayerId,
+    botName = config.simBotName
+  })
+end
+local function fn43(arg1, arg2, arg3, arg4, arg5, arg6)
+  local frame11 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 56),
+    BackgroundColor3 = data.Panel2,
+    LayoutOrder = arg1,
+    Parent = Parent7
+  }, { fn5(12), fn6(data.Stroke, 1) })
+  create("TextLabel", {
+    Size = UDim2.new(1, -40 - #arg4 * 86, 0, 18),
+    Position = UDim2.fromOffset(12, 8),
+    BackgroundTransparency = 1,
+    Text = arg2,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextColor3 = data.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = frame11
+  })
+  create("TextLabel", {
+    Size = UDim2.new(1, -40 - #arg4 * 86, 0, 24),
+    Position = UDim2.fromOffset(12, 26),
+    BackgroundTransparency = 1,
+    Text = arg3,
+    TextWrapped = true,
+    Font = Enum.Font.Gotham,
+    TextSize = 10,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    Parent = frame11
+  })
+  for key, value in arg4 do
+    local flag2 = arg5() == value[1]
+    local v18 = fn39(frame11, value[2], 80, flag2 and data.Accent or data.Panel3, flag2 and data.Text or data.Sub, flag2 and data.Accent or data.Stroke)
+    v18.Position = UDim2.new(1, -12 - (#arg4 - key + 1) * 86, .5, -15)
+    fn4(v18.MouseButton1Click:Connect(function()
+      if arg5() == value[1] then
+        return
+      end
+      arg6(value[1])
+      save(true)
+      fn42()
+      v17()
+    end))
+  end
+  return frame11
+end
+function v17()
+  fn10(Parent7)
+  local v18 = bus.sim or { state = "idle", partner = {} }
+  local flag2 = v18.state == "open"
+  local flag3 = flag2 or v18.state == "processing"
+  tbl3[6].label.Text = flag2 and "Trade (" .. #v18.partner .. ")" or "Trade"
+  create("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 28),
+    BackgroundTransparency = 1,
+    LayoutOrder = -2,
+    TextWrapped = true,
+    Text = "Simulação local com a conta @Roblox (não é ninguém do servidor). Só você vê.",
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = Parent7
+  })
+  local frame11 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 0),
+    AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundColor3 = data.Panel2,
+    LayoutOrder = -1,
+    Parent = Parent7
+  }, {
+    fn5(12),
+    fn6(data.Stroke, 1),
+    fn7(10, 12),
+    create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder })
+  })
+  local function fn44(arg1)
+    arg1 = string.sub(string.gsub(tostring(arg1 or ""), "[^%w_]", ""), 1, 20)
+    if arg1 == "" then
+      arg1 = "Roblox"
+    end
+    if arg1 == config.simBotName then
+      return false
+    end
+    config.simBotName = arg1
+    save(true)
+    fn42()
+    return true
+  end
+  local frame12 = create("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 0, Parent = frame11 })
+  create("TextLabel", {
+    Size = UDim2.fromOffset(110, 30),
+    BackgroundTransparency = 1,
+    Text = "Nome do bot  @",
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextColor3 = data.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = frame12
+  })
+  local textBox2 = create("TextBox", {
+    Size = UDim2.new(1, -118, 1, 0),
+    Position = UDim2.fromOffset(112, 0),
+    BackgroundColor3 = data.Panel3,
+    Text = config.simBotName,
+    PlaceholderText = "Roblox",
+    PlaceholderColor3 = data.Sub,
+    ClearTextOnFocus = false,
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextColor3 = data.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = frame12
+  }, { fn5(8), fn6(data.Stroke, 1), fn7(0, 10) })
+  fn4(textBox2.FocusLost:Connect(function()
+    if fn44(textBox2.Text) then
+      task.defer(v17)
+    else
+      textBox2.Text = config.simBotName
+    end
+  end))
+  local frame13 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 0),
+    AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundTransparency = 1,
+    LayoutOrder = 1,
+    Parent = frame11
+  }, {
+    create("UIGridLayout", {
+      CellSize = UDim2.fromOffset(130, 28),
+      CellPadding = UDim2.fromOffset(6, 6),
+      SortOrder = Enum.SortOrder.LayoutOrder
+    })
+  })
+  local data9 = { "Roblox" }
+  for key, value in Players:GetPlayers() do
+    if value ~= localPlayer then
+      table.insert(data9, value.Name)
+    end
+  end
+  for key, value in data9 do
+    local flag4 = config.simBotName == value
+    local v19 = fn39(frame13, "@" .. value, 130, flag4 and data.Accent or data.Panel3, flag4 and data.Text or data.Sub, flag4 and data.Accent or data.Stroke)
+    v19.LayoutOrder = key
+    v19.TextTruncate = Enum.TextTruncate.AtEnd
+    fn4(v19.MouseButton1Click:Connect(function()
+      if fn44(value) then
+        v17()
+      end
+    end))
+  end
+  local frame14 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 92),
+    BackgroundColor3 = data.Panel2,
+    LayoutOrder = 1,
+    Parent = Parent7
+  }, { fn5(12), fn6(flag3 and data.Green or data.Stroke, 1) })
+  local Text = data8[v18.state] or v18.state
+  if flag2 then
+    Text ..= ("\nVocê: %s  •  Ele: %s"):format(v18.meAcc and "Confirmed" or v18.meReady and "Ready" or "—", v18.botAcc and "Confirmed" or v18.botReady and "Ready" or "—")
+  end
+  create("TextLabel", {
+    Size = UDim2.new(1, -24, 0, 36),
+    Position = UDim2.fromOffset(12, 8),
+    BackgroundTransparency = 1,
+    TextWrapped = true,
+    Text = Text,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    TextColor3 = flag3 and data.Green or data.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    Parent = frame14
+  })
+  local flag4 = v18.state == "idle"
+  local v19 = fn39(frame14, "Receber invite", 140, flag4 and data.Accent or data.Panel3, flag4 and data.Text or data.Sub, flag4 and data.Accent or data.Stroke)
+  v19.Position = UDim2.fromOffset(12, 52)
+  fn4(v19.MouseButton1Click:Connect(function()
+    if flag4 then
+      bus.cmd:Fire("simReceiveInvite")
+    end
+  end))
+  local v20 = fn39(frame14, "Enviar invite", 140, data.Panel3, flag4 and data.Text or data.Sub, flag4 and data.Accent or data.Stroke)
+  v20.Position = UDim2.fromOffset(160, 52)
+  fn4(v20.MouseButton1Click:Connect(function()
+    if flag4 then
+      bus.cmd:Fire("simSendInvite")
+    end
+  end))
+  if not flag4 and v18.state ~= "processing" then
+    local v21 = fn39(frame14, "Cancelar", 110, color34, data.Danger, data.Danger)
+    v21.Position = UDim2.new(1, -122, 0, 52)
+    fn4(v21.MouseButton1Click:Connect(function()
+      bus.cmd:Fire("simCancel")
+    end))
+  end
+  fn43(2, "Ready dele", "Auto: ele dá Ready 1-2s depois de você. Manual: só quando você apertar \"Ele: Ready\".", { { "auto", "Auto" }, { "manual", "Manual" } }, function()
+    return config.simBotReady
+  end, function(arg1)
+    config.simBotReady = arg1
+  end)
+  fn43(3, "Accept dele", "Auto: ele aceita 1-2s depois de você. Manual: só quando você apertar \"Ele: Accept\".", { { "auto", "Auto" }, { "manual", "Manual" } }, function()
+    return config.simBotAccept
+  end, function(arg1)
+    config.simBotAccept = arg1
+  end)
+  if flag2 then
+    local frame15 = create("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 4, Parent = Parent7 })
+    local v21 = v18.timerOk and (not v18.botReady and not v18.allReady)
+    local v22 = v18.allReady and not v18.botAcc
+    local v23 = fn39(frame15, "Ele: Ready", 130, v21 and data.Green or data.Panel3, v21 and Color3.fromRGB(6, 32, 24) or data.Sub, v21 and data.Green or data.Stroke)
+    fn4(v23.MouseButton1Click:Connect(function()
+      bus.cmd:Fire("simBot", "ready")
+    end))
+    local v24 = fn39(frame15, "Ele: Accept", 130, v22 and data.Green or data.Panel3, v22 and Color3.fromRGB(6, 32, 24) or data.Sub, v22 and data.Green or data.Stroke)
+    v24.Position = UDim2.fromOffset(138, 0)
+    fn4(v24.MouseButton1Click:Connect(function()
+      bus.cmd:Fire("simBot", "accept")
+    end))
+  end
+  fn43(5, "Chat da trade", "Desligado = igual ao jogo hoje. Frases = Add More, L Trade, Deal?... Livre = caixa de texto.", { { "off", "Desligado" }, { "presets", "Frases" }, { "free", "Livre" } }, function()
+    return config.simChat
+  end, function(arg1)
+    config.simChat = arg1
+  end)
+  if flag3 and config.simChat ~= "off" then
+    local frame15 = create("Frame", {
+      Size = UDim2.new(1, 0, 0, 0),
+      AutomaticSize = Enum.AutomaticSize.Y,
+      BackgroundColor3 = data.Panel2,
+      LayoutOrder = 6,
+      Parent = Parent7
+    }, {
+      fn5(12),
+      fn6(data.Stroke, 1),
+      fn7(10, 12),
+      create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder })
+    })
+    create("TextLabel", {
+      Size = UDim2.new(1, 0, 0, 16),
+      BackgroundTransparency = 1,
+      LayoutOrder = 0,
+      Text = "Mensagem do @Roblox no chat",
+      Font = Enum.Font.GothamBold,
+      TextSize = 12,
+      TextColor3 = data.Text,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      Parent = frame15
+    })
+    local frame16 = create("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 1, Parent = frame15 })
+    local textBox3 = create("TextBox", {
+      Size = UDim2.new(1, -100, 1, 0),
+      BackgroundColor3 = data.Panel3,
+      PlaceholderText = "escreva como ele...",
+      PlaceholderColor3 = data.Sub,
+      Text = "",
+      ClearTextOnFocus = false,
+      Font = Enum.Font.GothamMedium,
+      TextSize = 12,
+      TextColor3 = data.Text,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      Parent = frame16
+    }, { fn5(8), fn6(data.Stroke, 1), fn7(0, 10) })
+    local v21 = fn39(frame16, "Enviar", 90, data.Accent, data.Text, data.Accent)
+    v21.Position = UDim2.new(1, -90, 0, 0)
+    local function onMouseButton1Click()
+      if textBox3.Text ~= "" then
+        bus.cmd:Fire("simChatAs", textBox3.Text)
+        textBox3.Text = ""
+      end
+    end
+    fn4(v21.MouseButton1Click:Connect(onMouseButton1Click))
+    fn4(textBox3.FocusLost:Connect(function(arg1)
+      if arg1 then
+        onMouseButton1Click()
+      end
+      if flag then
+        flag = false
+        task.defer(v17)
+      end
+    end))
+    local frame17 = create("Frame", {
+      Size = UDim2.new(1, 0, 0, 0),
+      AutomaticSize = Enum.AutomaticSize.Y,
+      BackgroundTransparency = 1,
+      LayoutOrder = 2,
+      Parent = frame15
+    }, {
+      create("UIGridLayout", {
+        CellSize = UDim2.fromOffset(118, 28),
+        CellPadding = UDim2.fromOffset(6, 6),
+        SortOrder = Enum.SortOrder.LayoutOrder
+      })
+    })
+    for key, value in v18.presets or {} do
+      local str4 = string.gsub(value, "^[^%w]+", "")
+      local v22 = fn39(frame17, str4 ~= "" and str4 or value, 118, data.Panel3, data.Text)
+      v22.LayoutOrder = key
+      fn4(v22.MouseButton1Click:Connect(function()
+        bus.cmd:Fire("simChatAs", value)
+      end))
+    end
+  end
+  local frame15 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 70),
+    BackgroundColor3 = data.Panel2,
+    LayoutOrder = 7,
+    Parent = Parent7
+  }, { fn5(12), fn6(data.Stroke, 1) })
+  local v21 = data5.index and tbl4[data5.index]
+  local v22 = data5.mutation and tbl5[data5.mutation]
+  create("TextLabel", {
+    Size = UDim2.new(1, -200, 0, 18),
+    Position = UDim2.fromOffset(12, 12),
+    BackgroundTransparency = 1,
+    Text = v21 and v21.display or "Escolha um brainrot na aba Brainrots",
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextColor3 = v21 and data.Text or data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextTruncate = Enum.TextTruncate.AtEnd,
+    Parent = frame15
+  })
+  local frame16 = create("Frame", {
+    Size = UDim2.new(1, -200, 0, 20),
+    Position = UDim2.fromOffset(12, 36),
+    BackgroundTransparency = 1,
+    Parent = frame15
+  }, {
+    create("UIListLayout", {
+      FillDirection = Enum.FillDirection.Horizontal,
+      Padding = UDim.new(0, 5),
+      VerticalAlignment = Enum.VerticalAlignment.Center,
+      SortOrder = Enum.SortOrder.LayoutOrder
+    })
+  })
+  if v21 then
+    fn21(v22 and v22.icon or Image, 16, frame16, 1)
+    fn22(frame16, v22 and v22.display or "Normal", data.Panel3, data.Text, 2)
+    for key, value in data5.traits do
+      local v23 = tbl6[value]
+      if v23 then
+        fn21(v23.icon, 16, frame16, 10 + key)
+      end
+    end
+    create("TextLabel", {
+      Size = UDim2.fromOffset(0, 16),
+      AutomaticSize = Enum.AutomaticSize.X,
+      BackgroundTransparency = 1,
+      Text = "$" .. fn11(fn20(v21, data5.mutation, data5.traits)) .. "/s",
+      Font = Enum.Font.GothamBold,
+      TextSize = 11,
+      TextColor3 = data.Accent2,
+      LayoutOrder = 50,
+      Parent = frame16
+    })
+  end
+  local v23 = flag2 and (v21 ~= nil and not v18.allReady)
+  local v24 = fn39(frame15, "Colocar na oferta dele", 176, v23 and data.Green or data.Panel3, v23 and Color3.fromRGB(6, 32, 24) or data.Sub, v23 and data.Green or data.Stroke)
+  v24.Position = UDim2.new(1, -188, .5, -15)
+  fn4(v24.MouseButton1Click:Connect(function()
+    if not flag2 then
+      fn17("abra uma trade com o @Roblox primeiro", data.Danger)
+      return
+    end
+    if not data5.index then
+      fn17("escolha um brainrot primeiro", data.Danger)
+      return
+    end
+    bus.cmd:Fire("simAddPartner", { index = data5.index, mutation = data5.mutation, traits = table.clone(data5.traits) })
+  end))
+  if #v18.partner > 0 then
+    create("TextLabel", {
+      Size = UDim2.new(1, 0, 0, 18),
+      BackgroundTransparency = 1,
+      LayoutOrder = 8,
+      Text = "Oferta do @Roblox",
+      Font = Enum.Font.GothamBold,
+      TextSize = 12,
+      TextColor3 = data.Sub,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      Parent = Parent7
+    })
+  end
+  for key, value in v18.partner do
+    local frame17 = create("Frame", {
+      Size = UDim2.new(1, 0, 0, 46),
+      BackgroundColor3 = data.Panel2,
+      LayoutOrder = 10 + key,
+      Parent = Parent7
+    }, { fn5(10), fn6(data.Stroke, 1) })
+    local v25 = value.mutation and tbl5[value.mutation]
+    fn21(v25 and v25.icon or Image, 24, frame17).Position = UDim2.fromOffset(10, 11)
+    create("TextLabel", {
+      Size = UDim2.new(1, -170, 1, 0),
+      Position = UDim2.fromOffset(42, 0),
+      BackgroundTransparency = 1,
+      Text = value.display .. (#value.traits > 0 and "  •  " .. #value.traits .. " trait" .. (#value.traits > 1 and "s" or "") or ""),
+      Font = Enum.Font.GothamBold,
+      TextSize = 12,
+      TextColor3 = data.Text,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      TextTruncate = Enum.TextTruncate.AtEnd,
+      Parent = frame17
+    })
+    if flag2 and not v18.allReady then
+      local v26 = fn39(frame17, "Tirar", 80, color34, data.Danger, data.Danger)
+      v26.Position = UDim2.new(1, -90, 0, 8)
+      fn4(v26.MouseButton1Click:Connect(function()
+        bus.cmd:Fire("simRemovePartner", value.key)
+      end))
+    end
+  end
+  local v25 = v18.other or {}
+  fn43(1000, "Slots da base dele", "Bot = você define. Jogador = a base de alguém do servidor. Última trade = a base de quem você trocou por último (trade real).", { { "bot", "Bot" }, { "player", "Jogador" }, { "last", "Última" } }, function()
+    return config.simSlotMode
+  end, function(arg1)
+    config.simSlotMode = arg1
+    if arg1 == "player" then
+      bus.cmd:Fire("simPlayers")
+    end
+  end)
+  local frame17 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 0),
+    AutomaticSize = Enum.AutomaticSize.Y,
+    BackgroundColor3 = data.Panel2,
+    LayoutOrder = 1001,
+    Parent = Parent7
+  }, {
+    fn5(12),
+    fn6(data.Stroke, 1),
+    fn7(10, 12),
+    create("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder })
+  })
+  local function fn45(arg1, arg2, arg3)
+    return create("TextLabel", {
+      Size = UDim2.new(1, 0, 0, 16),
+      AutomaticSize = Enum.AutomaticSize.Y,
+      BackgroundTransparency = 1,
+      LayoutOrder = arg1,
+      Text = arg2,
+      TextWrapped = true,
+      Font = Enum.Font.GothamBold,
+      TextSize = 11,
+      TextColor3 = arg3 or data.Sub,
+      TextXAlignment = Enum.TextXAlignment.Left,
+      Parent = frame17
+    })
+  end
+  if flag2 and v25.maxSlots then
+    fn45(0, ("Agora: ele tem %d brainrot(s) numa base de %d slots%s"):format(v25.used or 0, v25.maxSlots, v25.source and " (base de @" .. v25.source .. ")" or ""), data.Text)
+  end
+  if config.simSlotMode == "bot" then
+    local frame18 = create("Frame", { Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, LayoutOrder = 1, Parent = frame17 })
+    local function fn46(arg1, arg2, arg3, arg4)
+      create("TextLabel", {
+        Size = UDim2.fromOffset(90, 30),
+        Position = UDim2.fromOffset(arg1, 0),
+        BackgroundTransparency = 1,
+        Text = arg2,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        TextColor3 = data.Sub,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = frame18
+      })
+      local textBox3 = create("TextBox", {
+        Size = UDim2.fromOffset(60, 30),
+        Position = UDim2.fromOffset(arg1 + 92, 0),
+        BackgroundColor3 = data.Panel3,
+        Text = tostring(arg3()),
+        ClearTextOnFocus = false,
+        Font = Enum.Font.GothamBold,
+        TextSize = 13,
+        TextColor3 = data.Text,
+        Parent = frame18
+      }, { fn5(8), fn6(data.Stroke, 1) })
+      fn4(textBox3.FocusLost:Connect(function()
+        local number = tonumber(textBox3.Text)
+        if number then
+          arg4(math.floor(number))
+          save(true)
+          fn42()
+        end
+        textBox3.Text = tostring(arg3())
+        if flag then
+          flag = false
+          task.defer(v17)
+        end
+      end))
+    end
+    fn46(0, "Slots da base", function()
+      return config.simBotMax
+    end, function(arg1)
+      config.simBotMax = math.clamp(arg1, 1, 100)
+      config.simBotUsed = math.min(config.simBotUsed, config.simBotMax)
+    end)
+    fn46(170, "Brainrots dele", function()
+      return config.simBotUsed
+    end, function(arg1)
+      config.simBotUsed = math.clamp(arg1, 0, config.simBotMax)
+    end)
+  elseif config.simSlotMode == "player" then
+    local v26 = bus.simPlayers or {}
+    if #v26 == 0 then
+      fn45(1, "Nenhum jogador com base carregada (ou aperte Atualizar).")
+    end
+    local frame18 = create("Frame", {
+      Size = UDim2.new(1, 0, 0, 0),
+      AutomaticSize = Enum.AutomaticSize.Y,
+      BackgroundTransparency = 1,
+      LayoutOrder = 2,
+      Parent = frame17
+    }, {
+      create("UIGridLayout", {
+        CellSize = UDim2.fromOffset(170, 30),
+        CellPadding = UDim2.fromOffset(6, 6),
+        SortOrder = Enum.SortOrder.LayoutOrder
+      })
+    })
+    for key, value in v26 do
+      local flag5 = config.simPlayerId == value.id
+      local v27 = fn39(frame18, ("@%s  %d/%d"):format(value.name, value.used, value.max), 170, flag5 and data.Accent or data.Panel3, flag5 and data.Text or data.Sub, flag5 and data.Accent or data.Stroke)
+      v27.LayoutOrder = key
+      v27.TextTruncate = Enum.TextTruncate.AtEnd
+      fn4(v27.MouseButton1Click:Connect(function()
+        config.simPlayerId = value.id
+        save(true)
+        fn42()
+        v17()
+      end))
+    end
+    local v27 = fn39(frame17, "Atualizar lista", 130, data.Panel3, data.Text)
+    v27.LayoutOrder = 3
+    fn4(v27.MouseButton1Click:Connect(function()
+      bus.cmd:Fire("simPlayers")
+    end))
+  else
+    local lastReal = v18.lastReal
+    fn45(1, lastReal and ("Última trade real: @%s, base %d/%d"):format(lastReal.name, lastReal.maxSlots - lastReal.emptySlots, lastReal.maxSlots) or "Nenhuma trade real ainda: faça uma trade de verdade e a base da pessoa fica salva aqui. Até lá vale o modo Bot.")
+  end
+  local frame18 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 56),
+    BackgroundColor3 = data.Panel2,
+    LayoutOrder = 3000,
+    Parent = Parent7
+  }, { fn5(12), fn6(data.Stroke, 1) })
+  create("TextLabel", {
+    Size = UDim2.new(1, -150, 1, -12),
+    Position = UDim2.fromOffset(12, 6),
+    BackgroundTransparency = 1,
+    TextWrapped = true,
+    Text = ("Histórico: %d trade(s) simulada(s). Aparecem em Trade > History do jogo, na posição da data, e ficam salvas."):format(v18.histCount or 0),
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = frame18
+  })
+  if (v18.histCount or 0) > 0 then
+    local v26 = fn39(frame18, "Limpar histórico", 130, color34, data.Danger, data.Danger)
+    v26.Position = UDim2.new(1, -142, .5, -15)
+    fn4(v26.MouseButton1Click:Connect(function()
+      bus.cmd:Fire("simClearHistory")
+    end))
+  end
+end
+data4[6].onShow = v17
+local flag2 = false
+local v18
+local function fn44(arg1, arg2, arg3)
+  local frame11 = create("Frame", {
+    Size = UDim2.new(1, 0, 0, 60),
+    BackgroundColor3 = data.Panel2,
+    LayoutOrder = arg1,
+    Parent = Parent8
+  }, { fn5(12), fn6(data.Stroke, 1) })
+  create("TextLabel", {
+    Size = UDim2.new(1, -190, 0, 18),
+    Position = UDim2.fromOffset(14, 10),
+    BackgroundTransparency = 1,
+    Text = arg2,
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    TextColor3 = data.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = frame11
+  })
+  create("TextLabel", {
+    Size = UDim2.new(1, -190, 0, 26),
+    Position = UDim2.fromOffset(14, 28),
+    BackgroundTransparency = 1,
+    Text = arg3,
+    TextWrapped = true,
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    Parent = frame11
+  })
+  return frame11
+end
+local function fn45(arg1, arg2, arg3)
+  local textButton2 = create("TextButton", {
+    Size = UDim2.fromOffset(56, 28),
+    Position = UDim2.new(1, -70, .5, -14),
+    BackgroundColor3 = data.Panel3,
+    AutoButtonColor = false,
+    Text = "",
+    Parent = arg1
+  }, { fn5(14), fn6(data.Stroke, 1) })
+  local frame11 = create("Frame", {
+    Size = UDim2.fromOffset(22, 22),
+    Position = UDim2.fromOffset(3, 3),
+    BackgroundColor3 = data.Sub,
+    Parent = textButton2
+  }, { fn5(11) })
+  local function fn46()
+    local v19 = arg2()
+    fn9(textButton2, .18, { BackgroundColor3 = v19 and data.Green or data.Panel3 })
+    fn9(frame11, .18, {
+      Position = UDim2.fromOffset(v19 and 31 or 3, 3),
+      BackgroundColor3 = v19 and Color3.new(1, 1, 1) or data.Sub
+    })
+  end
+  fn4(textButton2.MouseButton1Click:Connect(function()
+    arg3(not arg2())
+    fn46()
+  end))
+  fn46()
+  return textButton2
+end
+local function fn46()
+  fn10(Parent8)
+  local v19 = fn44(1, "Tecla pra mostrar / esconder", "Esconde o hub inteiro e mostra de novo. No celular use o botão \"Brainrot Spawner\" nas Configurações do jogo.")
+  local v20 = fn39(v19, config.key, 110, data.Panel3, data.Text, data.Accent)
+  v20.Position = UDim2.new(1, -124, .5, -15)
+  fn4(v20.MouseButton1Click:Connect(function()
+    flag2 = true
+    v20.Text = "aperte..."
+  end))
+  local v21 = fn44(2, "Salvar automático", "Grava brainrots, posições, dinheiro pendente, Index e opções em BrainrotSpawner/config.json.")
+  fn45(v21, function()
+    return config.autoSave
+  end, function(arg1)
+    config.autoSave = arg1
+    save(true)
+  end)
+  local v22 = fn44(3, "Dinheiro offline", "Ao voltar, cada brainrot ganha o tempo que você ficou fora (até o limite do jogo) no Claim, como no original.")
+  fn45(v22, function()
+    return config.offline
+  end, function(arg1)
+    config.offline = arg1
+    save(true)
+  end)
+  local v23 = fn44(4, "Salvar agora", "Grava o estado atual na hora.")
+  local v24 = fn39(v23, "Salvar", 110, data.Accent, data.Text, data.Accent)
+  v24.Position = UDim2.new(1, -124, .5, -15)
+  fn4(v24.MouseButton1Click:Connect(function()
+    fn17(save(true) and "salvo em " .. str3 or "executor sem writefile", data.Green)
+  end))
+  local v25 = fn44(5, "Zerar dinheiro visual", "Remove do HUD todo o dinheiro que veio dos brainrots visuais.")
+  local v26 = fn39(v25, "Zerar", 110, color34, data.Danger, data.Danger)
+  v26.Position = UDim2.new(1, -124, .5, -15)
+  fn4(v26.MouseButton1Click:Connect(function()
+    bus.cmd:Fire("resetMoney")
+  end))
+  local v27 = fn44(6, "Apagar save", "Apaga o config.json (os brainrots atuais continuam até sair do jogo).")
+  local v28 = fn39(v27, "Apagar", 110, color34, data.Danger, data.Danger)
+  v28.Position = UDim2.new(1, -124, .5, -15)
+  fn4(v28.MouseButton1Click:Connect(function()
+    pcall(function()
+      if delfile and (isfile and isfile(str3)) then
+        delfile(str3)
+      end
+    end)
+    config.autoSave = false
+    fn17("save apagado (salvar automático desligado)", data.Danger)
+    fn46()
+  end))
+  local v29 = fn44(7, "Hub aberto ao iniciar", "Ligado: o hub já aparece aberto quando você executa o script. Desligado: começa escondido (abre pela tecla).")
+  fn45(v29, function()
+    return config.openOnStart ~= false
+  end, function(arg1)
+    config.openOnStart = arg1
+    save(true)
+  end)
+  local v30 = fn44(8, "Idioma do hub", "Só os textos do hub. A trade e o resto do jogo o Roblox traduz sozinho.")
+  for key, value in { { "pt", "PT" }, { "en", "EN" }, { "es", "ES" } } do
+    local flag3 = data3.lang == value[1]
+    local v31 = fn39(v30, value[2], 48, flag3 and data.Accent or data.Panel3, data.Text, flag3 and data.Accent or data.Stroke)
+    v31.Position = UDim2.new(1, -14 - (4 - key) * 54, .5, -15)
+    fn4(v31.MouseButton1Click:Connect(function()
+      if data3.lang == value[1] then
+        return
+      end
+      config.lang = value[1]
+      data3.set(value[1])
+      save(true)
+      fn46()
+    end))
+  end
+  v18 = create("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 18),
+    BackgroundTransparency = 1,
+    LayoutOrder = 99,
+    Text = "",
+    Font = Enum.Font.Gotham,
+    TextSize = 11,
+    TextColor3 = data.Sub,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = Parent8
+  })
+end
+fn4(textButton.MouseEnter:Connect(function()
+  if data5.index then
+    fn9(textButton, .15, { Size = UDim2.new(1, -16, 0, 48), Position = UDim2.new(0, 8, 1, -57) })
+  end
+end))
+fn4(textButton.MouseLeave:Connect(function()
+  fn9(textButton, .15, { Size = UDim2.new(1, -20, 0, 46), Position = UDim2.new(0, 10, 1, -56) })
+end))
+local flag3 = false
+fn4(textButton.MouseButton1Click:Connect(function()
+  if not data5.index or not bus.ready or flag3 then
+    return
+  end
+  flag3 = true
+  textButton.Text = "SPAWNANDO..."
+  bus.cmd:Fire("spawn", { index = data5.index, mutation = data5.mutation, traits = data5.traits })
+end))
+local flag4 = true
+local flag5 = false
+local function fn47(arg1)
+  flag4 = arg1
+  frame.Visible = arg1
+  imageButton.Visible = not arg1 and not flag5
+  bus.cmd:Fire("hubVisible", arg1)
+end
+fn4(Parent2.MouseButton1Click:Connect(function()
+  fn47(false)
+end))
+fn4(imageButton.MouseButton1Click:Connect(function()
+  fn47(true)
+end))
+local n8 = 0
+pcall(function()
+  local v19 = clonerefFn(game:GetService("ProximityPromptService"))
+  fn4(v19.PromptShown:Connect(function()
+    n8 += 1
+  end))
+  fn4(v19.PromptHidden:Connect(function()
+    n8 = math.max(0, n8 - 1)
+  end))
+end)
+fn4(UserInputService.InputBegan:Connect(function(arg1, arg2)
+  if arg1.UserInputType ~= Enum.UserInputType.Keyboard then
+    return
+  end
+  if flag2 then
+    flag2 = false
+    if arg1.KeyCode ~= Enum.KeyCode.Escape and arg1.KeyCode ~= Enum.KeyCode.Unknown then
+      config.key = arg1.KeyCode.Name
+    end
+    fn46()
+    save(true)
+    return
+  end
+  if arg2 or UserInputService:GetFocusedTextBox() then
+    return
+  end
+  if arg1.KeyCode.Name == config.key and n8 == 0 then
+    fn47(not flag4)
+  end
+end))
+bus.histTemplates = function(arg1)
+  if not (getconnections and (debug.getupvalues or getupvalues)) then
+    return nil
+  end
+  local v19 = debug.getupvalues or getupvalues
+  local tbl12, tbl13 = {}, {}
+  local function fn48(arg12, arg2)
+    if arg2 > 4 or tbl13[arg12] then
+      return
+    end
+    tbl13[arg12] = true
+    local v20, v21 = pcall(v19, arg12)
+    if not v20 or type(v21) ~= "table" then
+      return
+    end
+    for key, value in v21 do
+      if typeof(value) == "Instance" and (value.Parent == nil and (value.Name == "ClosedTemplate" or value.Name == "OpenedTemplate")) then
+        tbl12[value.Name] = tbl12[value.Name] or value
+      elseif type(value) == "function" and (not iscclosure or not iscclosure(value)) then
+        fn48(value, arg2 + 1)
+      end
+    end
+  end
+  for key, value in getconnections(arg1.Activated) do
+    local function2 = value.Function
+    if type(function2) == "function" then
+      fn48(function2, 0)
+    end
+  end
+  return tbl12.ClosedTemplate, tbl12.OpenedTemplate
+end
+local function fn48()
+  v12 = bus.catalog
+  for key, value in v12.animals do
+    tbl4[value.name] = value
+  end
+  fn34()
+  fn32()
+  fn37()
+  fn33()
+  fn40()
+  fn41()
+  fn42()
+  v17()
+  fn46()
+  fn28()
+  data4[1].sub = ("%d brainrots • %d mutações • %d traits"):format(#v12.animals, #v12.mutations, #v12.traits)
+  fn23(n7)
+  if v6 then
+    bus.cmd:Fire("restore", v6)
+  end
+end
+fn4(bus.evt.Event:Connect(function(arg1, arg2, arg3, arg4)
+  if arg1 == "ready" then
+    local v19, v20 = pcall(fn48)
+    if not v19 then
+      warn("[Brainrot Spawner] GUI: " .. tostring(v20))
+      table.insert(bus.logs, "GUI ERRO: " .. tostring(v20))
+    end
+  elseif arg1 == "preview" then
+    if arg2 == token then
+      pcall(fn27)
+    end
+  elseif arg1 == "fakes" then
+    pcall(fn40)
+    pcall(fn41)
+  elseif arg1 == "sim" or arg1 == "simPlayers" then
+    local v19 = UserInputService:GetFocusedTextBox()
+    if v19 and v19:IsDescendantOf(Parent7) then
+      flag = true
+    else
+      pcall(v17)
+    end
+  elseif arg1 == "hubToggle" then
+    flag5 = true
+    fn47(not flag4)
+  elseif arg1 == "restored" then
+    fn17(("%d brainrots restaurados • offline %s"):format(arg2, arg3 >= 60 and math.floor(arg3 / 60) .. "min" or arg3 .. "s"), data.Green)
+  elseif arg1 == "spawned" and arg4 then
+    save()
+  elseif arg1 == "simfail" then
+    fn17(tostring(arg2), data.Danger)
+  elseif arg1 == "spawned" then
+    flag3 = false
+    textButton.Text = "SPAWNAR"
+    local v19 = data5.index and (tbl4[data5.index] and tbl4[data5.index].display) or "Brainrot"
+    fn17(v19 .. " colocado no slot #" .. tostring(arg3), data.Green)
+    fn38()
+    save()
+  elseif arg1 == "spawnfail" then
+    flag3 = false
+    textButton.Text = "SPAWNAR"
+    fn17("não deu pra spawnar: " .. tostring(arg2), data.Danger)
+  end
+end))
+local n9, n10, n11, n12 = 0, 0, 0, 0
+fn4(RunService.Heartbeat:Connect(function()
+  local v19 = os.clock()
+  if n6 > 0 and v19 > n6 then
+    n6 = 0
+    fn9(textLabel10, .3, { Position = UDim2.new(.5, n3 / 2, 1, 12) })
+  end
+  if v19 - n12 > 1 then
+    n12 = v19
+    textLabel.Text = ((bus.money or 0) >= 0 and "+$" or "-$") .. fn11(math.abs(bus.money or 0), 2)
+    local currentCamera = workspace.CurrentCamera
+    if currentCamera then
+      local viewportSize = currentCamera.ViewportSize
+      uIScale.Scale = math.clamp(math.min(viewportSize.X / (n + 40), viewportSize.Y / (n2 + 40)), .45, 1)
+    end
+    if v18 then
+      v18.Text = "arquivo: workspace/" .. str3 .. (v7 and "  •  último save " .. v7 or "")
+    end
+    if not flag5 then
+      local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui")
+      local v20 = playerGui and playerGui:FindFirstChild("Settings")
+      if v20 and v20:FindFirstChild("Brainrot Spawner", true) then
+        flag5 = true
+        imageButton.Visible = false
+      end
+    end
+  end
+  if v19 - n11 > 5 and bus.state then
+    n11 = v19
+    save()
+  end
+  if writefile and (v19 - n9 > 2 and #bus.logs ~= n10) then
+    n9 = v19
+    n10 = #bus.logs
+    pcall(function()
+      if makefolder and (isfolder and not isfolder(str2)) then
+        makefolder(str2)
+      end
+      writefile(str2 .. "/log.txt", table.concat(bus.logs, "\n"))
+    end)
+  end
+end))
+local flag6 = false
+local function onMouseButton1Click()
+  if flag6 then
+    return
+  end
+  flag6 = true
+  save()
+  pcall(function()
+    bus.cmd:Fire("shutdown")
+  end)
+  for key, value in tbl do
+    pcall(function()
+      value:Disconnect()
+    end)
+  end
+  fn24()
+  pcall(function()
+    screenGui:Destroy()
+  end)
+  env.__BRSpawner = nil
+end
+fn4(Parent.MouseButton1Click:Connect(onMouseButton1Click))
+env.__BRSpawner = { Destroy = onMouseButton1Click, bus = bus, version = version, save = save }
+fn23(1)
+fn28()
+if config.openOnStart == false then
+  fn47(false)
+  bus.hubVisible = false
+end
+task.spawn(v5, v3, v2, bus)
