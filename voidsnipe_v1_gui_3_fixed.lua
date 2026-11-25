@@ -49,7 +49,7 @@ end
 local cfg = {
 	parts        = 1,
 	autoRedeem   = true,
-	submitDelay  = 10, -- secondes d'attente obligatoire avant le click (anti triche / anti rate-limit)
+	submitDelay  = 0.005001839, -- secondes d'attente obligatoire avant le click (anti triche / anti rate-limit)
 	growOnInvalid = true,
 	fastListen   = true,
 	directHook   = false,
