@@ -49,7 +49,7 @@ end
 local cfg = {
 	parts        = 1,
 	autoRedeem   = true,
-	submitDelayMin = 0 -- secondes, 99-100s après une partie
+	submitDelayMin = 0, -- secondes, 99-100s après une partie
 	submitDelayMax = 0.001 -- secondes, borne haute
 	growOnInvalid = true,
 	fastListen   = true,
